@@ -1059,7 +1059,7 @@ let state={view:'tracker', tr:{}, trSub:null, hsOpen:null, svOpen:null, filt:'Al
      picture. Ticking the chip folds them back in everywhere, as before. */
   inclDdoki:true, inclMdsd:false, inclHQ:true, inclInfraSai:true,
   mdsdSort:{key:'assign',dir:-1}, rcSort:{key:'bal',dir:-1}, sectSort:{key:'assign',dir:-1}, svSort:{key:'assign',dir:-1},
-  dsort:{key:'act',dir:-1}, dfilt:{sv:'',rc:'',scat:'',q:''}, dmode:'alloc', cdOpen:null, sfOpen:null, tg:{}};
+  dsort:{key:'act',dir:-1}, dfilt:{sv:'',rc:'',scat:'',q:''}, dmode:'alloc', cdOpen:null, sfOpen:null, tg:{}, _filtView:null};
 
 /* ---- geometry / tooltip ---- */
 function pol(cx,cy,r,a){return [cx+r*Math.cos(a),cy+r*Math.sin(a)];}
@@ -2094,7 +2094,33 @@ function renderTopFilters(){
     <button class="fchip${state.inclInfraSai!==false?' on':''}" onclick="toggleInfraSai()" title="Include or exclude the INFRA-SAI centre - SAI's own infrastructure wing. Unticking withdraws its limit and its actual expenditure from every figure on the platform and removes it from every table, dropdown and tooltip.">Infra-SAI</button>
   `;
 }
-function render(){ applyFilter(); renderNav(); renderTopFilters(); renderSyncPill(); const v=state.view;
+
+/* ---- Per-panel default stream filters --------------------------------------
+   A few panels open with a fixed selection of the four stream chips so their
+   figures read consistently. The preset is applied only when the ACTIVE VIEW
+   CHANGES, so a chip the user toggles while staying on a panel is preserved;
+   it re-asserts the default the next time the panel is opened.
+     • Regional Centres  -> DDO KI only            (DDO HQ + Infra-SAI excluded)
+     • Financial Overview / Component Tracker /
+       SAI KI 1, KI 2 & Infra -> DDO KI + DDO HQ + Infra-SAI  (KI Infra off)
+   Panels not listed here keep the platform's global, persistent filters
+   (the previous behaviour), i.e. they inherit whatever the user last set.
+--------------------------------------------------------------------------- */
+const EXEC_FILTER_PRESET = { inclDdoki:true, inclMdsd:false, inclHQ:true,  inclInfraSai:true  };
+const VIEW_FILTER_PRESETS = {
+  rc:       { inclDdoki:true, inclMdsd:false, inclHQ:false, inclInfraSai:false },
+  command:  EXEC_FILTER_PRESET,
+  tracker:  EXEC_FILTER_PRESET,
+  kigroups: EXEC_FILTER_PRESET,
+};
+function applyViewFilterDefaults(){
+  if(state._filtView === state.view) return;        // same panel -> respect manual toggles
+  const preset = VIEW_FILTER_PRESETS[state.view];
+  if(preset) Object.assign(state, preset);          // listed panel -> apply its default
+  state._filtView = state.view;                      // others -> leave filters untouched
+}
+
+function render(){ applyViewFilterDefaults(); applyFilter(); renderNav(); renderTopFilters(); renderSyncPill(); const v=state.view;
   const html = v==='command'?viewCommand():v==='rc'?viewRC():v==='sv'?viewSV():v==='mdsd'?viewMDSD():v==='kigroups'?viewKI():v==='saifmt'?viewSAIFmt():v==='exceptions'?viewExc():v==='detail'?viewDetail():viewTracker();
   document.getElementById('content').innerHTML=html;
 }
