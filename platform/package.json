@@ -1,0 +1,28 @@
+{
+  "name": "sai-efip",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Executive Financial Intelligence Platform — Sports Authority of India, Khelo India Scheme",
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/web"
+  ],
+  "scripts": {
+    "bootstrap": "npm run build -w @efip/shared && npm run seed -w @efip/server",
+    "dev": "concurrently -n server,web -c blue,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "npm run dev -w @efip/server",
+    "dev:web": "npm run dev -w @efip/web",
+    "build": "npm run build -w @efip/shared && npm run build -w @efip/server && npm run build -w @efip/web",
+    "seed": "npm run seed -w @efip/server",
+    "test": "npm run test -w @efip/server",
+    "typecheck": "npm run typecheck -w @efip/shared && npm run typecheck -w @efip/server && npm run typecheck -w @efip/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}

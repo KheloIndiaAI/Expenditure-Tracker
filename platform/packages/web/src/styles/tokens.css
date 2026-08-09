@@ -1,0 +1,254 @@
+/**
+ * Design tokens — the single source of colour, type, spacing and elevation.
+ * Mirrors `packages/shared/src/tokens.ts`, which is the machine-readable copy
+ * used by charts. Implements PRD `09_Design_System.md` §2–§6.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* 09 §2 foundation (light) */
+  --bg-page: #f9f9f7;
+  --bg-surface: #ffffff;
+  --bg-raised: #fcfcfb;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --border: rgba(11, 11, 11, 0.1);
+  --grid: #e1e0d9;
+
+  /* 09 §2.1 — one accent, used sparingly */
+  --primary: #256abf;
+  --primary-hover: #1c5cab;
+  --primary-subtle: #cde2fb;
+
+  /* 09 §2.2 — semantic status. Never used as a series colour. */
+  --status-good: #0ca30c;
+  --status-warn: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+
+  /* 09 §3 — categorical series palette, assigned in order, never cycled */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+
+  /* 09 §3 — sequential ramp (utilisation intensity, heat maps) */
+  --seq-1: #cde2fb;
+  --seq-2: #a6c9f2;
+  --seq-3: #7aade8;
+  --seq-4: #4f8fdb;
+  --seq-5: #2a78d6;
+  --seq-6: #1c5cab;
+  --seq-7: #134a8c;
+  --seq-8: #0d366b;
+
+  /* 09 §3 — diverging (variance vs plan), neutral grey midpoint */
+  --div-neg: #0d366b;
+  --div-mid: #f0efec;
+  --div-pos: #a32423;
+
+  /* 09 §6 elevation — restrained, depth from soft shadows not borders-everywhere */
+  --elev-0: none;
+  --elev-1: 0 1px 2px rgba(11, 11, 11, 0.06);
+  --elev-2: 0 4px 12px rgba(11, 11, 11, 0.08);
+  --elev-3: 0 12px 32px rgba(11, 11, 11, 0.12);
+
+  /* 09 §5 radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* 09 §4 typography */
+  --font-stack: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* 09 §10 motion — subtle, purposeful */
+  --motion-duration: 160ms;
+  --motion-easing: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/**
+ * 09 §11 — dark mode is a SELECTED theme, validated against the dark surface,
+ * not an automatic inversion.
+ */
+:root[data-theme='dark'] {
+  --bg-page: #141413;
+  --bg-surface: #1a1a19;
+  --bg-raised: #232322;
+  --text-primary: #f5f4ef;
+  --text-secondary: #b8b6ae;
+  --text-muted: #8a887f;
+  --border: rgba(245, 244, 239, 0.12);
+  --grid: #33322e;
+
+  --primary: #4a90e2;
+  --primary-hover: #6ba5ea;
+  --primary-subtle: #1b3354;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --elev-2: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --elev-3: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background: var(--bg-page);
+    color: var(--text-primary);
+    font-family: var(--font-stack);
+    font-size: 15px;
+    line-height: 22px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /**
+   * 09 §4 — tabular figures on every table column, axis tick and vertically
+   * aligned number. Large standalone figures keep proportional figures.
+   */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  /* 09 §10 — visible focus ring, full keyboard operation */
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  ::selection {
+    background: var(--primary-subtle);
+    color: var(--text-primary);
+  }
+
+  /* 09 §10 — honour prefers-reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* 09 §7 — card surface. Depth from --elev-1, hairline for flat surfaces. */
+  .card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--elev-1);
+  }
+
+  .card-flat {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--elev-0);
+  }
+
+  /* Skeleton — never a lone spinner (04 §6, 09 §7). */
+  .skeleton {
+    background: linear-gradient(90deg, var(--grid) 25%, var(--bg-raised) 50%, var(--grid) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+    border-radius: var(--radius-sm);
+  }
+
+  @keyframes skeleton-shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  /* Dense financial table — hairlines only, zebra off (09 §7). */
+  .league-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .league-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-align: left;
+    padding: 10px 12px;
+    white-space: nowrap;
+  }
+
+  .league-table tbody td {
+    border-bottom: 1px solid var(--border);
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .league-table tbody tr:hover {
+    background: var(--bg-raised);
+  }
+
+  .league-table tbody tr[data-selected='true'] {
+    background: var(--primary-subtle);
+  }
+
+  .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Recharts default text should wear text tokens, never the series colour (09 §3). */
+.recharts-cartesian-axis-tick text,
+.recharts-legend-item-text,
+.recharts-label {
+  fill: var(--text-muted) !important;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.recharts-cartesian-grid line {
+  stroke: var(--grid);
+}
+
+.recharts-surface {
+  overflow: visible;
+}
