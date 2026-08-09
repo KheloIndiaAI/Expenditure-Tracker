@@ -621,6 +621,88 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 @media(max-width:420px){
   .kpi-grid,.kpi-grid.k3{grid-template-columns:1fr}
 }
+
+/* ============================================================
+   MOBILE HARDENING LAYER  (appended — phones & small tablets only)
+   Every rule below lives inside a media query, so the desktop
+   experience is byte-for-byte unchanged. Ordered widest → narrowest.
+   ============================================================ */
+
+/* ---- Tablet / large phone (<=980px): the sidebar-drawer breakpoint ---- */
+@media(max-width:980px){
+  /* Stop wide children (tables, charts) from creating a page-wide
+     horizontal scroll. `clip` (not `hidden`) so it doesn't turn body
+     into a scroll container and break the sticky topbar. */
+  html,body{overflow-x:clip}
+  .app,.main,.content{min-width:0;max-width:100%}
+
+  /* Charts stack vertically and become fluid instead of fixed-width */
+  .chartwrap{flex-direction:column;align-items:stretch;gap:12px}
+  .chartwrap .cc{flex:1 1 auto;width:100%;max-width:360px;margin:0 auto}
+  .chart-svg{width:100%;height:auto;max-width:100%}
+
+  /* Wide "document format" summary tables scroll within their own panel
+     rather than pushing the whole page sideways */
+  .saif-inner,.saif-page{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+  /* Roomier tap target for every drawer nav item */
+  .navitem{padding:11px 12px;font-size:15px}
+
+  /* Momentum scrolling + slim scrollbars on all horizontal table wrappers */
+  .tscroll{scrollbar-width:thin}
+  .tscroll::-webkit-scrollbar{height:6px}
+  .tscroll::-webkit-scrollbar-thumb{background:rgba(16,24,40,.22);border-radius:3px}
+}
+
+/* ---- Phone (<=640px) ---- */
+@media(max-width:640px){
+  /* Search drops onto its own full-width row beneath the hamburger + filters */
+  .topbar .search{order:9;flex:1 1 100%;max-width:none;min-width:0}
+
+  /* Thumb-friendly controls (WCAG ~44px target where practical) */
+  .btn,.fchip,.chip-sel{min-height:40px;display:inline-flex;align-items:center}
+  .toggle button{padding:8px 14px;font-size:13px}
+  .card-hd .link{padding:4px 0;display:inline-block}
+  .hamburger{width:42px;height:42px}
+  .navitem{padding:12px}
+
+  /* Keep table cells legible while horizontally scrolling */
+  table.dt th,table.dt td{padding:9px 10px}
+
+  /* Hover tooltips are pointer-only; hide on touch so they can't stick */
+  #tip{display:none!important}
+
+  /* Action tools wrap to a full row instead of crushing against the edge */
+  .tools{margin-left:0;width:100%;justify-content:flex-start;flex-wrap:wrap}
+  .filterbar{gap:8px}
+}
+
+/* ---- Small phones (<=380px) ---- */
+@media(max-width:380px){
+  .content{padding:12px 10px 40px}
+  .kpi{padding:12px 11px 10px}
+  .kpi .val{font-size:20px}
+  .kpi .val.sm{font-size:17px}
+  .pagehead h1{font-size:18px}
+  .pagehead .sub{font-size:12.5px}
+  .brand .bt{font-size:13px}
+  .brand .bs{font-size:10px}
+  .card{padding:12px 11px}
+  table.dt{font-size:12.5px}
+  .fchip{padding:6px 9px;font-size:11px}
+}
+
+/* ---- Landscape phones: keep the drawer pattern, reclaim vertical space ---- */
+@media(max-width:980px) and (orientation:landscape) and (max-height:520px){
+  .topbar{padding-top:7px;padding-bottom:7px}
+  .content{padding-top:12px}
+  .kpi-grid,.kpi-grid.k3{grid-template-columns:repeat(3,1fr)}
+}
+
+/* ---- Honour reduced-motion preferences (accessibility) ---- */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+}
 </style>
 </head>
 <body>
