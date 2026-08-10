@@ -7,16 +7,9 @@ import { useState } from 'react';
 import * as Icons from 'lucide-react';
 import { useAuth } from '../lib/auth.tsx';
 
-const DEMO_ACCOUNTS = [
-  { email: 'js@sai.gov.in', label: 'Joint Secretary', note: 'exec view + exceptions' },
-  { email: 'finance@sai.gov.in', label: 'Finance Officer', note: 'maker — upload + validate' },
-  { email: 'checker@sai.gov.in', label: 'Senior Finance', note: 'checker — approve, publish, rollback' },
-  { email: 'auditor@sai.gov.in', label: 'Auditor', note: 'full audit trail' },
-];
-
 export function Login() {
   const { login } = useAuth();
-  const [email, setEmail] = useState('js@sai.gov.in');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -126,32 +119,10 @@ export function Login() {
             </button>
           </form>
 
-          <div className="mt-6 border-t border-hairline pt-4">
-            <div className="mb-2 text-caption font-medium uppercase tracking-wide text-ink-muted">
-              Demonstration accounts
-            </div>
-            <ul className="space-y-1">
-              {DEMO_ACCOUNTS.map((a) => (
-                <li key={a.email}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail(a.email);
-                      setPassword('khelo2026');
-                    }}
-                    className="flex w-full items-baseline gap-2 rounded-sm px-2 py-1 text-left hover:bg-raised"
-                  >
-                    <span className="text-label font-medium text-ink">{a.label}</span>
-                    <span className="truncate text-caption text-ink-muted">{a.note}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-caption text-ink-muted">
-              Seeded development credentials — password <code className="text-ink-secondary">khelo2026</code>. Replace
-              before any production deployment.
-            </p>
-          </div>
+          <p className="mt-6 border-t border-hairline pt-4 text-caption text-ink-muted">
+            Access is restricted to authorised SAI finance users. Contact the platform
+            administrator if you need an account.
+          </p>
         </div>
       </div>
     </div>

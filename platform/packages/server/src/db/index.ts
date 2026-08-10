@@ -27,7 +27,9 @@ export function getDb(): DatabaseSync {
   const path = dbPath();
   mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
-  db.exec(readFileSync(resolve(__dirname, 'schema.sql'), 'utf8'));
+  // Auth-only store: financial data is read live from the Google Sheet by the
+  // dashboard, so only the custom-login identity table is created here.
+  db.exec(readFileSync(resolve(__dirname, 'auth-schema.sql'), 'utf8'));
   _db = db;
   return db;
 }
