@@ -2306,7 +2306,7 @@ const SYNC={
   txTabs:['DDO HQ','PATIALA','BANGALORE','BHOPAL','CHANDIGARH','GANDHINAGAR','KOLKATA',
           'GUWAHATI','IMPHAL','LUCKNOW','MUMBAI','SONEPAT','TRIVANDRUM'],
   intervalMs:10*60*1000,
-  status:'idle', last:null, lastTry:null, err:null, timer:null, applied:0, newPoints:[]
+  status:'idle', last:null, lastTry:null, err:null, timer:null, applied:0, updates:0, newPoints:[]
 };
 /* Transport. A page opened from the filesystem cannot fetch() a remote URL - Chrome blocks
    it outright, whatever CORS headers the server sends - so the sheet is pulled with a
@@ -2438,7 +2438,10 @@ function syncApply(b){
   var _prev={}; (DATA.txns||[]).forEach(function(t){ _prev[t.rc+'|'+t.voucher+'|'+t.net]=1; });
   var _fresh=(b.txns||[]).filter(function(t){ return !_prev[t.rc+'|'+t.voucher+'|'+t.net]; })
     .sort(function(x,y){ return (y.date||'').localeCompare(x.date||''); });   // newest first
-  if(_fresh.length) SYNC.newPoints=_fresh.map(function(t){ return {name:pointName(t), amt:t.net}; });
+  /* First successful sync = baseline (SYNC.applied is still 0 here, bumped at the end).
+     Differences against the build-time seed are not "updates"; only later syncs that bring
+     genuine changes count, so a plain refresh with no new data never inflates the number. */
+  if(SYNC.applied>0 && _fresh.length){ SYNC.newPoints=_fresh.map(function(t){ return {name:pointName(t), amt:t.net}; }); SYNC.updates++; }
   DATA.asOf=b.asOf; AS_OF=b.asOf;
   DATA.subverticals=b.subverticals;
   DATA.sectionTotals=b.sectionTotals; DATA.grand=b.grand;
@@ -2509,8 +2512,7 @@ function renderSyncPill(){
           + '<br>Latest new data:<br>'+latest
           + '<br>Last successful sync: '+(SYNC.last?SYNC.last.toLocaleString():'not yet')
           + '<br>Source: SAI Expenditure SYNC (Google Sheet)'
-          + '<br>Updates this session: '+SYNC.applied
-          + '<br>Position date: <b>'+esc(AS_OF)+'</b>'
+          + (SYNC.updates>0 ? '<br>Updates this session: '+SYNC.updates : '')
           + '<br><span style="opacity:.7">Click to sync now.</span>';
       })();
   el.innerHTML='<span class="syncp"'+tattr(tip)+' onclick="syncNow(true)"><span class="dot '+cls+'"></span>'+txt+'<span class="rf">↻</span></span>';
