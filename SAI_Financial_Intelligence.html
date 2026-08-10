@@ -2297,7 +2297,7 @@ const SYNC={
   txTabs:['DDO HQ','PATIALA','BANGALORE','BHOPAL','CHANDIGARH','GANDHINAGAR','KOLKATA',
           'GUWAHATI','IMPHAL','LUCKNOW','MUMBAI','SONEPAT','TRIVANDRUM'],
   intervalMs:10*60*1000,
-  status:'idle', last:null, lastTry:null, err:null, timer:null, applied:0
+  status:'idle', last:null, lastTry:null, err:null, timer:null, applied:0, newPoints:[]
 };
 /* Transport. A page opened from the filesystem cannot fetch() a remote URL - Chrome blocks
    it outright, whatever CORS headers the server sends - so the sheet is pulled with a
@@ -2421,6 +2421,15 @@ function syncValidate(b){
   return {ok:e.length===0,errors:e.slice(0,6)};
 }
 function syncApply(b){
+  /* Detect genuinely NEW releases (data points) before the live set is overwritten.
+     Keyed exactly as syncBuild preserves labels: centre|voucher|amount. An amount
+     change surfaces as a new point (old key drops, new key appears) - which is the
+     "what changed" behaviour we want. Only replace SYNC.newPoints when this sync
+     actually brought something new, so the tooltip keeps showing the latest arrivals. */
+  var _prev={}; (DATA.txns||[]).forEach(function(t){ _prev[t.rc+'|'+t.voucher+'|'+t.net]=1; });
+  var _fresh=(b.txns||[]).filter(function(t){ return !_prev[t.rc+'|'+t.voucher+'|'+t.net]; })
+    .sort(function(x,y){ return (y.date||'').localeCompare(x.date||''); });   // newest first
+  if(_fresh.length) SYNC.newPoints=_fresh.map(function(t){ return {name:pointName(t), amt:t.net}; });
   DATA.asOf=b.asOf; AS_OF=b.asOf;
   DATA.subverticals=b.subverticals;
   DATA.sectionTotals=b.sectionTotals; DATA.grand=b.grand;
@@ -2458,6 +2467,13 @@ function syncAgo(d){
   if(s<3600) return Math.floor(s/60)+' min ago';
   return Math.floor(s/3600)+' hr ago';
 }
+/* A short, human label for a release, used in the Live-sync tooltip. Prefers the
+   grantee, then the narration, then the component / centre. */
+function pointName(t){
+  var s=(t.grantee||t.nar||t.sv||t.rc||'Release');
+  s=(''+s).replace(/\s+/g,' ').trim();
+  return s.length>36 ? s.slice(0,34)+'…' : s;
+}
 function renderSyncPill(){
   const el=document.getElementById('syncPill'); if(!el) return;
   const st=SYNC.status;
@@ -2470,10 +2486,24 @@ function renderSyncPill(){
     ? '<b>Live sync could not update</b><br><span style="color:var(--critical)">'+esc(SYNC.err||'unknown error')+'</span>'+
       '<br><br>The platform is showing the last figures that passed validation (as on '+AS_OF+
       '). It will retry automatically every 10 minutes.<br><span style="opacity:.75">If this persists, the sheet may be unreachable from a file:// page - see the sync note in the folder.</span>'
-    : '<b>Live sync</b><br>Source: SAI Expenditure SYNC (Google Sheet)<br>Position date: <b>'+AS_OF+'</b>'+
-      '<br>Last successful sync: '+(SYNC.last?SYNC.last.toLocaleString():'not yet')+
-      '<br>Refreshes every 10 minutes · '+SYNC.applied+' update'+(SYNC.applied===1?'':'s')+' applied this session'+
-      '<br><span style="opacity:.75">Every refresh is validated before it is shown; bad data is rejected, not displayed. Click to sync now.</span>';
+    : (function(){
+        /* Live-sync tooltip - shows exactly five things, in order:
+           1) latest new data points (name + short amount)
+           2) last successful sync   3) source
+           4) updates made this session   5) latest position date */
+        var np=SYNC.newPoints||[];
+        var latest = np.length
+          ? np.slice(0,3).map(function(p){ return esc(p.name)+' &middot; <b>'+esc(crShort(p.amt))+'</b>'; }).join('<br>')
+            + (np.length>3 ? '<br><span style="opacity:.7">+'+(np.length-3)+' more</span>' : '')
+          : '<span style="opacity:.7">None yet this session</span>';
+        return '<b>Live sync</b>'
+          + '<br>Latest new data:<br>'+latest
+          + '<br>Last successful sync: '+(SYNC.last?SYNC.last.toLocaleString():'not yet')
+          + '<br>Source: SAI Expenditure SYNC (Google Sheet)'
+          + '<br>Updates this session: '+SYNC.applied
+          + '<br>Position date: <b>'+esc(AS_OF)+'</b>'
+          + '<br><span style="opacity:.7">Click to sync now.</span>';
+      })();
   el.innerHTML='<span class="syncp"'+tattr(tip)+' onclick="syncNow(true)"><span class="dot '+cls+'"></span>'+txt+'<span class="rf">↻</span></span>';
 }
 function syncStart(){
