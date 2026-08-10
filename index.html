@@ -1848,7 +1848,7 @@ function ageRow(t){
 function viewExc(){
   const by=ageingByCentre(), rows=ageingReleases();
   const tot=sum(rows,r=>r.bal);
-  const head=pageHead('Attention Centre','Releases of more than '+crShort(AGE_MIN)+' still unspent '+AGE_DAYS+'+ days after issue (as on '+AS_OF+')');
+  const head=pageHead('Attention Centre','Releases of more than '+crShort(AGE_MIN)+' still unspent '+AGE_DAYS+'+ days after issue (as on '+syncedAsOf()+')');
   const rule=`<div class="reco"${tattr(`<b>The rule</b><br>A release is flagged when BOTH hold:<br>1. more than ${crShort(AGE_MIN)} of it remains unspent, and<br>2. it was issued on or before ${fmtD(ageCutoffISO())} - i.e. ${AGE_DAYS}+ days before the data position date.<br><span style="opacity:.75">Money released in the last ${AGE_DAYS} days is excluded however large the balance: the centre has not yet had time to spend it.</span>`)}>
       <span class="rl">Flagging rule</span>
       <span>Unspent <span class="rv">&gt; ${crShort(AGE_MIN)}</span></span><span class="op">and</span>
@@ -1936,7 +1936,7 @@ function viewDetail(){
       <div class="tscroll"><table class="dt"><thead><tr>${th('sv','Component')}${th('section','Section')}${th('rc','Centre')}${th('scat','Sub-category')}${th('sanction','Sanction · Date')}${th('net','Released','num')}${th('util','Utilised','num')}${th('bal','Balance','num')}</tr></thead><tbody>${body}</tbody></table></div>`
       :`<div style="margin:2px 2px 10px" class="small muted">0 of ${RMETA.count} releases</div>${dtEmpty(anyFilt)}`;
   } else {
-    sub='Every sub-vertical × centre allocation - limit assigned vs actual, as on '+AS_OF;
+    sub='Every sub-vertical × centre allocation - limit assigned vs actual, as on '+syncedAsOf();
     let rows=detailFilteredAlloc();
     const s=state.dsort; rows=rows.slice().sort((a,b)=>{let av=a[s.key],bv=b[s.key]; av=av==null?-1:av; bv=bv==null?-1:bv; if(typeof av==='string')return String(av).localeCompare(String(bv))*s.dir; return (av-bv)*s.dir;});
     const tl=sum(rows.filter(r=>r.lim!=null),r=>r.lim), ta=sum(rows,r=>r.act);
