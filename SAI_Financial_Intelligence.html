@@ -2103,15 +2103,18 @@ function renderTopFilters(){
      • Regional Centres  -> DDO KI only            (DDO HQ + Infra-SAI excluded)
      • Financial Overview / Component Tracker /
        SAI KI 1, KI 2 & Infra -> DDO KI + DDO HQ + Infra-SAI  (KI Infra off)
+     • SAI Format Summary -> all four streams ON   (full statutory picture)
    Panels not listed here keep the platform's global, persistent filters
    (the previous behaviour), i.e. they inherit whatever the user last set.
 --------------------------------------------------------------------------- */
 const EXEC_FILTER_PRESET = { inclDdoki:true, inclMdsd:false, inclHQ:true,  inclInfraSai:true  };
+const ALL_FILTER_PRESET  = { inclDdoki:true, inclMdsd:true,  inclHQ:true,  inclInfraSai:true  };
 const VIEW_FILTER_PRESETS = {
   rc:       { inclDdoki:true, inclMdsd:false, inclHQ:false, inclInfraSai:false },
   command:  EXEC_FILTER_PRESET,
   tracker:  EXEC_FILTER_PRESET,
   kigroups: EXEC_FILTER_PRESET,
+  saifmt:   ALL_FILTER_PRESET,
 };
 function applyViewFilterDefaults(){
   if(state._filtView === state.view) return;        // same panel -> respect manual toggles
