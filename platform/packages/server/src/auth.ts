@@ -36,6 +36,17 @@ export function verifyPassword(pw: string, stored: string): boolean {
   return key.length === test.length && timingSafeEqual(key, test);
 }
 
+/**
+ * Constant-work stand-in used when the email is unknown. Running a real scrypt
+ * makes an "unknown user" response take the same time as a "wrong password" one,
+ * so login timing cannot be used to enumerate valid accounts. Result discarded.
+ */
+export function dummyVerify(pw: string): void {
+  scryptSync(pw, DUMMY_SALT, KEYLEN);
+}
+
+const DUMMY_SALT = randomBytes(16);
+
 export interface TokenClaims {
   sub: string;
   email: string;

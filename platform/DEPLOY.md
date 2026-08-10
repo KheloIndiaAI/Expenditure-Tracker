@@ -120,3 +120,20 @@ cd /opt/efip/platform && npm run sync:dashboard && sudo systemctl restart efip
 - **Auth‑only DB.** `packages/server/src/db/auth-schema.sql` defines a single `app_user` table. The richer star schema (`schema.sql`) is retained for a future full‑data build but is not loaded.
 - **Cookie security.** In `NODE_ENV=production` the session cookie is `Secure` + `httpOnly` + `SameSite=Lax`. Terminate TLS (step 6) so the cookie is sent.
 - **Dev mode.** `npm run dev` runs the login SPA on Vite (:5173, proxying `/api` to :4000) for UI iteration. The integrated login→dashboard flow is best exercised against the built server (`npm run build:deploy && npm start`).
+
+## Security hardening
+
+The server ships with the following controls (see `packages/server/src/main.ts`):
+
+- **Security headers (`@fastify/helmet`).** Every response carries a Content‑Security‑Policy, `X‑Frame‑Options`, `X‑Content‑Type‑Options: nosniff`, `Referrer‑Policy: no‑referrer` and (in production) HSTS. The CSP is deliberately scoped to what the two served documents need — the login SPA's same‑origin assets, and the dashboard's inline scripts/styles, Google Fonts (`fonts.googleapis.com` / `fonts.gstatic.com`) and its live Google Sheets read (`docs.google.com`). **If the dashboard later loads a resource from a new host, add that host to the matching CSP directive in `main.ts` or the browser will block it.** `frame-ancestors 'none'` protects the gated dashboard from clickjacking.
+- **Login rate limiting (`@fastify/rate-limit`).** `POST /api/auth/login` is capped at 8 attempts/minute per client IP (returns `429` beyond that) as brute‑force / credential‑stuffing protection. Other routes are not globally limited.
+- **`trustProxy` is enabled.** Behind the nginx reverse proxy (step 6), the rate limiter and audit log key on the real client IP from `X‑Forwarded‑For`. Make sure nginx sets that header (the sample config in step 6 does). Do **not** expose the Node port (4000) directly to the internet, or clients could spoof `X‑Forwarded‑For`.
+- **Audit logging.** Login success, login failure and logout are logged (actor id/role where known, plus client IP) via the Fastify logger — visible in `journalctl -u efip`. Ship these logs somewhere durable if you need a long‑term audit trail.
+- **Account enumeration & health.** Login timing is equalised between unknown‑email and wrong‑password paths, and `GET /api/health` returns only `{ ok: true }` (no user count or internal detail).
+- **HTML cached at boot.** The login and dashboard HTML are read into memory at startup, so a redeploy or `sync:dashboard` requires a service restart (`sudo systemctl restart efip`) — already the documented step for refreshing the dashboard.
+
+### Dependency vulnerabilities
+
+- `npm audit` is clean of **high**‑severity issues in the served stack. Re‑run it after any dependency change: `cd platform && npm audit`.
+- Two **moderate** advisories remain in `react-router` (pulled in only by the *parked* dashboard‑SPA scaffolding — `AppShell`, `CommandPalette`, `useFilters` — which is **not** part of the login build or the deployed bundle). Resolving them requires a breaking upgrade to React Router v7 and should be done as part of building the full dashboard SPA, not before.
+- `xlsx`/SheetJS was removed from dependencies (unpatched prototype‑pollution/ReDoS advisories, and not imported anywhere). When the ingestion pipeline is built, add a patched SheetJS build from the vendor's official distribution rather than the npm registry copy.
