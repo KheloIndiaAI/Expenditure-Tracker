@@ -1540,7 +1540,7 @@ function viewSAIFmt(){
   const HD=['','RECURRING','NON- RECURRING','INFRA (SAI)','INFRA MDSD',''];
   let body='';
   body+=`<tr class="doc-t"><td colspan="5">Sports Authority Of India</td><td class="meta">${esc(synced)}</td></tr>`;
-  body+=`<tr class="doc-t"><td colspan="5">${esc(SCHEME)} (Finance) ${esc(FY)} Expenditure Incurred as on ${esc(AS_OF)}</td><td class="meta">(Rs. in Crore)</td></tr>`;
+  body+=`<tr class="doc-t"><td colspan="5">${esc(SCHEME)} (Finance) ${esc(FY)} Expenditure Incurred as on ${esc(synced)}</td><td class="meta">(Rs. in Crore)</td></tr>`;
   body+=`<tr class="colhd">${HD.map((h,i)=>`<td${i===0?'':' class="num"'}>${h}</td>`).join('')}</tr>`;
   body+=`<tr class="grant"><td>(A) MDSD Grant Received</td>${nc(0)}${nc(0)}${nc(0)}${nc(G0.A)}<td class="num"><b>${n2(G0.A)}</b></td></tr>`;
   body+=`<tr class="grant"><td>(B) SAI Grant Received</td>${nc(G0.B.rec)}${nc(G0.B.nrec)}${nc(G0.B.isai)}${nc(0)}<td class="num"><b>${n2(G0.B.tot)}</b></td></tr>`;
@@ -1560,7 +1560,7 @@ function viewSAIFmt(){
   body+=`<tr class="blank"><td colspan="6"></td></tr>`;
   body+=`<tr class="bal"><td>Balance Grant :- (A + B - C)</td>${nc(B.rec)}${nc(B.nrec)}${nc(B.isai)}${nc(B.mdsd)}<td class="num">${n2(B.tot)}</td></tr>`;
 
-  return pageHead('SAI Format Summary','Finance-wing summary format, filled from live platform data (as on '+AS_OF+')')
+  return pageHead('SAI Format Summary','Finance-wing summary format, filled from live platform data (as on '+synced+')')
    + kpis
    + (tie?'':`<div class="kig-warn"><b>⚠ Reconciliation error:</b> this sheet totals ${cr(C.tot)} expenditure against the platform's ${cr(G.exp)}.</div>`)
    + `<div class="saif-page">
