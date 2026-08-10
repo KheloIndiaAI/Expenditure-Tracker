@@ -924,6 +924,13 @@ function grpIN(v){ v=Math.round(v); const neg=v<0; let s=String(Math.abs(v)); if
 function cr(v){ return '₹'+(v/1e7).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})+' Cr'; }
 function crShort(v){ if(v==null) return '-'; const sg=v<0?'-':''; v=Math.abs(v); if(v>=1e7) return sg+'₹'+(v/1e7).toFixed(2)+' Cr'; if(v>=1e5) return sg+'₹'+(v/1e5).toFixed(2)+' L'; return sg+'₹'+grpIN(v); }
 function pct(v,d){ d=d||0; return (v*100).toFixed(d)+'%'; }
+/* Panel subtitle / "as on" date: the date the figures were last pulled from the
+   Google Sheet, formatted DD.MM.YYYY. Falls back to the source position date
+   (AS_OF) until the first successful sync completes, so a subtitle is never blank
+   or wrong. SYNC is defined later in the file; this is only ever called at render
+   time, by which point it exists (the typeof guard covers any earlier call). */
+function fmtDMY(d){ return String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+d.getFullYear(); }
+function syncedAsOf(){ return (typeof SYNC!=='undefined' && SYNC.last) ? fmtDMY(SYNC.last) : AS_OF; }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function jstr(v){ return esc(JSON.stringify(v)); }
 function sum(a,f){ let s=0; for(const x of a) s+=f(x); return s; }
@@ -1262,7 +1269,7 @@ function viewTracker(){
     });
   });
   rows+=`<tr class="total"><td>GRAND TOTAL</td><td class="num tnum">${(G.assign/1e7).toFixed(2)}</td><td class="num tnum" style="color:var(--good)">${(G.exp/1e7).toFixed(2)}</td><td class="num tnum" style="color:var(--serious)">${(G.bal/1e7).toFixed(2)}</td><td class="num tnum">${pct(G.assign?G.exp/G.assign:0,0)}</td><td></td></tr>`;
-  return pageHead('Component Expenditure Tracker','Khelo India Scheme · '+FY+' - assignment vs expenditure, as on '+AS_OF)
+  return pageHead('Component Expenditure Tracker','Khelo India Scheme · '+FY+' - assignment vs expenditure, as on '+syncedAsOf())
     + kpiScheme()
     + `<div class="card"><div class="card-hd"><h3>Expenditure by scheme component</h3><span class="small muted">figures in ₹ Cr</span></div>
        <div class="tscroll"><table class="dt tree"><thead><tr><th>Scheme component / sub-vertical</th><th class="num">Assignment</th><th class="num">Expenditure</th><th class="num">Balance</th><th class="num">Used</th><th>Health</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
@@ -1525,8 +1532,7 @@ function viewSAIFmt(){
      copy must read the same whoever prints it and whenever. The top-right cell shows when the
      figures were last pulled from the Google Sheet (falling back to the position date if a
      sync has not completed yet). */
-  const dd=d=>String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+d.getFullYear();
-  const synced=(typeof SYNC!=='undefined'&&SYNC.last)?dd(SYNC.last):AS_OF;
+  const synced=syncedAsOf();
   /* guard: (C) must equal the platform's own expenditure total on the same basis */
   const tie=Math.abs(C.tot-G.exp)<1 && Math.abs(G0.T.tot-G.assign)<1;
 
@@ -1707,7 +1713,7 @@ function viewKI(){
       <td class="barcell">${g.assign?utilBar(g.up,'Used','Bal'):'<span class="muted">–</span>'}</td>
       <td style="text-align:left">${healthBadge(healthForNode({assign:g.assign,exp:g.exp,bal:g.bal,idle:g.idle}))}</td></tr>`).join('')}</tbody>
     <tfoot><tr><td>Scheme total <span class="muted" style="font-weight:500;font-size:12px">(ex-KI Infra)</span></td><td class="tnum">${crShort(T.assign)}</td><td class="tnum">${crShort(T.exp)}</td><td class="tnum${Math.round(T.bal)===0?'':(T.bal<0?' bal-over':' bal-red')}">${crShort(T.bal)}</td><td class="tnum">${crShort(Math.max(0,T.idle))}</td><td class="barcell">${utilBar(T.up,'Used','Bal')}</td><td></td></tr></tfoot></table>`;
-  return pageHead('SAI KI 1, KI 2 &amp; Infra','How the scheme splits across its three delivery blocks (as on '+AS_OF+')')
+  return pageHead('SAI KI 1, KI 2 &amp; Infra','How the scheme splits across its three delivery blocks (as on '+syncedAsOf()+')')
    + warn
    + `<div class="reco"${tattr(`<b>Partition check</b><br>The three blocks are a complete, non-overlapping split of every component except the KI Infra States/UTs grants.<br>${cr(groups[0].assign)} + ${cr(groups[1].assign)} + ${cr(groups[2].assign)} = <b>${cr(T.assign)}</b><br><span style="opacity:.75">Equals Total Assignment on Financial Overview exactly.</span>`)}>
       <span class="rl">Partition check</span>
@@ -1724,7 +1730,7 @@ function viewKI(){
 }
 function viewRC(){
   const items=utilSorted(centreAgg().map(c=>({name:c.key,assign:c.lim,exp:c.act,bal:c.idle,up:c.up})),state.rcSort);
-  return pageHead('Regional Centre Dashboard','How is each centre using its assigned limit? (as on '+AS_OF+')')
+  return pageHead('Regional Centre Dashboard','How is each centre using its assigned limit? (as on '+syncedAsOf()+')')
    + rcKpis()
    + rcReco()
    /* HQ-direct note. The limit/actual/idle totals that used to sit here now have their own
@@ -1800,7 +1806,7 @@ function viewSV(){
       <td>${secPill(s.section)}</td></tr>`
       +(open?`<tr class="rc-det"><td colspan="6">${centreDetail(s)}</td></tr>`:'');
   }).join('');
-  return pageHead('Sub-Vertical Analysis','What exactly is the money assigned to and spent on? (as on '+AS_OF+')')
+  return pageHead('Sub-Vertical Analysis','What exactly is the money assigned to and spent on? (as on '+syncedAsOf()+')')
    + `<div class="card" style="padding:8px 10px 12px">
       <div class="tscroll"><table class="dt sctable"><thead><tr>${th('name','Sub-Vertical')}${th('assign','Assignment',true)}${th('up','Utilisation',true)}${th('exp','Used',true)}${th('bal','Balance',true)}<th>Section</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
