@@ -12,7 +12,7 @@
   --bg-page:#f4f6fa; --bg-surface:#ffffff; --bg-raised:#ffffff;
   --bg-app:#eef2f8;
   --text-primary:#141a24; --text-secondary:#4d5666; --text-muted:#88909f;
-  --border:#e3e8f0; --border-1subtle:#eef1f6; --grid:#e8ecf3;
+  --border:#e3e8f0; --border-subtle:#eef1f6; --grid:#e8ecf3;
   --primary:#256abf; --primary-hover:#1d5aa6; --primary-subtle:#e9f0fb;
   --good:#1b9e63; --warn:#c98a00; --serious:#d4622a; --critical:#c62d2d;
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
@@ -2320,7 +2320,8 @@ const SYNC={
   txTabs:['DDO HQ','PATIALA','BANGALORE','BHOPAL','CHANDIGARH','GANDHINAGAR','KOLKATA',
           'GUWAHATI','IMPHAL','LUCKNOW','MUMBAI','SONEPAT','TRIVANDRUM'],
   intervalMs:10*60*1000,
-  status:'idle', last:null, lastTry:null, err:null, timer:null, applied:0, updates:0, newPoints:[]
+  status:'idle', last:null, lastTry:null, err:null, timer:null, applied:0, updates:0, newPoints:[],
+  lastTxn:null, notes:[]
 };
 /* Transport. A page opened from the filesystem cannot fetch() a remote URL - Chrome blocks
    it outright, whatever CORS headers the server sends - so the sheet is pulled with a
@@ -2468,6 +2469,8 @@ function syncApply(b){
   Object.keys(b.releasesMeta).forEach(function(k){ RMETA[k]=b.releasesMeta[k]; });
   DATA.releasesMeta=b.releasesMeta;
   SYNC.applied++;
+  // Recompute the derived facts against the data that was just applied.
+  refreshSyncFacts();
 }
 function syncNow(manual){
   if(SYNC.status==='syncing') return;
@@ -2500,6 +2503,91 @@ function pointName(t){
   s=(''+s).replace(/\s+/g,' ').trim();
   return s.length>36 ? s.slice(0,34)+'…' : s;
 }
+
+/* ---- Last update: the most recent release actually present in the data -------
+   Taken from the applied dataset (not the filtered view), so the tooltip always
+   reports what the sheet holds rather than what the current chips happen to show.
+   Newest by date; voucher breaks ties so the pick is deterministic. */
+function latestTxn(){
+  var rows=(DATA.txns||[]);
+  var best=null;
+  for(var i=0;i<rows.length;i++){
+    var t=rows[i]; if(!t) continue;
+    if(!best) { best=t; continue; }
+    var c=String(t.date||'').localeCompare(String(best.date||''));
+    if(c>0 || (c===0 && String(t.voucher||'')>String(best.voucher||''))) best=t;
+  }
+  return best;
+}
+/** Compact "basic details" line for a release. */
+function txnBrief(t){
+  if(!t) return null;
+  return {
+    when: t.date ? fmtD(t.date) : '—',
+    rc: t.rc||'—',
+    voucher: t.voucher||'—',
+    sv: (t.sv||t.scat||'—'),
+    net: t.net, util: t.util
+  };
+}
+
+/* ---- Data-integrity audit (non-blocking) ------------------------------------
+   syncValidate() is the hard gate: it rejects a sheet whose columns do not sum,
+   so bad data is never displayed. This audit is the SOFT pass that runs on data
+   which already passed that gate - it catches figures that add up arithmetically
+   but contradict the scheme's own logic (money spent beyond what was assigned,
+   a centre drawing more than was released to it, a release utilised beyond its
+   own amount). Those are real source-sheet problems worth showing, not reasons
+   to refuse the update, so they surface as a NOTE and never block a sync.
+   Tolerance of ₹1 throughout, matching syncValidate, so rounding never trips it. */
+function auditData(){
+  var out=[], TOL=1;
+  var subs=(DATA.subverticals||[]), rows=(DATA.txns||[]), g=(DATA.grand||{});
+
+  var over=subs.filter(function(s){ return (s.exp-s.assign)>TOL; });
+  over.forEach(function(s){
+    out.push('Expenditure exceeds assignment for “'+s.name+'” - '+crShort(s.exp)+' spent against '+
+             crShort(s.assign)+' assigned (over by '+crShort(s.exp-s.assign)+').');
+  });
+
+  var drawn=subs.filter(function(s){ return (s.totAct-s.totLim)>TOL; });
+  drawn.forEach(function(s){
+    out.push('Centre expenditure exceeds the limit released for “'+s.name+'” - '+
+             crShort(s.totAct)+' drawn against '+crShort(s.totLim)+' released.');
+  });
+
+  var idn=subs.filter(function(s){ return Math.abs(s.exp-(s.ddoki+s.totAct))>TOL; });
+  if(idn.length) out.push(idn.length+' component'+(idn.length===1?'':'s')+
+             ' where expenditure does not equal HQ-direct + centre actual.');
+
+  var noAssign=subs.filter(function(s){ return s.exp>TOL && s.assign<=TOL; });
+  if(noAssign.length) out.push(noAssign.length+' component'+(noAssign.length===1?'':'s')+
+             ' carrying expenditure with no assignment recorded.');
+
+  var badRow=0, overRow=0, negRow=0;
+  rows.forEach(function(t){
+    if((t.util-t.net)>TOL) overRow++;
+    if(Math.abs((t.bal)-(t.net-t.util))>TOL) badRow++;
+    if(t.net<0||t.util<0||t.bal<0) negRow++;
+  });
+  if(overRow) out.push(overRow+' release'+(overRow===1?'':'s')+' utilised beyond the amount released.');
+  if(badRow)  out.push(badRow+' release'+(badRow===1?'':'s')+' where balance ≠ released − utilised.');
+  if(negRow)  out.push(negRow+' release'+(negRow===1?'':'s')+' carrying a negative figure.');
+
+  if(Math.abs((g.exp||0)-((g.ddoki||0)+(g.actual||0)))>TOL) out.push('Scheme total: expenditure ≠ HQ-direct + centre actual.');
+  if(Math.abs((g.bal||0)-((g.assign||0)-(g.exp||0)))>TOL)   out.push('Scheme total: balance ≠ assignment − expenditure.');
+
+  var m=DATA.releasesMeta;
+  if(m && m.count!=null && m.count!==rows.length)
+    out.push('Release count mismatch: sheet states '+m.count+', '+rows.length+' parsed.');
+
+  return out;
+}
+/** Refresh the derived sync facts (latest release + integrity notes). */
+function refreshSyncFacts(){
+  try{ SYNC.lastTxn=txnBrief(latestTxn()); SYNC.notes=auditData(); }
+  catch(e){ SYNC.notes=['Integrity check could not run: '+(e&&e.message||e)]; }
+}
 function renderSyncPill(){
   const el=document.getElementById('syncPill'); if(!el) return;
   const st=SYNC.status;
@@ -2522,11 +2610,32 @@ function renderSyncPill(){
           ? np.slice(0,3).map(function(p){ return esc(p.name)+' &middot; <b>'+esc(crShort(p.amt))+'</b>'; }).join('<br>')
             + (np.length>3 ? '<br><span style="opacity:.7">+'+(np.length-3)+' more</span>' : '')
           : '<span style="opacity:.7">None yet this session</span>';
+
+        /* Last update - basic details of the most recent release in the sheet. */
+        var lt=SYNC.lastTxn;
+        var lastUpd = lt
+          ? esc(lt.when)+' &middot; '+esc(lt.rc)+' &middot; Vch '+esc(lt.voucher)
+            + '<br>'+esc(lt.sv)
+            + '<br>Released <b>'+esc(crShort(lt.net))+'</b> &middot; Utilised '+esc(crShort(lt.util))
+          : '<span style="opacity:.7">No releases in the current data</span>';
+
+        /* NOTE - source-sheet figures that pass the arithmetic gate but defy the
+           scheme's logic (e.g. spending beyond assignment). Shown, never blocking. */
+        var nt=SYNC.notes||[];
+        var note = nt.length
+          ? '<br><span style="color:var(--critical)"><b>NOTE &middot; '+nt.length+' issue'+(nt.length===1?'':'s')+' found:</b><br>'
+            + nt.slice(0,2).map(function(x){ return '&bull; '+esc(x); }).join('<br>')
+            + (nt.length>2 ? '<br>&bull; +'+(nt.length-2)+' more' : '')
+            + '</span>'
+          : '<br><span style="opacity:.7">NOTE: no calculation errors detected.</span>';
+
         return '<b>Live sync</b>'
           + '<br>Latest new data:<br>'+latest
+          + '<br>Last update:<br>'+lastUpd
           + '<br>Last successful sync: '+(SYNC.last?SYNC.last.toLocaleString():'not yet')
           + '<br>Source: SAI Expenditure SYNC (Google Sheet)'
           + (SYNC.updates>0 ? '<br>Updates this session: '+SYNC.updates : '')
+          + note
           + '<br><span style="opacity:.7">Click to sync now.</span>';
       })();
   el.innerHTML='<span class="syncp"'+tattr(tip)+' onclick="syncNow(true)"><span class="dot '+cls+'"></span>'+txt+'<span class="rf">↻</span></span>';
@@ -2539,7 +2648,7 @@ function syncStart(){
   setInterval(renderSyncPill,60000);   // keep the "x min ago" honest between syncs
 }
 
-renderNav(); render(); syncStart();
+renderNav(); refreshSyncFacts(); render(); syncStart();
 </script>
 </body>
 </html>
