@@ -1073,7 +1073,7 @@ let state={view:'tracker', tr:{}, trSub:null, hsOpen:null, svOpen:null, filt:'Al
      picture. Ticking the chip folds them back in everywhere, as before. */
   inclDdoki:true, inclMdsd:false, inclHQ:true, inclInfraSai:true,
   mdsdSort:{key:'assign',dir:-1}, rcSort:{key:'bal',dir:-1}, sectSort:{key:'assign',dir:-1}, svSort:{key:'assign',dir:-1},
-  dsort:{key:'act',dir:-1}, dfilt:{sv:'',rc:'',scat:'',q:''}, dmode:'alloc', cdOpen:null, sfOpen:null, tg:{}, _filtView:null};
+  dsort:{key:'act',dir:-1}, dfilt:{sv:'',rc:'',scat:'',q:''}, dmode:'alloc', cdOpen:null, sfOpen:null, tg:{}, _filtView:null, txRange:'all', txType:''};
 
 /* ---- geometry / tooltip ---- */
 function pol(cx,cy,r,a){return [cx+r*Math.cos(a),cy+r*Math.sin(a)];}
@@ -1096,7 +1096,7 @@ const ICON={
  kig:'M3 4h7v7H3zM14 4h7v4h-7zM14 12h7v8h-7zM3 15h7v5H3z',
  saif:'M5 3h11l3 3v15H5zM16 3v4h3M8 11h8M8 15h8M8 19h5'
 };
-const NAV=[{g:'ANALYSIS'},{v:'command',t:'Financial Overview',i:'command'},{v:'tracker',t:'Component Tracker',i:'tracker',feat:1},{v:'kigroups',t:'SAI KI 1, KI 2 & Infra',i:'kig'},{v:'saifmt',t:'SAI Format Summary',i:'saif'},{v:'mdsd',t:'KI Infra (States/UTs)',i:'mdsd'},{v:'rc',t:'Regional Centres',i:'rc'},{v:'sv',t:'Sub-Vertical Analysis',i:'sv'},{g:'INTELLIGENCE'},{v:'exceptions',t:'Attention Centre',i:'exceptions',badge:1},{v:'detail',t:'Expenditure Detail',i:'detail'}];
+const NAV=[{g:'ANALYSIS'},{v:'command',t:'Financial Overview',i:'command'},{v:'tracker',t:'Component Tracker',i:'tracker',feat:1},{v:'kigroups',t:'SAI KI 1, KI 2 & Infra',i:'kig'},{v:'saifmt',t:'SAI Format Summary',i:'saif'},{v:'mdsd',t:'KI Infra (States/UTs)',i:'mdsd'},{v:'rc',t:'Regional Centres',i:'rc'},{v:'sv',t:'Sub-Vertical Analysis',i:'sv'},{g:'INTELLIGENCE'},{v:'exceptions',t:'Attention Centre',i:'exceptions',badge:1},{v:'detail',t:'Transaction Record',i:'detail'}];
 function svgIcon(i){ return `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[i]}"/>${i==='rc'?'<circle cx="12" cy="10" r="2.4"/>':''}</svg>`; }
 function renderNav(){
   const n=attentionCount();
@@ -1921,66 +1921,139 @@ function dtEmpty(hasFilters){
   return `<div class="dt-empty"><div class="e-ic">🔍</div><div class="e-t">No matching records</div>
     <div class="e-s">${hasFilters?'Try widening or ':''}<span style="text-decoration:underline;cursor:pointer;color:var(--primary)" onclick="resetDFilt()">clear the filters</span>${hasFilters?'.':' - no data available for the current classification filter.'}</div></div>`;
 }
+/* ---- Transaction Record ----------------------------------------------------
+   Replaces the former Expenditure Detail dump. That panel restated the whole
+   dataset, which the analysis pages already cover; this one answers a different
+   question - what has actually changed in the sheet, and when did we see it.
+   KPI cards report the previous IST calendar day (00:00:00 - 23:59:59.999 IST),
+   computed from absolute time so the figures are identical in any timezone. */
 function viewDetail(){
-  const mode=state.dmode||'alloc', f=state.dfilt;
-  // if a toggle chip excludes the centre currently filtered on, fall back to "All centres"
-  // rather than silently showing a permanently-empty table for a filter value that no
-  // longer exists in the master dataset
-  if(f.rc==='DDO KI · HQ Direct'&&!state.inclDdoki) f.rc='';
-  if(f.rc==='Direct · State/Institute (MDSD)'&&!state.inclMdsd) f.rc='';
-  if(excludedCentres().indexOf(f.rc)>=0) f.rc='';
-  const svOpts=['<option value="">All sub-verticals</option>'].concat(SV.filter(x=>x.assign>0||x.exp>0).map(x=>`<option value="${esc(x.name)}"${f.sv===x.name?' selected':''}>${esc(x.name)}</option>`)).join('');
-  const rcOpts=['<option value="">All centres</option>']
-    .concat(state.inclDdoki?['<option value="DDO KI · HQ Direct"'+(f.rc==='DDO KI · HQ Direct'?' selected':'')+'>DDO KI · HQ Direct</option>']:[])
-    .concat(state.inclMdsd?['<option value="Direct · State/Institute (MDSD)"'+(f.rc==='Direct · State/Institute (MDSD)'?' selected':'')+'>Direct · State/Institute (MDSD)</option>']:[])
-    .concat(ACTIVE_CENTRES.map(c=>`<option value="${esc(c)}"${f.rc===c?' selected':''}>${esc(c)}</option>`)).join('');
-  const modeT=`<div class="toggle" style="border:1px solid var(--border);border-radius:7px;overflow:hidden;display:inline-flex"><button class="${mode==='alloc'?'on':''}" onclick="setDMode('alloc')">Allocations</button><button class="${mode==='releases'?'on':''}" onclick="setDMode('releases')">Releases (${RMETA.count})</button></div>`;
-  const anyFilt=!!(f.sv||f.rc||f.scat||(f.q&&f.q.trim()));
-  const th=(k,l,cls)=>`<th class="${cls||''}" onclick="sortDetail('${k}')">${l}${state.dsort.key===k?(state.dsort.dir<0?' ↓':' ↑'):''}</th>`;
-  let table, sub, scatChip='';
-  if(mode==='releases'){
-    sub='';
-    const scatOpts=['<option value="">All categories</option>'].concat(detailScatOptions().map(c=>`<option value="${esc(c)}"${f.scat===c?' selected':''}>${esc(c)}</option>`)).join('');
-    scatChip=`<span class="chip-sel"><span class="muted">Category</span><select onchange="setDFilt('scat',this.value)">${scatOpts}</select></span>`;
-    let rows=detailFilteredReleases();
-    const s=state.dsort; rows=rows.slice().sort((a,b)=>{let av=a[s.key],bv=b[s.key]; if(typeof av==='string')return String(av).localeCompare(String(bv))*s.dir; return ((av||0)-(bv||0))*s.dir;});
-    const tn=sum(rows,r=>r.net), tu=sum(rows,r=>r.util);
-    const body=rows.map(r=>`<tr title="${esc(r.nar)}"><td><b>${esc(r.sv)}</b></td><td><span class="badge b-mut">${esc(r.section)}</span></td><td>${esc(r.rc)}</td><td>${esc(r.scat)}</td><td>${esc(r.sanction)}<div class="muted" style="font-size:11px">${fmtD(r.date)}</div></td><td class="num tnum">${crShort(r.net)}</td><td class="num tnum" style="color:${r.util>0?'var(--good)':'var(--text-muted)'}">${crShort(r.util)}</td><td class="num tnum">${crShort(r.bal)}</td></tr>`).join('');
-    table=rows.length?`<div style="margin:2px 2px 10px" class="small muted">${rows.length} of ${RMETA.count} releases · released ${crShort(tn)} · utilised ${crShort(tu)} · balance ${crShort(tn-tu)}</div>
-      <div class="tscroll"><table class="dt"><thead><tr>${th('sv','Component')}${th('section','Section')}${th('rc','Centre')}${th('scat','Sub-category')}${th('sanction','Sanction · Date')}${th('net','Released','num')}${th('util','Utilised','num')}${th('bal','Balance','num')}</tr></thead><tbody>${body}</tbody></table></div>`
-      :`<div style="margin:2px 2px 10px" class="small muted">0 of ${RMETA.count} releases</div>${dtEmpty(anyFilt)}`;
-  } else {
-    sub='Every sub-vertical × centre allocation - limit assigned vs actual, as on '+syncedAsOf();
-    let rows=detailFilteredAlloc();
-    const s=state.dsort; rows=rows.slice().sort((a,b)=>{let av=a[s.key],bv=b[s.key]; av=av==null?-1:av; bv=bv==null?-1:bv; if(typeof av==='string')return String(av).localeCompare(String(bv))*s.dir; return (av-bv)*s.dir;});
-    const tl=sum(rows.filter(r=>r.lim!=null),r=>r.lim), ta=sum(rows,r=>r.act);
-    const body=rows.map(r=>`<tr><td><b>${esc(r.sv)}</b></td><td><span class="badge b-mut">${esc(r.section)}</span></td><td>${esc(r.centre)}</td><td class="num tnum">${r.lim==null?'<span class="muted">-</span>':crShort(r.lim)}</td><td class="num tnum">${crShort(r.act)}</td><td class="num tnum" style="color:${r.idle>0?'var(--serious)':'var(--text-muted)'}">${r.idle==null?'-':crShort(r.idle)}</td><td class="num tnum">${r.up==null?'-':pct(r.up,0)}</td></tr>`).join('');
-    table=rows.length?`<div style="margin:2px 2px 10px" class="small muted">${rows.length} rows · limit ${crShort(tl)} · actual ${crShort(ta)}</div>
-      <div class="tscroll"><table class="dt"><thead><tr>${th('sv','Sub-Vertical')}${th('section','Section')}${th('centre','Centre / Head')}${th('lim','Limit Assigned','num')}${th('act','Actual Exp.','num')}${th('idle','Unspent','num')}${th('up','Used','num')}</tr></thead><tbody>${body}</tbody></table></div>`
-      :`<div style="margin:2px 2px 10px" class="small muted">0 rows</div>${dtEmpty(anyFilt)}`;
-  }
-  const filterbar=`<div class="filterbar">${modeT}
-      <span class="chip-sel"><span class="muted">Sub-vertical</span><select onchange="setDFilt('sv',this.value)">${svOpts}</select></span>
-      <span class="chip-sel"><span class="muted">Centre</span><select onchange="setDFilt('rc',this.value)">${rcOpts}</select></span>
-      ${scatChip}
-      <span class="chip-sel dfind"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input type="text" placeholder="${mode==='releases'?'Search narration, grantee, sanction, voucher':'Search sub-vertical, centre, section'}" value="${esc(f.q||'')}" oninput="setDFilt('q',this.value)"></span>
-      ${anyFilt?`<button class="btn" onclick="resetDFilt()">Clear filters</button>`:''}
-      <div class="tools"><button class="btn" onclick="exportDetail()">Export CSV</button></div></div>`;
-  return pageHead('Expenditure Detail',sub) + `<div class="card">${filterbar}${table}</div>`;
+  const win=istDayWindow(1);
+  const st=txStats(win);
+  const dayLabel=istStamp(win.start,false);
+  const range=state.txRange||'all';
+  const typeF=state.txType||'';
+
+  const all=(TXLOG.entries||[]).slice().sort(function(a,b){ return b.ts-a.ts; });
+  let rows=all;
+  if(range==='1')  rows=rows.filter(function(x){ return x.ts>=win.start && x.ts<=win.end; });
+  if(range==='7')  { const w7=istDayWindow(7); rows=rows.filter(function(x){ return x.ts>=w7.start; }); }
+  if(typeF) rows=rows.filter(function(x){ return x.type===typeF; });
+
+  const kpis=`<div class="kpi-grid">
+    <div class="kpi accent"${tattr('<b>Transactions recorded</b><br>New transaction rows first seen in the sheet during '+dayLabel+
+        ' (IST 00:00-23:59).<br><span style="opacity:.75">Value revisions to existing rows are counted separately.</span>')}>
+      <div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('receipt')}</span><div class="kpi-txt">
+      <div class="lbl">Transactions recorded</div><div class="val tnum">${st.newN}</div></div></div>
+      <div class="sub">${st.updN} value update${st.updN===1?'':'s'}${st.rmN?' · '+st.rmN+' withdrawn':''}</div></div>
+
+    <div class="kpi"${tattr('<b>Expenditure recorded</b><br>Utilisation newly recorded on '+dayLabel+
+        ': the utilised amount of each new transaction, plus any increase in utilisation on existing rows.'+
+        '<br><span style="opacity:.75">Downward corrections are listed in the table but never added here.</span>')}>
+      <div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt">
+      <div class="lbl">Expenditure recorded</div><div class="val tnum">${crShort(st.exp)}</div></div></div>
+      <div class="sub">on ${esc(dayLabel)}</div></div>
+
+    <div class="kpi"${tattr('<b>Assignment recorded</b><br>Increase in component assignment observed on '+dayLabel+
+        '.<br><span style="opacity:.75">Sourced from the summary tab, not from release rows.</span>')}>
+      <div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('wallet')}</span><div class="kpi-txt">
+      <div class="lbl">Assignment recorded</div><div class="val tnum">${crShort(st.asg)}</div></div></div>
+      <div class="sub">${st.asgN} revision${st.asgN===1?'':'s'}</div></div>
+
+    <div class="kpi"${tattr('<b>Disbursed to Regional Centres</b><br>Amount released to the 12 Regional Centres on '+dayLabel+
+        '.<br><span style="opacity:.75">DDO HQ and INFRA-SAI are excluded - they are not Regional Centres.</span>')}>
+      <div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('bank')}</span><div class="kpi-txt">
+      <div class="lbl">Disbursed to Regional Centres</div><div class="val tnum">${crShort(st.rc)}</div></div></div>
+      <div class="sub">excludes HQ &amp; Infra-SAI</div></div>
+  </div>`;
+
+  const chip=(v,l)=>`<button class="fchip${range===v?' on':''}" onclick="setTxRange('${v}')">${l}</button>`;
+  const tOpts=[['','All activity'],['new','New transactions'],['update','Value updates'],
+               ['assign','Assignment revisions'],['removed','Withdrawn rows']]
+    .map(function(o){ return `<option value="${o[0]}"${typeF===o[0]?' selected':''}>${o[1]}</option>`; }).join('');
+
+  const filterbar=`<div class="filterbar">
+      ${chip('1','Yesterday')}${chip('7','Last 7 days')}${chip('all','All recorded')}
+      <span class="chip-sel"><span class="muted">Show</span>
+        <select onchange="setTxType(this.value)">${tOpts}</select></span>
+      <div class="tools"><button class="btn" onclick="exportTxLog()">Export CSV</button></div></div>`;
+
+  const body=rows.map(function(x){
+    return `<tr><td class="tnum" style="white-space:nowrap">${esc(istStamp(x.ts))}</td>
+      <td>${txTypePill(x.type)}</td>
+      <td>${esc(x.rc||'—')}</td>
+      <td style="white-space:nowrap">${esc(x.voucher||'—')}</td>
+      <td><b>${esc(x.sv||'—')}</b>${x.scat?`<div class="small muted">${esc(x.scat)}</div>`:''}</td>
+      <td style="white-space:nowrap">${x.date?esc(fmtD(x.date)):'—'}</td>
+      <td class="num tnum">${x.type==='assign'?'—':crShort(x.net)}</td>
+      <td class="num tnum">${x.type==='assign'?'—':crShort(x.util)}</td>
+      <td class="small">${txChange(x)}</td></tr>`;
+  }).join('');
+
+  const table=rows.length
+    ? `<div style="margin:2px 2px 10px" class="small muted">${rows.length} entr${rows.length===1?'y':'ies'}${
+        range==='1'?' recorded on '+esc(dayLabel):range==='7'?' in the last 7 days':' recorded in total'}</div>
+       <div class="tscroll"><table class="dt"><thead><tr>
+       <th>Recorded (IST)</th><th>Activity</th><th>Centre</th><th>Voucher</th><th>Component</th>
+       <th>Txn date</th><th class="num">Released</th><th class="num">Utilised</th><th>Change</th>
+       </tr></thead><tbody>${body}</tbody></table></div>`
+    : `<div class="dt-empty"><div class="e-ic">🗂</div>
+       <div class="e-t">${TXLOG.since?'No changes recorded in this range':'Recording has not started yet'}</div>
+       <div class="e-s">${TXLOG.since
+          ? 'The sheet has not changed in the selected period.'
+          : 'The first sync sets the baseline; anything edited in the sheet after that is recorded here.'}</div></div>`;
+
+  const note=`<div class="dki-note"><div class="ico">i</div><div>
+      Entries are recorded when the platform <b>observes</b> a change in the sync sheet - the sheet's
+      feed carries cell values only, not edit history, so this is the time of observation
+      (within the 10-minute sync interval), shown in IST. Each row also carries the transaction's own
+      date from the sheet. ${TXLOG.since
+        ? 'Recording since <b>'+esc(istStamp(TXLOG.since))+' IST</b>.'
+        : 'Recording begins at the first successful sync.'}
+      <span class="muted">Held in this browser; a shared permanent record needs server-side storage.</span>
+    </div></div>`;
+
+  return pageHead('Transaction Record','New transactions and value changes observed in the sync sheet · KPIs cover '+dayLabel+' (IST)')
+   + kpis + note + `<div class="card">${filterbar}${table}</div>`;
 }
-function exportDetail(){
-  let head, lines;
-  if(state.dmode==='releases'){
-    const rows=detailFilteredReleases();
-    head=['Component','Section','Centre','Sub-category','Sanction','Date','Released','Utilised','Balance'];
-    lines=[head.join(',')].concat(rows.map(r=>[r.sv,r.section,r.rc,r.scat,r.sanction,r.date,r.net,r.util,r.bal].map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')));
-  } else {
-    const rows=detailFilteredAlloc();
-    head=['Sub-Vertical','Section','Centre','Limit Assigned','Actual Exp','Unspent','Used %'];
-    lines=[head.join(',')].concat(rows.map(r=>[r.sv,r.section,r.centre,r.lim==null?'':r.lim,r.act,r.idle==null?'':r.idle,r.up==null?'':(r.up*100).toFixed(1)].map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')));
+function txTypePill(t){
+  const m={new:['New','#e3f6e8','#1b7a4b'],update:['Updated','#e9f0fb','#1d5aa6'],
+           assign:['Assignment','#ece8fa','#4a3aa7'],removed:['Withdrawn','#fbeaea','#a52121']};
+  const v=m[t]||['—','#eef1f6','#4d5666'];
+  return `<span style="display:inline-block;padding:1px 8px;border-radius:16px;font-size:11px;font-weight:700;background:${v[1]};color:${v[2]};white-space:nowrap">${v[0]}</span>`;
+}
+/** Human before/after for a logged change. */
+function txChange(x){
+  if(x.type==='new')     return '<span class="muted">First recorded</span>';
+  if(x.type==='removed') return '<span class="muted">Row withdrawn (was '+esc(crShort(x.pNet))+' released)</span>';
+  if(x.type==='assign'){
+    const d=(x.assign||0)-(x.pAssign||0);
+    return esc(crShort(x.pAssign))+' → <b>'+esc(crShort(x.assign))+'</b> '+txDelta(d);
   }
+  const bits=[];
+  if(Math.abs((x.net||0)-(x.pNet||0))>1)   bits.push('Released '+esc(crShort(x.pNet))+' → <b>'+esc(crShort(x.net))+'</b> '+txDelta((x.net||0)-(x.pNet||0)));
+  if(Math.abs((x.util||0)-(x.pUtil||0))>1) bits.push('Utilised '+esc(crShort(x.pUtil))+' → <b>'+esc(crShort(x.util))+'</b> '+txDelta((x.util||0)-(x.pUtil||0)));
+  if(!bits.length && Math.abs((x.bal||0)-(x.pBal||0))>1) bits.push('Balance '+esc(crShort(x.pBal))+' → <b>'+esc(crShort(x.bal))+'</b>');
+  return bits.join('<br>')||'<span class="muted">—</span>';
+}
+function txDelta(d){
+  const up=d>0;
+  return `<span style="color:${up?'var(--good)':'var(--critical)'};font-weight:700">(${up?'+':'−'}${esc(crShort(Math.abs(d)))})</span>`;
+}
+function setTxRange(v){ state.txRange=v; render(); }
+function setTxType(v){ state.txType=v; render(); }
+function exportTxLog(){
+  const rows=(TXLOG.entries||[]).slice().sort(function(a,b){ return b.ts-a.ts; });
+  const head=['Recorded (IST)','Activity','Centre','Voucher','Component','Sub-category','Txn date',
+              'Released','Utilised','Balance','Previous released','Previous utilised','Previous balance','Assignment','Previous assignment'];
+  const lines=[head.join(',')].concat(rows.map(function(x){
+    return [istStamp(x.ts),x.type,x.rc,x.voucher,x.sv,x.scat,x.date,
+            x.net,x.util,x.bal,x.pNet==null?'':x.pNet,x.pUtil==null?'':x.pUtil,x.pBal==null?'':x.pBal,
+            x.assign==null?'':x.assign,x.pAssign==null?'':x.pAssign]
+      .map(function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }).join(',');
+  }));
   const blob=new Blob([lines.join('\n')],{type:'text/csv'}), url=URL.createObjectURL(blob), a=document.createElement('a');
-  a.href=url; a.download='khelo_'+(state.dmode==='releases'?'releases':'allocations')+'.csv'; a.click(); URL.revokeObjectURL(url);
+  a.href=url; a.download='khelo_transaction_record.csv'; a.click(); URL.revokeObjectURL(url);
 }
 
 /* ---- Infrastructure MDSD module ---- */
@@ -2014,7 +2087,9 @@ function kpiIcon(type){
     coins:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v5c0 1.66 3.13 3 7 3s7-1.34 7-3V6"/><path d="M5 11v5c0 1.66 3.13 3 7 3s7-1.34 7-3v-5"/></svg>',
     scale:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M7 21h10M12 6l-6.5 1.2M12 6l6.5 1.2"/><path d="M2.5 7.2l3 5.6a3 3 0 0 0 5 0l-3-5.6M13.5 7.2l3 5.6a3 3 0 0 0 5 0l-3-5.6"/></svg>',
     gauge:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15a8 8 0 1 1 16 0"/><path d="M12 15l3.3-4.3"/><circle cx="12" cy="15" r="1.15" fill="currentColor" stroke="none"/></svg>',
-    alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"/></svg>'
+    alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"/></svg>',
+    receipt:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18l2.5-1.6L10 21l2-1.6L14 21l2.5-1.6L19 21V3H5Z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
+    bank:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18L12 4 3 10Z"/><path d="M5 10v7M10 10v7M14 10v7M19 10v7M3 20h18"/></svg>'
   };
   return svgs[type]||'';
 }
@@ -2450,6 +2525,10 @@ function syncApply(b){
      change surfaces as a new point (old key drops, new key appears) - which is the
      "what changed" behaviour we want. Only replace SYNC.newPoints when this sync
      actually brought something new, so the tooltip keeps showing the latest arrivals. */
+  /* Transaction Record: diff this build against the stored baseline and log
+     what changed, with the time of observation. Runs before DATA is replaced;
+     it reads its own persisted baseline, so ordering here is not load-bearing. */
+  txDetect(b);
   var _prev={}; (DATA.txns||[]).forEach(function(t){ _prev[t.rc+'|'+t.voucher+'|'+t.net]=1; });
   var _fresh=(b.txns||[]).filter(function(t){ return !_prev[t.rc+'|'+t.voucher+'|'+t.net]; })
     .sort(function(x,y){ return (y.date||'').localeCompare(x.date||''); });   // newest first
@@ -2645,6 +2724,146 @@ function auditData(){
 
   return out;
 }
+/* ============================================================================
+   TRANSACTION RECORD - a log of what actually changed in the Google Sheet
+   ============================================================================
+   Purpose: track every new transaction and every change in value observed in
+   the sync sheet, with the date and time it was recorded.
+
+   HOW THE TIME IS ESTABLISHED - read this before trusting the timestamp.
+   The Google Sheets gviz feed returns cell values only; it carries no per-cell
+   edit history, so the sheet cannot tell us when a figure was typed. The time
+   stored here is therefore the moment THIS PLATFORM OBSERVED the change during
+   a sync - labelled "Recorded" throughout, never "edited". With the sync
+   running every 10 minutes, an edit is observed within 10 minutes of being
+   made, provided a session is open. The transaction's own date column from the
+   sheet is kept alongside, so both are visible and never conflated.
+
+   IDENTITY. Rows are keyed on centre + voucher, which is unique across the
+   workbook (verified against the full release set). Keying on identity rather
+   than on the amounts is what lets a changed figure be reported as an UPDATE
+   with its before/after, instead of appearing as a brand-new transaction.
+
+   BASELINE. The first successful sync of a browser records the sheet's current
+   state as the baseline and logs nothing - the rows already in the sheet were
+   not created at that instant, and dating them "now" would be false. Only what
+   changes after that point is logged, so every entry is a genuine observation.
+
+   STORAGE. The log persists in this browser (localStorage) so the record
+   survives reloads; the platform holds no financial data server-side. It is
+   therefore per-browser: a different machine starts its own baseline. A shared,
+   permanent record needs the change log written server-side - the natural next
+   step now that the platform has a backend.
+   ========================================================================== */
+const TLOG_KEY='sai.efip.txlog.v1', TBASE_KEY='sai.efip.txbase.v1', TLOG_MAX=5000;
+const IST_MIN=330;                       // IST = UTC+5:30, no daylight saving
+
+function lsGet(k){ try{ var s=localStorage.getItem(k); return s?JSON.parse(s):null; }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } }
+
+let TXLOG = lsGet(TLOG_KEY) || {since:null, entries:[]};
+
+/** Stable row identity - deliberately excludes the amounts, which may change. */
+function txKey(t){ return (t.rc||'')+'|'+(t.voucher||''); }
+
+/** Value snapshot used to diff one sync against the next. */
+function txSnapshot(b){
+  var s={t:{},a:{}};
+  (b.txns||[]).forEach(function(t){ s.t[txKey(t)]={n:t.net||0,u:t.util||0,b:t.bal||0}; });
+  (b.subverticals||[]).forEach(function(x){ s.a[x.name]=x.assign||0; });
+  return s;
+}
+
+/** True for the 12 Regional Centres - DDO HQ and INFRA-SAI are not centres. */
+function isRegionalCentre(c){
+  return !!c && c!==HQ_KEY && c!==INFRA_KEY && (DATA.centres||[]).indexOf(c)>=0;
+}
+
+/* Compare an incoming build against the stored baseline and append what changed.
+   Returns the number of entries added. Never throws into the sync path. */
+function txDetect(b){
+  try{
+    var prev=lsGet(TBASE_KEY), snap=txSnapshot(b), now=Date.now();
+    if(!prev){                                  // first sync in this browser
+      lsSet(TBASE_KEY,snap);
+      if(!TXLOG.since){ TXLOG.since=now; lsSet(TLOG_KEY,TXLOG); }
+      return 0;
+    }
+    var add=[], TOL=1, seen={};
+    (b.txns||[]).forEach(function(t){
+      var k=txKey(t); seen[k]=1;
+      var p=prev.t[k];
+      var row={ts:now, rc:t.rc||'', voucher:t.voucher||'', sv:t.sv||'', scat:t.scat||'',
+               date:t.date||'', grantee:t.grantee||'', net:t.net||0, util:t.util||0, bal:t.bal||0};
+      if(!p){ row.type='new'; add.push(row); return; }
+      if(Math.abs(p.n-row.net)>TOL || Math.abs(p.u-row.util)>TOL || Math.abs(p.b-row.bal)>TOL){
+        row.type='update'; row.pNet=p.n; row.pUtil=p.u; row.pBal=p.b; add.push(row);
+      }
+    });
+    Object.keys(prev.t).forEach(function(k){           // rows withdrawn from the sheet
+      if(seen[k]) return;
+      var p=prev.t[k], parts=k.split('|');
+      add.push({ts:now,type:'removed',rc:parts[0]||'',voucher:parts[1]||'',sv:'',scat:'',date:'',
+                net:0,util:0,bal:0,pNet:p.n,pUtil:p.u,pBal:p.b});
+    });
+    (b.subverticals||[]).forEach(function(x){          // assignment revisions
+      var p=prev.a[x.name];
+      if(p==null) return;                              // component not previously seen
+      var now2=x.assign||0;
+      if(Math.abs(p-now2)>TOL)
+        add.push({ts:now,type:'assign',rc:'',voucher:'',sv:x.name,scat:'',date:'',
+                  net:0,util:0,bal:0,assign:now2,pAssign:p});
+    });
+    if(add.length){
+      TXLOG.entries=TXLOG.entries.concat(add).slice(-TLOG_MAX);
+      if(!TXLOG.since) TXLOG.since=now;
+      lsSet(TLOG_KEY,TXLOG);
+    }
+    lsSet(TBASE_KEY,snap);
+    return add.length;
+  }catch(e){ return 0; }
+}
+
+/* ---- IST calendar helpers ------------------------------------------------
+   Computed from absolute epoch time and a fixed +5:30 offset, so the result is
+   the same whatever timezone the viewing browser is set to. Shifting by the
+   offset and then reading UTC fields is what makes the arithmetic exact. */
+function istDayWindow(daysAgo){
+  var shifted=new Date(Date.now()+IST_MIN*60000);
+  var midnightShifted=Date.UTC(shifted.getUTCFullYear(),shifted.getUTCMonth(),shifted.getUTCDate())
+                      - (daysAgo||0)*86400000;
+  var start=midnightShifted - IST_MIN*60000;          // real epoch of that IST midnight
+  return {start:start, end:start+86400000-1, dayShifted:midnightShifted};
+}
+function istStamp(ms,withTime){
+  var d=new Date(ms+IST_MIN*60000), p=function(n){ return String(n).padStart(2,'0'); };
+  var s=p(d.getUTCDate())+'.'+p(d.getUTCMonth()+1)+'.'+d.getUTCFullYear();
+  return withTime===false ? s : s+' '+p(d.getUTCHours())+':'+p(d.getUTCMinutes());
+}
+
+/* Aggregate the log over a window. Only increases count towards the money
+   totals: a downward correction is shown in the table but must not be read as
+   fresh expenditure. */
+function txStats(win){
+  var rows=(TXLOG.entries||[]).filter(function(x){ return x.ts>=win.start && x.ts<=win.end; });
+  var o={newN:0,updN:0,rmN:0,asgN:0,exp:0,asg:0,rc:0,rows:rows};
+  rows.forEach(function(x){
+    if(x.type==='new'){
+      o.newN++; o.exp+=x.util||0;
+      if(isRegionalCentre(x.rc)) o.rc+=x.net||0;
+    } else if(x.type==='update'){
+      o.updN++;
+      var du=(x.util||0)-(x.pUtil||0); if(du>0) o.exp+=du;
+      var dn=(x.net||0)-(x.pNet||0);   if(dn>0 && isRegionalCentre(x.rc)) o.rc+=dn;
+    } else if(x.type==='removed'){ o.rmN++; }
+    else if(x.type==='assign'){
+      o.asgN++;
+      var da=(x.assign||0)-(x.pAssign||0); if(da>0) o.asg+=da;
+    }
+  });
+  return o;
+}
+
 /** Refresh the derived sync facts (latest release + integrity notes). */
 function refreshSyncFacts(){
   try{ SYNC.lastTxn=txnBrief(latestTxn()); SYNC.notes=auditData(); }
