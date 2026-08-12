@@ -524,6 +524,54 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 .muted{color:var(--text-muted)}
 .small{font-size:12.5px}
 #tip{position:fixed;z-index:200;pointer-events:none;background:var(--bg-surface);border:1px solid var(--border);box-shadow:var(--elev-2);border-radius:8px;padding:8px 11px;font-size:12.5px;color:var(--text-secondary);display:none;max-width:340px;line-height:1.5}
+/* ---- Live-sync hover card -------------------------------------------------
+   A structured card rather than a list of label: value lines, so the state of
+   the feed reads at a glance: status in the header, the latest movement given
+   the most visual weight, supporting facts in a quiet key/value block, and any
+   data problem as a distinct alert. #tip drops its own padding for this one so
+   the card can run its sections full-bleed. */
+#tip.wide{max-width:392px;padding:0;border-radius:12px;overflow:hidden;line-height:1.45}
+.syncard{font-size:12.5px;color:var(--text-secondary)}
+.sy-hd{display:flex;align-items:center;gap:8px;padding:11px 14px;
+  background:linear-gradient(135deg,rgba(37,106,191,.10),rgba(74,58,167,.06));border-bottom:1px solid var(--border)}
+.sy-hd .sy-t{font-weight:700;color:var(--text-primary);font-size:13px;letter-spacing:-.01em}
+.sy-hd .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.sy-hd .dot.ok{background:var(--good);box-shadow:0 0 0 3px rgba(27,158,99,.18)}
+.sy-hd .dot.run{background:var(--primary);box-shadow:0 0 0 3px rgba(37,106,191,.18)}
+.sy-hd .dot.err{background:var(--critical);box-shadow:0 0 0 3px rgba(198,45,45,.18)}
+.sy-hd .dot.idle{background:var(--text-muted)}
+.sy-pill{margin-left:auto;font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+  padding:2px 9px;border-radius:20px;white-space:nowrap}
+.sy-pill.ok{background:#e3f6e8;color:#1b7a4b}
+.sy-pill.run{background:var(--primary-subtle);color:var(--primary-hover)}
+.sy-pill.err{background:#fbeaea;color:#a52121}
+.sy-pill.idle{background:var(--bg-app);color:var(--text-muted)}
+.sy-sec{padding:11px 14px;border-bottom:1px solid var(--border-subtle)}
+.sy-sec:last-child{border-bottom:none}
+.sy-lbl{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px}
+.sy-main{font-weight:700;color:var(--text-primary);font-size:13px;line-height:1.3}
+.sy-meta{font-size:11.5px;color:var(--text-muted);margin-top:2px}
+.sy-figs{display:flex;gap:8px;margin-top:9px}
+.sy-fig{flex:1;background:var(--bg-app);border-radius:8px;padding:7px 10px;min-width:0}
+.sy-fig .k{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}
+.sy-fig .v{font-size:14px;font-weight:700;color:var(--text-primary);font-variant-numeric:tabular-nums;margin-top:1px}
+.sy-fig.used .v{color:var(--primary)}
+.sy-kv{display:flex;align-items:baseline;gap:12px;padding:3px 0}
+.sy-kv .k{color:var(--text-muted);flex:none}
+.sy-kv .v{margin-left:auto;text-align:right;color:var(--text-primary);font-weight:600;overflow-wrap:anywhere}
+.sy-kv .v.mut{color:var(--text-muted);font-weight:500}
+.sy-note{display:flex;gap:9px;padding:10px 14px;background:#fdf4f4;border-top:1px solid #f0d6d6}
+.sy-note.good{background:#f2faf5;border-top-color:#d8ecdf}
+.sy-note .ic{width:17px;height:17px;border-radius:50%;flex:none;display:grid;place-items:center;
+  font-size:11px;font-weight:800;background:var(--critical);color:#fff;margin-top:1px}
+.sy-note.good .ic{background:var(--good)}
+.sy-note .nt{min-width:0}
+.sy-note .nh{font-weight:700;color:#a52121;font-size:12px}
+.sy-note.good .nh{color:#1b7a4b}
+.sy-note .nb{font-size:11.5px;color:var(--text-secondary);margin-top:2px;line-height:1.4;overflow-wrap:anywhere}
+.sy-foot{display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--bg-app);
+  font-size:11px;color:var(--text-muted);font-weight:600}
+.sy-foot .rf{margin-left:auto;font-size:12px}
 /* per-centre breakdown rendered inside any "Unspent by Centre" tooltip */
 .tipbd-h{font-weight:700;color:var(--text-primary);margin:7px 0 3px;padding-top:6px;border-top:1px dashed var(--border)}
 .tipbd{width:100%;border-collapse:collapse;font-size:11.5px;line-height:1.45}
@@ -1079,7 +1127,14 @@ let state={view:'tracker', tr:{}, trSub:null, hsOpen:null, svOpen:null, filt:'Al
 function pol(cx,cy,r,a){return [cx+r*Math.cos(a),cy+r*Math.sin(a)];}
 function arcPath(cx,cy,rO,rI,a0,a1){const large=(a1-a0)>Math.PI?1:0;const A=pol(cx,cy,rO,a0),B=pol(cx,cy,rO,a1),C=pol(cx,cy,rI,a1),D=pol(cx,cy,rI,a0);return `M${A[0]} ${A[1]}A${rO} ${rO} 0 ${large} 1 ${B[0]} ${B[1]}L${C[0]} ${C[1]}A${rI} ${rI} 0 ${large} 0 ${D[0]} ${D[1]}Z`;}
 const TIP=document.createElement('div'); TIP.id='tip'; document.body.appendChild(TIP);
-function tipShow(e,html){ TIP.innerHTML=html; TIP.style.display='block'; tipMove(e); }
+/* The Live-sync card styles its own sections full-bleed, so #tip drops its
+   padding and widens for that one tooltip. Detected from the markup itself -
+   no extra plumbing through the generic tattr() handlers. */
+function tipShow(e,html){
+  TIP.innerHTML=html;
+  TIP.classList.toggle('wide', String(html).indexOf('syncard')>=0);
+  TIP.style.display='block'; tipMove(e);
+}
 function tipMove(e){ const r=TIP.getBoundingClientRect(),p=14; let x=e.clientX+p,y=e.clientY+p; if(x+r.width>innerWidth)x=e.clientX-r.width-p; if(y+r.height>innerHeight)y=e.clientY-r.height-p; TIP.style.left=Math.max(4,x)+'px'; TIP.style.top=Math.max(4,y)+'px'; }
 function tipHide(){ TIP.style.display='none'; }
 function tattr(html){ return ` data-tip="${String(html).replace(/"/g,'&quot;')}" onmousemove="tipShow(event,this.getAttribute('data-tip'))" onmouseleave="tipHide()"`; }
@@ -2914,47 +2969,70 @@ function renderSyncPill(){
       :st==='ok'?'Live · '+syncAgo(SYNC.last)
       :st==='error'?'Sync failed · showing last good data'
       :'Data as of '+AS_OF;
+  /* ---- Live-sync hover card -------------------------------------------------
+     Structured so the feed's state reads in one glance: status in the header,
+     the latest movement carrying the most visual weight, supporting facts in a
+     quiet key/value block, and any data problem as its own alert strip. */
   const tip=(st==='error'||SYNC.err)
-    ? '<b>Live sync could not update</b><br><span style="color:var(--critical)">'+esc(SYNC.err||'unknown error')+'</span>'+
-      '<br><br>The platform is showing the last figures that passed validation (as on '+AS_OF+
-      '). It will retry automatically every 10 minutes.<br><span style="opacity:.75">If this persists, the sheet may be unreachable from a file:// page - see the sync note in the folder.</span>'
+    ? '<div class="syncard">'
+      + '<div class="sy-hd"><span class="dot err"></span><span class="sy-t">Live sync</span>'
+        + '<span class="sy-pill err">Failed</span></div>'
+      + '<div class="sy-note"><span class="ic">!</span><div class="nt">'
+        + '<div class="nh">Could not update</div>'
+        + '<div class="nb">'+esc(SYNC.err||'unknown error')+'</div></div></div>'
+      + '<div class="sy-sec"><div class="sy-kv"><span class="k">Showing</span>'
+        + '<span class="v">Last figures that passed validation</span></div>'
+        + '<div class="sy-kv"><span class="k">Position date</span><span class="v">'+esc(AS_OF)+'</span></div>'
+        + '<div class="sy-kv"><span class="k">Retry</span><span class="v mut">Automatic, every 10 minutes</span></div></div>'
+      + '<div class="sy-foot">Click to retry now<span class="rf">↻</span></div>'
+      + '</div>'
     : (function(){
-        /* Live-sync tooltip - shows exactly five things, in order:
-           1) latest new data points (name + short amount)
-           2) last successful sync   3) source
-           4) updates made this session   5) latest position date */
-        var np=SYNC.newPoints||[];
-        var latest = np.length
-          ? np.slice(0,3).map(function(p){ return esc(p.name)+' &middot; <b>'+esc(crShort(p.amt))+'</b>'; }).join('<br>')
-            + (np.length>3 ? '<br><span style="opacity:.7">+'+(np.length-3)+' more</span>' : '')
-          : '<span style="opacity:.7">None yet this session</span>';
+        const pill = st==='syncing' ? ['run','Syncing'] : st==='ok' ? ['ok','Live'] : ['idle','Idle'];
 
-        /* Last update - basic details of the most recent release in the sheet. */
-        var lt=SYNC.lastTxn;
-        var lastUpd = lt
-          ? esc(lt.when)+' &middot; '+esc(lt.rc)+' &middot; Vch '+esc(lt.voucher)
-            + '<br>'+esc(lt.sv)
-            + '<br>Released <b>'+esc(crShort(lt.net))+'</b> &middot; Utilised '+esc(crShort(lt.util))
-          : '<span style="opacity:.7">No releases in the current data</span>';
+        /* Latest movement - the most recent release the sheet holds. */
+        const lt=SYNC.lastTxn;
+        const last = lt
+          ? '<div class="sy-main">'+esc(lt.sv)+'</div>'
+            + '<div class="sy-meta">'+esc(lt.when)+' &middot; '+esc(lt.rc)+' &middot; Voucher '+esc(lt.voucher)+'</div>'
+            + '<div class="sy-figs">'
+              + '<div class="sy-fig"><div class="k">Released</div><div class="v">'+esc(crShort(lt.net))+'</div></div>'
+              + '<div class="sy-fig used"><div class="k">Utilised</div><div class="v">'+esc(crShort(lt.util))+'</div></div>'
+            + '</div>'
+          : '<div class="sy-meta">No releases in the current data</div>';
 
-        /* NOTE - source-sheet figures that pass the arithmetic gate but defy the
-           scheme's logic (e.g. spending beyond assignment). Shown, never blocking. */
-        var nt=SYNC.notes||[];
-        var note = nt.length
-          ? '<br><span style="color:var(--critical)"><b>NOTE &middot; '+nt.length+' issue'+(nt.length===1?'':'s')+' found:</b><br>'
-            + nt.slice(0,2).map(function(x){ return '&bull; '+esc(x); }).join('<br>')
-            + (nt.length>2 ? '<br>&bull; +'+(nt.length-2)+' more' : '')
-            + '</span>'
-          : '<br><span style="opacity:.7">NOTE: no calculation errors detected.</span>';
+        /* Supporting facts. */
+        const np=SYNC.newPoints||[];
+        const fresh = np.length
+          ? np.slice(0,2).map(function(p){ return esc(p.name)+' &middot; '+esc(crShort(p.amt)); }).join('<br>')
+            + (np.length>2 ? '<br>+'+(np.length-2)+' more' : '')
+          : '<span class="v mut">None yet</span>';
+        let facts='<div class="sy-kv"><span class="k">New this session</span><span class="v">'+fresh+'</span></div>';
+        if(SYNC.updates>0) facts+='<div class="sy-kv"><span class="k">Updates applied</span><span class="v">'+SYNC.updates+'</span></div>';
+        facts+='<div class="sy-kv"><span class="k">Last sync</span><span class="v">'
+             +(SYNC.last?esc(SYNC.last.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}))
+                        +' <span style="color:var(--text-muted);font-weight:500">('+esc(syncAgo(SYNC.last))+')</span>'
+                      :'<span class="mut">not yet</span>')+'</span></div>';
+        facts+='<div class="sy-kv"><span class="k">Source</span><span class="v mut">SAI Expenditure SYNC · Google Sheet</span></div>';
 
-        return '<b>Live sync</b>'
-          + '<br>Latest new data:<br>'+latest
-          + '<br>Last update:<br>'+lastUpd
-          + '<br>Last successful sync: '+(SYNC.last?SYNC.last.toLocaleString():'not yet')
-          + '<br>Source: SAI Expenditure SYNC (Google Sheet)'
-          + (SYNC.updates>0 ? '<br>Updates this session: '+SYNC.updates : '')
+        /* Data-integrity result - sums that do not add up, never a blocker. */
+        const nt=SYNC.notes||[];
+        const note = nt.length
+          ? '<div class="sy-note"><span class="ic">!</span><div class="nt">'
+            + '<div class="nh">'+nt.length+' figure'+(nt.length===1?'':'s')+' need'+(nt.length===1?'s':'')+' checking</div>'
+            + '<div class="nb">'+nt.slice(0,2).map(function(x){ return esc(x); }).join('<br><br>')
+            + (nt.length>2 ? '<br><br>+'+(nt.length-2)+' more' : '')+'</div></div></div>'
+          : '<div class="sy-note good"><span class="ic">✓</span><div class="nt">'
+            + '<div class="nh">Figures reconcile</div>'
+            + '<div class="nb">All totals and cross-checks add up.</div></div></div>';
+
+        return '<div class="syncard">'
+          + '<div class="sy-hd"><span class="dot '+pill[0]+'"></span><span class="sy-t">Live sync</span>'
+            + '<span class="sy-pill '+pill[0]+'">'+pill[1]+'</span></div>'
+          + '<div class="sy-sec"><div class="sy-lbl">Latest entry in sheet</div>'+last+'</div>'
+          + '<div class="sy-sec">'+facts+'</div>'
           + note
-          + '<br><span style="opacity:.7">Click to sync now.</span>';
+          + '<div class="sy-foot">Click to sync now<span class="rf">↻</span></div>'
+          + '</div>';
       })();
   el.innerHTML='<span class="syncp"'+tattr(tip)+' onclick="syncNow(true)"><span class="dot '+cls+'"></span>'+txt+'<span class="rf">↻</span></span>';
 }
