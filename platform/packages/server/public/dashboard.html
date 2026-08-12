@@ -530,6 +530,37 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
    the most visual weight, supporting facts in a quiet key/value block, and any
    data problem as a distinct alert. #tip drops its own padding for this one so
    the card can run its sections full-bleed. */
+/* ---- Trend Analytics ---- */
+.ta-top{align-items:center;gap:8px;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:9px 12px;box-shadow:var(--elev-1);margin-bottom:14px}
+.ta-cap{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-right:2px}
+.ta-mod{padding:16px 18px 18px}
+.ta-hd{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+.ta-hd h3{margin:0;font-size:15.5px;font-weight:700}
+.ta-hd .qh{margin:2px 0 0}
+.ta-seg{margin-left:auto;display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex:none}
+.ta-seg button{border:none;background:var(--bg-surface);padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-secondary);cursor:pointer;font-family:inherit;border-right:1px solid var(--border)}
+.ta-seg button:last-child{border-right:none}
+.ta-seg button:hover{background:var(--primary-subtle);color:var(--primary-hover)}
+.ta-seg button.on{background:var(--primary);color:#fff}
+.ta-picks{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0 4px}
+.ta-pick{display:inline-flex;flex-direction:column;align-items:flex-start;gap:1px;border:1px solid var(--border);background:var(--bg-surface);border-radius:9px;padding:6px 11px;cursor:pointer;font-family:inherit;text-align:left;transition:background .12s,border-color .12s,box-shadow .12s}
+.ta-pick:hover{border-color:var(--primary);background:var(--primary-subtle)}
+.ta-pick.on{background:var(--primary);border-color:var(--primary);box-shadow:0 2px 10px rgba(37,106,191,.30)}
+.ta-pick .nm{font-size:12px;font-weight:600;color:var(--text-secondary);max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ta-pick .vv{font-size:11px;font-weight:700;color:var(--text-primary);font-variant-numeric:tabular-nums}
+.ta-pick.on .nm,.ta-pick.on .vv{color:#fff}
+.ta-subs{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:10px 0 2px;padding-top:10px;border-top:1px dashed var(--border-subtle)}
+.ta-legend{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:14px 0 6px}
+.ta-lg{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-secondary)}
+.ta-lg i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.ta-cov{margin-left:auto;font-size:11px;color:var(--text-muted)}
+@media(max-width:720px){
+  .ta-seg{margin-left:0;width:100%}
+  .ta-seg button{flex:1}
+  .ta-pick .nm{max-width:120px}
+  .ta-legend{gap:10px}
+  .ta-cov{margin-left:0;flex-basis:100%}
+}
 #tip.wide{max-width:392px;padding:0;border-radius:12px;overflow:hidden;line-height:1.45}
 .syncard{font-size:12.5px;color:var(--text-secondary)}
 .sy-hd{display:flex;align-items:center;gap:8px;padding:11px 14px;
@@ -1121,7 +1152,8 @@ let state={view:'tracker', tr:{}, trSub:null, hsOpen:null, svOpen:null, filt:'Al
      picture. Ticking the chip folds them back in everywhere, as before. */
   inclDdoki:true, inclMdsd:false, inclHQ:true, inclInfraSai:true,
   mdsdSort:{key:'assign',dir:-1}, rcSort:{key:'bal',dir:-1}, sectSort:{key:'assign',dir:-1}, svSort:{key:'assign',dir:-1},
-  dsort:{key:'act',dir:-1}, dfilt:{sv:'',rc:'',scat:'',q:''}, dmode:'alloc', cdOpen:null, sfOpen:null, tg:{}, _filtView:null, txRange:'all', txType:''};
+  dsort:{key:'act',dir:-1}, dfilt:{sv:'',rc:'',scat:'',q:''}, dmode:'alloc', cdOpen:null, sfOpen:null, tg:{}, _filtView:null, txRange:'all', txType:'',
+  taMetric:'all', taCum:false, taBucket:{m1:'W',m2:'W',m3:'W'}, taRc:'', taComp:'', taSub:''};
 
 /* ---- geometry / tooltip ---- */
 function pol(cx,cy,r,a){return [cx+r*Math.cos(a),cy+r*Math.sin(a)];}
@@ -1142,6 +1174,7 @@ function tattr(html){ return ` data-tip="${String(html).replace(/"/g,'&quot;')}"
 /* ---- nav ---- */
 const ICON={
  command:'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',
+ trend:'M3 17l5.5-5.5 3.5 3.5L21 6M21 6h-5M21 6v5',
  tracker:'M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5',
  rc:'M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z',
  sv:'M4 20V9M10 20V4M16 20v-6M22 20H2',
@@ -1151,7 +1184,7 @@ const ICON={
  kig:'M3 4h7v7H3zM14 4h7v4h-7zM14 12h7v8h-7zM3 15h7v5H3z',
  saif:'M5 3h11l3 3v15H5zM16 3v4h3M8 11h8M8 15h8M8 19h5'
 };
-const NAV=[{g:'ANALYSIS'},{v:'command',t:'Financial Overview',i:'command'},{v:'tracker',t:'Component Tracker',i:'tracker',feat:1},{v:'kigroups',t:'SAI KI 1, KI 2 & Infra',i:'kig'},{v:'saifmt',t:'SAI Format Summary',i:'saif'},{v:'mdsd',t:'KI Infra (States/UTs)',i:'mdsd'},{v:'rc',t:'Regional Centres',i:'rc'},{v:'sv',t:'Sub-Vertical Analysis',i:'sv'},{g:'INTELLIGENCE'},{v:'exceptions',t:'Attention Centre',i:'exceptions',badge:1},{v:'detail',t:'Transaction Record',i:'detail'}];
+const NAV=[{g:'ANALYSIS'},{v:'command',t:'Financial Overview',i:'command'},{v:'tracker',t:'Component Tracker',i:'tracker',feat:1},{v:'kigroups',t:'SAI KI 1, KI 2 & Infra',i:'kig'},{v:'saifmt',t:'SAI Format Summary',i:'saif'},{v:'mdsd',t:'KI Infra (States/UTs)',i:'mdsd'},{v:'rc',t:'Regional Centres',i:'rc'},{v:'sv',t:'Sub-Vertical Analysis',i:'sv'},{g:'INTELLIGENCE'},{v:'trend',t:'Trend Analytics',i:'trend'},{v:'exceptions',t:'Attention Centre',i:'exceptions',badge:1},{v:'detail',t:'Transaction Record',i:'detail'}];
 function svgIcon(i){ return `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[i]}"/>${i==='rc'?'<circle cx="12" cy="10" r="2.4"/>':''}</svg>`; }
 function renderNav(){
   const n=attentionCount();
@@ -2159,6 +2192,314 @@ function exportTxLog(){
   a.href=url; a.download='khelo_transaction_record.csv'; a.click(); URL.revokeObjectURL(url);
 }
 
+/* ============================================================================
+   TREND ANALYTICS
+   ============================================================================
+   Three modules over one engine: overall, by Regional Centre, and by component
+   / sub-component. Each can be grouped Daily, 3-Day, Weekly or Monthly; the
+   metric filter and the per-period/cumulative switch apply across all three.
+
+   WHAT IS PLOTTED, AND WHY IT IS ONLY THIS.
+   Only the release rows carry a date, so they are the only thing that can
+   honestly sit on a timeline. All three metrics are therefore read from dated
+   releases and reconcile exactly to one another:
+       Assigned limit = amount released in the period   (release "net")
+       Expenditure    = amount utilised in the period   (release "util")
+       Balance        = released - utilised, i.e. money released but not drawn
+   Component assignment (Rs 219.84 Cr) has no date column anywhere in the
+   workbook and is deliberately NOT inferred onto the timeline.
+
+   COVERAGE. Dated releases cover Rs 89.20 Cr of the Rs 99.80 Cr the summary
+   reports as released. The gap is one component - New Sports Infrastructure
+   Projects - whose releases are not itemised in the transaction tabs, plus
+   HQ-direct expenditure which has no release rows by design. Rather than
+   spread those over dates that do not exist, the panel charts what is dated
+   and states the coverage on screen, so the trend can never silently
+   contradict the totals on the other pages.
+   ========================================================================== */
+const TA_METRICS={
+  exp:{f:'util', label:'Expenditure',    color:'#1baf7a', tip:'Utilised on releases dated in the period'},
+  lim:{f:'net',  label:'Assigned limit', color:'#2a78d6', tip:'Limit released to centres in the period'},
+  bal:{f:'bal',  label:'Balance',        color:'#eb6834', tip:'Released minus utilised - money released but not yet drawn'}
+};
+const TA_BUCKETS=[['D','Daily'],['3D','3-Day'],['W','Weekly'],['M','Monthly']];
+
+/** Earliest dated release in the FULL dataset - anchors 3-day blocks so the
+    bucket edges never shift when a filter changes. */
+function taEpoch(){
+  let min='';
+  (DATA.txns||[]).forEach(function(t){ if(t.date && (!min||t.date<min)) min=t.date; });
+  return min||'2026-04-01';
+}
+function taDay(s){ return new Date(s+'T00:00:00Z'); }
+function taISO(d){ return d.toISOString().slice(0,10); }
+
+/** The bucket a date belongs to, expressed as the bucket's start key. */
+function taKeyOf(date,b){
+  if(b==='D') return date;
+  if(b==='M') return date.slice(0,7);
+  const d=taDay(date);
+  if(b==='W'){ d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7)); return taISO(d); }   // Monday start
+  const e=taDay(taEpoch());
+  const n=Math.floor((d-e)/86400000);
+  return taISO(new Date(e.getTime()+Math.floor(n/3)*3*86400000));
+}
+/** Every bucket key from `from` to `to` inclusive, so quiet periods show as gaps. */
+function taKeysBetween(from,to,b){
+  const out=[];
+  if(b==='M'){
+    let y=+from.slice(0,4), m=+from.slice(5,7);
+    const ey=+to.slice(0,4), em=+to.slice(5,7);
+    while(y<ey||(y===ey&&m<=em)){ out.push(y+'-'+String(m).padStart(2,'0')); m++; if(m>12){m=1;y++;} }
+    return out;
+  }
+  const step=b==='D'?1:b==='3D'?3:7;
+  let d=taDay(taKeyOf(from,b)); const end=taDay(taKeyOf(to,b));
+  let guard=0;
+  while(d<=end && guard++<4000){ out.push(taISO(d)); d=new Date(d.getTime()+step*86400000); }
+  return out;
+}
+function taLabel(key,b){
+  if(b==='M'){ const p=key.split('-'); return MON[(+p[1])-1]+' '+p[0].slice(2); }
+  const d=taDay(key), dd=d.getUTCDate(), mm=MON[d.getUTCMonth()];
+  if(b==='D') return dd+' '+mm;
+  if(b==='W') return dd+' '+mm;
+  const e=new Date(d.getTime()+2*86400000);
+  return dd+'–'+e.getUTCDate()+' '+(e.getUTCMonth()===d.getUTCMonth()?mm:MON[e.getUTCMonth()]);
+}
+function taRangeLabel(key,b){
+  if(b==='M'){ const p=key.split('-'); return MON[(+p[1])-1]+' '+p[0]; }
+  const d=taDay(key);
+  const span=b==='D'?0:b==='W'?6:2;
+  const e=new Date(d.getTime()+span*86400000);
+  const f=function(x){ return x.getUTCDate()+' '+MON[x.getUTCMonth()]; };
+  return span? f(d)+' – '+f(e) : f(d);
+}
+
+/** Bucket a set of dated releases. Returns points in chronological order. */
+function taSeries(rows,b){
+  const dated=rows.filter(function(t){ return !!t.date; });
+  if(!dated.length) return [];
+  const m={};
+  let lo='', hi='';
+  dated.forEach(function(t){
+    if(!lo||t.date<lo) lo=t.date;
+    if(!hi||t.date>hi) hi=t.date;
+    const k=taKeyOf(t.date,b);
+    if(!m[k]) m[k]={key:k,net:0,util:0,n:0};
+    m[k].net+=t.net||0; m[k].util+=t.util||0; m[k].n++;
+  });
+  return taKeysBetween(lo,hi,b).map(function(k){
+    const v=m[k]||{key:k,net:0,util:0,n:0};
+    v.bal=v.net-v.util;
+    return v;
+  });
+}
+/** Running totals - the cumulative view. */
+function taCumulate(pts){
+  let n=0,u=0,c=0;
+  return pts.map(function(p){
+    n+=p.net; u+=p.util; c+=p.bal;
+    return {key:p.key,n:p.n,net:n,util:u,bal:c};
+  });
+}
+function taActiveMetrics(){
+  const m=state.taMetric||'all';
+  return m==='all' ? ['lim','exp','bal'] : [m];
+}
+
+/* ---- Chart ---------------------------------------------------------------
+   Hand-drawn SVG: one path per metric, an area wash when a single metric is
+   selected, and a full-height hit zone per bucket carrying the hover detail so
+   the pointer never has to find a 3px line. */
+function taChart(pts,id){
+  if(!pts.length) return '<div class="dt-empty"><div class="e-ic">📈</div><div class="e-t">No dated releases in this selection</div>'
+    + '<div class="e-s">Only itemised release rows carry a date and can be plotted.</div></div>';
+  const cum=!!state.taCum, b=state.taBucket&&state.taBucket[id]||'W';
+  const data=cum?taCumulate(pts):pts;
+  const keys=taActiveMetrics();
+  const W=780,H=252,L=64,R=16,T=16,B=34;
+  const iw=W-L-R, ih=H-T-B;
+  let max=0;
+  data.forEach(function(p){ keys.forEach(function(k){ const v=p[TA_METRICS[k].f]; if(v>max) max=v; }); });
+  if(max<=0) max=1;
+  const nice=Math.pow(10,Math.floor(Math.log10(max)));
+  const top=Math.ceil(max/nice*4)/4*nice;
+  const n=data.length;
+  const x=function(i){ return n===1 ? L+iw/2 : L+(i*iw)/(n-1); };
+  const y=function(v){ return T+ih-(v/top)*ih; };
+
+  let grid='';
+  for(let g=0;g<=4;g++){
+    const gy=T+ih-(g/4)*ih, gv=top*g/4;
+    grid+=`<line x1="${L}" y1="${gy.toFixed(1)}" x2="${W-R}" y2="${gy.toFixed(1)}" stroke="var(--grid)" stroke-width="1"/>`
+        + `<text x="${L-8}" y="${(gy+3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--text-muted)">${esc(crShort(gv))}</text>`;
+  }
+  let series='';
+  keys.forEach(function(k){
+    const c=TA_METRICS[k], f=c.f;
+    const pathD=data.map(function(p,i){ return (i?'L':'M')+x(i).toFixed(1)+' '+y(p[f]).toFixed(1); }).join(' ');
+    if(keys.length===1){
+      series+=`<path d="${pathD} L ${x(n-1).toFixed(1)} ${(T+ih).toFixed(1)} L ${x(0).toFixed(1)} ${(T+ih).toFixed(1)} Z" fill="${c.color}" opacity=".12"/>`;
+    }
+    series+=`<path d="${pathD}" fill="none" stroke="${c.color}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if(n<=40) data.forEach(function(p,i){
+      series+=`<circle cx="${x(i).toFixed(1)}" cy="${y(p[f]).toFixed(1)}" r="2.6" fill="#fff" stroke="${c.color}" stroke-width="1.8"/>`;
+    });
+  });
+  // x labels, thinned so they never collide
+  const every=Math.max(1,Math.ceil(n/12));
+  let xl='';
+  data.forEach(function(p,i){
+    if(i%every && i!==n-1) return;
+    xl+=`<text x="${x(i).toFixed(1)}" y="${H-12}" text-anchor="middle" font-size="10" fill="var(--text-muted)">${esc(taLabel(p.key,b))}</text>`;
+  });
+  // hover zones
+  const bw=n>1?iw/(n-1):iw;
+  let hits='';
+  data.forEach(function(p,i){
+    const raw=pts[i];
+    const tip='<b>'+esc(taRangeLabel(p.key,b))+'</b>'
+      +(cum?' <span style="opacity:.7">(cumulative)</span>':'')
+      +'<br>'+raw.n+' release'+(raw.n===1?'':'s')+' in period'
+      +'<br>Assigned limit: <b>'+esc(crShort(p.net))+'</b>'
+      +'<br>Expenditure: <b>'+esc(crShort(p.util))+'</b>'
+      +'<br>Balance: <b>'+esc(crShort(p.bal))+'</b>'
+      +(cum?'<br><span style="opacity:.7">This period alone: '+esc(crShort(raw.net))+' released · '+esc(crShort(raw.util))+' utilised</span>':'');
+    hits+=`<rect x="${(x(i)-bw/2).toFixed(1)}" y="${T}" width="${bw.toFixed(1)}" height="${ih}" fill="transparent" style="cursor:crosshair"${tattr(tip)}/>`;
+  });
+  const legend=keys.map(function(k){
+    return `<span class="ta-lg"><i style="background:${TA_METRICS[k].color}"></i>${TA_METRICS[k].label}</span>`;
+  }).join('');
+  return `<div class="ta-legend">${legend}<span class="ta-cov">${data.length} ${b==='M'?'months':b==='W'?'weeks':b==='3D'?'blocks':'days'}</span></div>`
+    + `<svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:252px">${grid}${series}${xl}${hits}</svg>`;
+}
+
+/* ---- KPI strip - recomputed for whatever the module has selected ---- */
+function taKpis(rows,scope){
+  const net=sum(rows,function(t){return t.net;}), util=sum(rows,function(t){return t.util;});
+  const b=state.taBucket&&state.taBucket[scope.id]||'W';
+  const pts=taSeries(rows,b);
+  let peak=null;
+  pts.forEach(function(p){ if(!peak||p.util>peak.util) peak=p; });
+  const active=pts.filter(function(p){ return p.n>0; }).length;
+  const rate=active?util/active:0;
+  return `<div class="kpi-grid">
+    <div class="kpi accent"${tattr('<b>Assigned limit released</b><br>Total released to '+esc(scope.name)+' across every dated release in view.')}>
+      <div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt">
+      <div class="lbl">Assigned limit</div><div class="val tnum">${crShort(net)}</div></div></div>
+      <div class="sub">${rows.length} release${rows.length===1?'':'s'}</div></div>
+    <div class="kpi"${tattr('<b>Expenditure</b><br>Utilised against those releases - '+pct(net?util/net:0,1)+' of the limit released.')}>
+      <div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt">
+      <div class="lbl">Expenditure</div><div class="val tnum">${crShort(util)}</div></div></div>
+      <div class="sub">${pct(net?util/net:0,1)} of limit released</div></div>
+    <div class="kpi"${tattr('<b>Balance</b><br>Released but not yet drawn: '+esc(crShort(net))+' − '+esc(crShort(util))+'.')}>
+      <div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('scale')}</span><div class="kpi-txt">
+      <div class="lbl">Balance</div><div class="val tnum${net-util>0?' neg':''}">${crShort(net-util)}</div></div></div>
+      <div class="sub">released, not drawn</div></div>
+    <div class="kpi"${tattr('<b>Busiest period</b><br>The '+(b==='M'?'month':b==='W'?'week':b==='3D'?'3-day block':'day')+' with the highest utilisation.<br><span style="opacity:.75">Average across active periods: '+esc(crShort(rate))+'.</span>')}>
+      <div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('gauge')}</span><div class="kpi-txt">
+      <div class="lbl">Busiest period</div><div class="val tnum sm">${peak&&peak.util>0?esc(crShort(peak.util)):'—'}</div></div></div>
+      <div class="sub">${peak&&peak.util>0?esc(taRangeLabel(peak.key,b)):'no activity'}</div></div>
+  </div>`;
+}
+
+function taBucketBar(id){
+  return '<div class="ta-seg">'+TA_BUCKETS.map(function(o){
+    const on=(state.taBucket&&state.taBucket[id]||'W')===o[0];
+    return `<button class="${on?'on':''}" onclick="setTaBucket('${id}','${o[0]}')">${o[1]}</button>`;
+  }).join('')+'</div>';
+}
+
+/* ---- The panel ---- */
+function viewTrend(){
+  const scoped=detailScopedTxn();                 // honours classification + centre chips
+  const metric=state.taMetric||'all';
+  const mChip=function(k,l){ return `<button class="fchip${metric===k?' on':''}" onclick="setTaMetric('${k}')">${l}</button>`; };
+
+  const controls=`<div class="filterbar ta-top">
+      <span class="ta-cap">Measure</span>
+      ${mChip('all','All')}${mChip('exp','Expenditure')}${mChip('lim','Assigned limit')}${mChip('bal','Balance')}
+      <div class="tools">
+        <div class="toggle"><button class="${!state.taCum?'on':''}" onclick="setTaCum(0)">Per period</button>
+        <button class="${state.taCum?'on':''}" onclick="setTaCum(1)">Cumulative</button></div>
+      </div></div>`;
+
+  const covered=sum(scoped,function(t){return t.net;});
+  const cov=`<div class="dki-note"><div class="ico">i</div><div>
+      Trends are built from <b>itemised release rows</b>, the only records in the workbook that carry a date.
+      In the current filter that is <b>${crShort(covered)}</b> across ${scoped.length} releases.
+      Component assignment has no date column and is never inferred onto the timeline; HQ-direct expenditure
+      and the New Sports Infrastructure Projects releases are not itemised, so they sit outside these curves.
+      <span class="muted">Figures here reconcile to the release tables, not to the scheme-wide assignment total.</span>
+    </div></div>`;
+
+  /* Module 1 - overall, under the site's own filters */
+  const m1=`<div class="card ta-mod">
+      <div class="ta-hd"><div><h3>1 · Overall</h3>
+        <div class="qh">Every release in scope of the filters set at the top of the platform</div></div>
+        ${taBucketBar('m1')}</div>
+      ${taKpis(scoped,{id:'m1',name:'the current filter'})}
+      ${taChart(taSeries(scoped,state.taBucket.m1),'m1')}</div>`;
+
+  /* Module 2 - Regional Centre */
+  const centres=ACTIVE_CENTRES.filter(function(c){ return isRegionalCentre(c); });
+  const byRc={}; scoped.forEach(function(t){ if(!byRc[t.rc]) byRc[t.rc]={net:0,util:0,n:0};
+    byRc[t.rc].net+=t.net||0; byRc[t.rc].util+=t.util||0; byRc[t.rc].n++; });
+  const ranked=centres.slice().sort(function(a,b){ return (byRc[b]?byRc[b].net:0)-(byRc[a]?byRc[a].net:0); });
+  if(!state.taRc || ranked.indexOf(state.taRc)<0) state.taRc=ranked[0]||'';
+  const rcRows=scoped.filter(function(t){ return t.rc===state.taRc; });
+  const rcPicker=ranked.map(function(c){
+    const v=byRc[c]||{net:0,util:0,n:0};
+    return `<button class="ta-pick${state.taRc===c?' on':''}" onclick="setTaRc('${esc(c)}')"
+      ${tattr('<b>'+esc(c)+'</b><br>Released '+esc(crShort(v.net))+'<br>Utilised '+esc(crShort(v.util))+'<br>'+v.n+' releases')}>
+      <span class="nm">${esc(c)}</span><span class="vv">${crShort(v.net)}</span></button>`;
+  }).join('');
+  const m2=`<div class="card ta-mod">
+      <div class="ta-hd"><div><h3>2 · Regional Centre</h3>
+        <div class="qh">Pick a centre to see how its releases and spending moved over time</div></div>
+        ${taBucketBar('m2')}</div>
+      <div class="ta-picks">${rcPicker}</div>
+      ${state.taRc?taKpis(rcRows,{id:'m2',name:state.taRc})+taChart(taSeries(rcRows,state.taBucket.m2),'m2'):''}</div>`;
+
+  /* Module 3 - component, then sub-component */
+  const comps={}; scoped.forEach(function(t){ if(!comps[t.sv]) comps[t.sv]={net:0,util:0,n:0};
+    comps[t.sv].net+=t.net||0; comps[t.sv].util+=t.util||0; comps[t.sv].n++; });
+  const compList=Object.keys(comps).sort(function(a,b){ return comps[b].net-comps[a].net; });
+  if(!state.taComp || compList.indexOf(state.taComp)<0){ state.taComp=compList[0]||''; state.taSub=''; }
+  let cRows=scoped.filter(function(t){ return t.sv===state.taComp; });
+  const subs={}; cRows.forEach(function(t){ const k=t.scat||'(Unspecified)';
+    if(!subs[k]) subs[k]={net:0,util:0,n:0}; subs[k].net+=t.net||0; subs[k].util+=t.util||0; subs[k].n++; });
+  const subList=Object.keys(subs).sort(function(a,b){ return subs[b].net-subs[a].net; });
+  if(state.taSub && subList.indexOf(state.taSub)<0) state.taSub='';
+  const rows3=state.taSub?cRows.filter(function(t){ return (t.scat||'(Unspecified)')===state.taSub; }):cRows;
+  const compPicker=compList.map(function(c){
+    const v=comps[c];
+    return `<button class="ta-pick${state.taComp===c?' on':''}" onclick="setTaComp('${esc(c).replace(/'/g,"\\'")}')"
+      ${tattr('<b>'+esc(c)+'</b><br>Released '+esc(crShort(v.net))+'<br>Utilised '+esc(crShort(v.util))+'<br>'+v.n+' releases')}>
+      <span class="nm">${esc(c)}</span><span class="vv">${crShort(v.net)}</span></button>`;
+  }).join('');
+  const subPicker=subList.length>1?`<div class="ta-subs"><span class="ta-cap">Sub-component</span>
+      <button class="fchip${!state.taSub?' on':''}" onclick="setTaSub('')">All</button>
+      ${subList.map(function(s){ return `<button class="fchip${state.taSub===s?' on':''}" onclick="setTaSub('${esc(s).replace(/'/g,"\\'")}')">${esc(s)} <span style="opacity:.65">${crShort(subs[s].net)}</span></button>`; }).join('')}</div>`:'';
+  const m3=`<div class="card ta-mod">
+      <div class="ta-hd"><div><h3>3 · Component &amp; sub-component</h3>
+        <div class="qh">Pick a component, then narrow to a sub-component</div></div>
+        ${taBucketBar('m3')}</div>
+      <div class="ta-picks">${compPicker}</div>
+      ${subPicker}
+      ${state.taComp?taKpis(rows3,{id:'m3',name:state.taSub||state.taComp})+taChart(taSeries(rows3,state.taBucket.m3),'m3'):''}</div>`;
+
+  return pageHead('Trend Analytics','How releases and spending have moved over time · '+(state.taCum?'cumulative':'per period'))
+   + controls + cov + m1 + m2 + m3;
+}
+function setTaMetric(v){ state.taMetric=v; render(); }
+function setTaCum(v){ state.taCum=!!(+v); render(); }
+function setTaBucket(id,v){ state.taBucket[id]=v; render(); }
+function setTaRc(v){ state.taRc=v; render(); }
+function setTaComp(v){ state.taComp=v; state.taSub=''; render(); }
+function setTaSub(v){ state.taSub=v; render(); }
+
 /* ---- Infrastructure MDSD module ---- */
 function mdsdDetail(x){
   const rank=MDSD.items.slice().sort((a,b)=>b.assign-a.assign).findIndex(m=>m.name===x.name)+1;
@@ -2322,7 +2663,7 @@ function applyViewFilterDefaults(){
 }
 
 function render(){ applyViewFilterDefaults(); applyFilter(); renderNav(); renderTopFilters(); renderSyncPill(); const v=state.view;
-  const html = v==='command'?viewCommand():v==='rc'?viewRC():v==='sv'?viewSV():v==='mdsd'?viewMDSD():v==='kigroups'?viewKI():v==='saifmt'?viewSAIFmt():v==='exceptions'?viewExc():v==='detail'?viewDetail():viewTracker();
+  const html = v==='command'?viewCommand():v==='rc'?viewRC():v==='sv'?viewSV():v==='mdsd'?viewMDSD():v==='kigroups'?viewKI():v==='saifmt'?viewSAIFmt():v==='trend'?viewTrend():v==='exceptions'?viewExc():v==='detail'?viewDetail():viewTracker();
   document.getElementById('content').innerHTML=html;
 }
 
