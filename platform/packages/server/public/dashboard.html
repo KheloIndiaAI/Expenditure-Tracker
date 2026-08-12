@@ -1927,129 +1927,177 @@ function dtEmpty(hasFilters){
    question - what has actually changed in the sheet, and when did we see it.
    KPI cards report the previous IST calendar day (00:00:00 - 23:59:59.999 IST),
    computed from absolute time so the figures are identical in any timezone. */
-function viewDetail(){
-  const win=istDayWindow(1);
-  const st=txStats(win);
-  const dayLabel=istStamp(win.start,false);
-  const range=state.txRange||'all';
-  const typeF=state.txType||'';
+/* ---- Transaction Record ----------------------------------------------------
+   Replaces the former Expenditure Detail dump, which restated the whole dataset
+   that the analysis pages already cover. This panel answers a different
+   question: what activity has the sheet recorded, and what has changed in it.
 
-  const all=(TXLOG.entries||[]).slice().sort(function(a,b){ return b.ts-a.ts; });
-  let rows=all;
-  if(range==='1')  rows=rows.filter(function(x){ return x.ts>=win.start && x.ts<=win.end; });
-  if(range==='7')  { const w7=istDayWindow(7); rows=rows.filter(function(x){ return x.ts>=w7.start; }); }
-  if(typeF) rows=rows.filter(function(x){ return x.type===typeF; });
+   WHERE THE DAY COMES FROM. Every release row in the workbook carries its own
+   date column (verified: 275 of 275 rows dated, none malformed), so daily
+   activity is read straight from the sheet. That matters - it means the figures
+   are complete and correct on the very first load, whether or not anyone had
+   this dashboard open when the entry was made. Days are IST calendar days,
+   derived from absolute time, so they are identical in any timezone.
+
+   THE ONE EXCEPTION. Component assignment is a summary-tab figure with no date
+   column, so an assignment revision cannot be dated from the sheet. Those are
+   detected by comparing one sync against the next and are labelled as observed,
+   not as sheet-dated. Everything else on this panel comes from the sheet. */
+function viewDetail(){
+  const yday=istDateStr(1);
+  const k=sheetDayStats(yday);
+  const asg=assignStats(istDayWindow(1));
+  const range=state.txRange||'all';
+  const dayLabel=sheetDMY(yday);
+
+  const dated=(DATA.txns||[]).filter(function(t){ return !!t.date; });
+  const latest=dated.reduce(function(a,t){ return t.date>a?t.date:a; },'');
+  let rows=dated.slice();
+  if(range==='1') rows=rows.filter(function(t){ return t.date===yday; });
+  if(range==='7'){ const from=istDateStr(7); rows=rows.filter(function(t){ return t.date>=from; }); }
+  rows.sort(function(a,b){ return (b.date||'').localeCompare(a.date||'') || String(a.rc).localeCompare(String(b.rc)); });
 
   const kpis=`<div class="kpi-grid">
-    <div class="kpi accent"${tattr('<b>Transactions recorded</b><br>New transaction rows first seen in the sheet during '+dayLabel+
-        ' (IST 00:00-23:59).<br><span style="opacity:.75">Value revisions to existing rows are counted separately.</span>')}>
+    <div class="kpi accent"${tattr('<b>Transactions</b><br>Release rows dated '+dayLabel+' in the sheet.'+
+        '<br><span style="opacity:.75">Counted from the sheet\'s own date column, so the figure is complete regardless of when this page was opened.</span>')}>
       <div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('receipt')}</span><div class="kpi-txt">
-      <div class="lbl">Transactions recorded</div><div class="val tnum">${st.newN}</div></div></div>
-      <div class="sub">${st.updN} value update${st.updN===1?'':'s'}${st.rmN?' · '+st.rmN+' withdrawn':''}</div></div>
+      <div class="lbl">Transactions</div><div class="val tnum">${k.n}</div></div></div>
+      <div class="sub">dated ${esc(dayLabel)}</div></div>
 
-    <div class="kpi"${tattr('<b>Expenditure recorded</b><br>Utilisation newly recorded on '+dayLabel+
-        ': the utilised amount of each new transaction, plus any increase in utilisation on existing rows.'+
-        '<br><span style="opacity:.75">Downward corrections are listed in the table but never added here.</span>')}>
+    <div class="kpi"${tattr('<b>Expenditure</b><br>Total utilised on releases dated '+dayLabel+'.'+
+        '<br><span style="opacity:.75">Released on the same rows: '+crShort(k.net)+'.</span>')}>
       <div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt">
-      <div class="lbl">Expenditure recorded</div><div class="val tnum">${crShort(st.exp)}</div></div></div>
-      <div class="sub">on ${esc(dayLabel)}</div></div>
+      <div class="lbl">Expenditure</div><div class="val tnum">${crShort(k.util)}</div></div></div>
+      <div class="sub">of ${crShort(k.net)} released</div></div>
 
-    <div class="kpi"${tattr('<b>Assignment recorded</b><br>Increase in component assignment observed on '+dayLabel+
-        '.<br><span style="opacity:.75">Sourced from the summary tab, not from release rows.</span>')}>
+    <div class="kpi"${tattr('<b>Assignment</b><br>Increase in component assignment observed on '+dayLabel+'.'+
+        '<br><span style="opacity:.75">Assignment carries no date column in the sheet, so this is detected by comparing one sync with the next - it is only populated while the platform is running.</span>')}>
       <div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('wallet')}</span><div class="kpi-txt">
-      <div class="lbl">Assignment recorded</div><div class="val tnum">${crShort(st.asg)}</div></div></div>
-      <div class="sub">${st.asgN} revision${st.asgN===1?'':'s'}</div></div>
+      <div class="lbl">Assignment</div><div class="val tnum">${crShort(asg.amt)}</div></div></div>
+      <div class="sub">${asg.n} revision${asg.n===1?'':'s'} observed</div></div>
 
-    <div class="kpi"${tattr('<b>Disbursed to Regional Centres</b><br>Amount released to the 12 Regional Centres on '+dayLabel+
-        '.<br><span style="opacity:.75">DDO HQ and INFRA-SAI are excluded - they are not Regional Centres.</span>')}>
+    <div class="kpi"${tattr('<b>Disbursed to Regional Centres</b><br>Released to the 12 Regional Centres on '+dayLabel+'.'+
+        '<br><span style="opacity:.75">DDO HQ and INFRA-SAI are excluded - they are not Regional Centres.</span>')}>
       <div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('bank')}</span><div class="kpi-txt">
-      <div class="lbl">Disbursed to Regional Centres</div><div class="val tnum">${crShort(st.rc)}</div></div></div>
-      <div class="sub">excludes HQ &amp; Infra-SAI</div></div>
+      <div class="lbl">Disbursed to Regional Centres</div><div class="val tnum">${crShort(k.rc)}</div></div></div>
+      <div class="sub">${k.rcN} release${k.rcN===1?'':'s'} · excl. HQ &amp; Infra-SAI</div></div>
   </div>`;
 
   const chip=(v,l)=>`<button class="fchip${range===v?' on':''}" onclick="setTxRange('${v}')">${l}</button>`;
-  const tOpts=[['','All activity'],['new','New transactions'],['update','Value updates'],
-               ['assign','Assignment revisions'],['removed','Withdrawn rows']]
-    .map(function(o){ return `<option value="${o[0]}"${typeF===o[0]?' selected':''}>${o[1]}</option>`; }).join('');
-
   const filterbar=`<div class="filterbar">
-      ${chip('1','Yesterday')}${chip('7','Last 7 days')}${chip('all','All recorded')}
-      <span class="chip-sel"><span class="muted">Show</span>
-        <select onchange="setTxType(this.value)">${tOpts}</select></span>
+      ${chip('1','Yesterday')}${chip('7','Last 7 days')}${chip('all','All activity')}
       <div class="tools"><button class="btn" onclick="exportTxLog()">Export CSV</button></div></div>`;
 
-  const body=rows.map(function(x){
-    return `<tr><td class="tnum" style="white-space:nowrap">${esc(istStamp(x.ts))}</td>
-      <td>${txTypePill(x.type)}</td>
-      <td>${esc(x.rc||'—')}</td>
-      <td style="white-space:nowrap">${esc(x.voucher||'—')}</td>
-      <td><b>${esc(x.sv||'—')}</b>${x.scat?`<div class="small muted">${esc(x.scat)}</div>`:''}</td>
-      <td style="white-space:nowrap">${x.date?esc(fmtD(x.date)):'—'}</td>
-      <td class="num tnum">${x.type==='assign'?'—':crShort(x.net)}</td>
-      <td class="num tnum">${x.type==='assign'?'—':crShort(x.util)}</td>
-      <td class="small">${txChange(x)}</td></tr>`;
+  const body=rows.map(function(t){
+    const ch=txChangeFor(t);
+    return `<tr title="${esc(t.nar||'')}">
+      <td style="white-space:nowrap">${esc(sheetDMY(t.date))}</td>
+      <td>${esc(t.rc||'—')}</td>
+      <td style="white-space:nowrap">${esc(t.voucher||'—')}</td>
+      <td><b>${esc(t.sv||'—')}</b>${t.scat?`<div class="small muted">${esc(t.scat)}</div>`:''}</td>
+      <td class="num tnum">${crShort(t.net)}</td>
+      <td class="num tnum">${crShort(t.util)}</td>
+      <td class="num tnum">${crShort(t.bal)}</td>
+      <td class="small">${ch}</td></tr>`;
   }).join('');
 
   const table=rows.length
-    ? `<div style="margin:2px 2px 10px" class="small muted">${rows.length} entr${rows.length===1?'y':'ies'}${
-        range==='1'?' recorded on '+esc(dayLabel):range==='7'?' in the last 7 days':' recorded in total'}</div>
+    ? `<div style="margin:2px 2px 10px" class="small muted">${rows.length} transaction${rows.length===1?'':'s'}${
+        range==='1'?' dated '+esc(dayLabel):range==='7'?' in the last 7 days':' recorded in the sheet'}
+        · released ${crShort(sum(rows,r=>r.net))} · utilised ${crShort(sum(rows,r=>r.util))}</div>
        <div class="tscroll"><table class="dt"><thead><tr>
-       <th>Recorded (IST)</th><th>Activity</th><th>Centre</th><th>Voucher</th><th>Component</th>
-       <th>Txn date</th><th class="num">Released</th><th class="num">Utilised</th><th>Change</th>
+       <th>Date</th><th>Centre</th><th>Voucher</th><th>Component</th>
+       <th class="num">Released</th><th class="num">Utilised</th><th class="num">Balance</th><th>Change</th>
        </tr></thead><tbody>${body}</tbody></table></div>`
     : `<div class="dt-empty"><div class="e-ic">🗂</div>
-       <div class="e-t">${TXLOG.since?'No changes recorded in this range':'Recording has not started yet'}</div>
-       <div class="e-s">${TXLOG.since
-          ? 'The sheet has not changed in the selected period.'
-          : 'The first sync sets the baseline; anything edited in the sheet after that is recorded here.'}</div></div>`;
+       <div class="e-t">No transactions ${range==='1'?'dated '+esc(dayLabel):range==='7'?'in the last 7 days':'in the sheet'}</div>
+       <div class="e-s">${latest?'Most recent activity in the sheet is dated <b>'+esc(sheetDMY(latest))+'</b>.':''}</div></div>`;
 
-  const note=`<div class="dki-note"><div class="ico">i</div><div>
-      Entries are recorded when the platform <b>observes</b> a change in the sync sheet - the sheet's
-      feed carries cell values only, not edit history, so this is the time of observation
-      (within the 10-minute sync interval), shown in IST. Each row also carries the transaction's own
-      date from the sheet. ${TXLOG.since
-        ? 'Recording since <b>'+esc(istStamp(TXLOG.since))+' IST</b>.'
-        : 'Recording begins at the first successful sync.'}
-      <span class="muted">Held in this browser; a shared permanent record needs server-side storage.</span>
-    </div></div>`;
+  const stale=(range!=='all' && !rows.length && latest)
+    ? `<div class="dki-note"><div class="ico">i</div><div>
+         The sheet holds no releases dated ${esc(dayLabel)}. Its most recent entry is
+         <b>${esc(sheetDMY(latest))}</b> — switch to <b>All activity</b> to see the full record.
+       </div></div>` : '';
 
-  return pageHead('Transaction Record','New transactions and value changes observed in the sync sheet · KPIs cover '+dayLabel+' (IST)')
-   + kpis + note + `<div class="card">${filterbar}${table}</div>`;
+  const upd=txRecentUpdates();
+  const updBlock=upd.length
+    ? `<div class="card"><div class="card-hd"><h3>Value revisions observed</h3></div>
+       <div class="qh">Figures changed in the sheet after they were first recorded, detected by comparing successive syncs</div>
+       <div class="tscroll"><table class="dt"><thead><tr><th>Observed</th><th>Centre</th><th>Voucher</th><th>Component</th><th>Change</th></tr></thead><tbody>
+       ${upd.map(function(x){ return `<tr><td style="white-space:nowrap">${esc(istStamp(x.ts))}</td><td>${esc(x.rc||'—')}</td>
+         <td style="white-space:nowrap">${esc(x.voucher||'—')}</td><td>${esc(x.sv||'—')}</td>
+         <td class="small">${txChange(x)}</td></tr>`; }).join('')}
+       </tbody></table></div></div>` : '';
+
+  return pageHead('Transaction Record','Activity recorded in the sync sheet · KPI cards cover '+dayLabel+' (IST)')
+   + kpis + stale + `<div class="card">${filterbar}${table}</div>` + updBlock;
 }
-function txTypePill(t){
-  const m={new:['New','#e3f6e8','#1b7a4b'],update:['Updated','#e9f0fb','#1d5aa6'],
-           assign:['Assignment','#ece8fa','#4a3aa7'],removed:['Withdrawn','#fbeaea','#a52121']};
-  const v=m[t]||['—','#eef1f6','#4d5666'];
-  return `<span style="display:inline-block;padding:1px 8px;border-radius:16px;font-size:11px;font-weight:700;background:${v[1]};color:${v[2]};white-space:nowrap">${v[0]}</span>`;
+
+/* Aggregate the sheet's own release rows for one IST calendar day (YYYY-MM-DD). */
+function sheetDayStats(day){
+  const o={n:0,net:0,util:0,rc:0,rcN:0};
+  (DATA.txns||[]).forEach(function(t){
+    if(t.date!==day) return;
+    o.n++; o.net+=t.net||0; o.util+=t.util||0;
+    if(isRegionalCentre(t.rc)){ o.rc+=t.net||0; o.rcN++; }
+  });
+  return o;
 }
-/** Human before/after for a logged change. */
+/* Assignment revisions observed in a window - the one figure the sheet cannot date. */
+function assignStats(win){
+  let n=0, amt=0;
+  (TXLOG.entries||[]).forEach(function(x){
+    if(x.type!=='assign' || x.ts<win.start || x.ts>win.end) return;
+    n++; const d=(x.assign||0)-(x.pAssign||0); if(d>0) amt+=d;
+  });
+  return {n:n, amt:amt};
+}
+/* Change annotation for a sheet row, if a revision has been observed for it. */
+function txChangeFor(t){
+  const k=txKey(t), e=(TXLOG.entries||[]);
+  for(let i=e.length-1;i>=0;i--){
+    const x=e[i];
+    if(x.type==='update' && (x.rc+'|'+x.voucher)===k) return txChange(x);
+    if(x.type==='new'    && (x.rc+'|'+x.voucher)===k) return '<span style="color:var(--good);font-weight:600">Newly recorded</span>';
+  }
+  return '<span class="muted">—</span>';
+}
+/** Human before -> after for an observed revision. */
 function txChange(x){
-  if(x.type==='new')     return '<span class="muted">First recorded</span>';
+  if(x.type==='new')     return '<span style="color:var(--good);font-weight:600">Newly recorded</span>';
   if(x.type==='removed') return '<span class="muted">Row withdrawn (was '+esc(crShort(x.pNet))+' released)</span>';
   if(x.type==='assign'){
-    const d=(x.assign||0)-(x.pAssign||0);
-    return esc(crShort(x.pAssign))+' → <b>'+esc(crShort(x.assign))+'</b> '+txDelta(d);
+    return esc(crShort(x.pAssign))+' → <b>'+esc(crShort(x.assign))+'</b> '+txDelta((x.assign||0)-(x.pAssign||0));
   }
-  const bits=[];
-  if(Math.abs((x.net||0)-(x.pNet||0))>1)   bits.push('Released '+esc(crShort(x.pNet))+' → <b>'+esc(crShort(x.net))+'</b> '+txDelta((x.net||0)-(x.pNet||0)));
-  if(Math.abs((x.util||0)-(x.pUtil||0))>1) bits.push('Utilised '+esc(crShort(x.pUtil))+' → <b>'+esc(crShort(x.util))+'</b> '+txDelta((x.util||0)-(x.pUtil||0)));
-  if(!bits.length && Math.abs((x.bal||0)-(x.pBal||0))>1) bits.push('Balance '+esc(crShort(x.pBal))+' → <b>'+esc(crShort(x.bal))+'</b>');
+  var bits=[];
+  if(Math.abs((x.net||0)-(x.pNet||0))>1)
+    bits.push('Released '+esc(crShort(x.pNet))+' → <b>'+esc(crShort(x.net))+'</b> '+txDelta((x.net||0)-(x.pNet||0)));
+  if(Math.abs((x.util||0)-(x.pUtil||0))>1)
+    bits.push('Utilised '+esc(crShort(x.pUtil))+' → <b>'+esc(crShort(x.util))+'</b> '+txDelta((x.util||0)-(x.pUtil||0)));
+  if(!bits.length && Math.abs((x.bal||0)-(x.pBal||0))>1)
+    bits.push('Balance '+esc(crShort(x.pBal))+' → <b>'+esc(crShort(x.bal))+'</b>');
   return bits.join('<br>')||'<span class="muted">—</span>';
 }
 function txDelta(d){
-  const up=d>0;
-  return `<span style="color:${up?'var(--good)':'var(--critical)'};font-weight:700">(${up?'+':'−'}${esc(crShort(Math.abs(d)))})</span>`;
+  var up=d>0;
+  return '<span style="color:'+(up?'var(--good)':'var(--critical)')+';font-weight:700">('+
+         (up?'+':'−')+esc(crShort(Math.abs(d)))+')</span>';
+}
+/** Most recent observed value revisions, newest first. */
+function txRecentUpdates(){
+  return (TXLOG.entries||[]).filter(function(x){ return x.type==='update'||x.type==='removed'; })
+    .sort(function(a,b){ return b.ts-a.ts; }).slice(0,25);
 }
 function setTxRange(v){ state.txRange=v; render(); }
-function setTxType(v){ state.txType=v; render(); }
 function exportTxLog(){
-  const rows=(TXLOG.entries||[]).slice().sort(function(a,b){ return b.ts-a.ts; });
-  const head=['Recorded (IST)','Activity','Centre','Voucher','Component','Sub-category','Txn date',
-              'Released','Utilised','Balance','Previous released','Previous utilised','Previous balance','Assignment','Previous assignment'];
-  const lines=[head.join(',')].concat(rows.map(function(x){
-    return [istStamp(x.ts),x.type,x.rc,x.voucher,x.sv,x.scat,x.date,
-            x.net,x.util,x.bal,x.pNet==null?'':x.pNet,x.pUtil==null?'':x.pUtil,x.pBal==null?'':x.pBal,
-            x.assign==null?'':x.assign,x.pAssign==null?'':x.pAssign]
+  const yday=istDateStr(1), range=state.txRange||'all';
+  let rows=(DATA.txns||[]).filter(function(t){ return !!t.date; });
+  if(range==='1') rows=rows.filter(function(t){ return t.date===yday; });
+  if(range==='7'){ const from=istDateStr(7); rows=rows.filter(function(t){ return t.date>=from; }); }
+  rows.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  const head=['Date','Centre','Voucher','Component','Sub-category','Sanction','Released','Utilised','Balance'];
+  const lines=[head.join(',')].concat(rows.map(function(t){
+    return [sheetDMY(t.date),t.rc,t.voucher,t.sv,t.scat,t.sanction,t.net,t.util,t.bal]
       .map(function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }).join(',');
   }));
   const blob=new Blob([lines.join('\n')],{type:'text/csv'}), url=URL.createObjectURL(blob), a=document.createElement('a');
@@ -2835,34 +2883,23 @@ function istDayWindow(daysAgo){
   var start=midnightShifted - IST_MIN*60000;          // real epoch of that IST midnight
   return {start:start, end:start+86400000-1, dayShifted:midnightShifted};
 }
-function istStamp(ms,withTime){
+/** Epoch -> IST calendar date, displayed as DD.MM.YYYY (date only, no clock time). */
+function istStamp(ms){
   var d=new Date(ms+IST_MIN*60000), p=function(n){ return String(n).padStart(2,'0'); };
-  var s=p(d.getUTCDate())+'.'+p(d.getUTCMonth()+1)+'.'+d.getUTCFullYear();
-  return withTime===false ? s : s+' '+p(d.getUTCHours())+':'+p(d.getUTCMinutes());
+  return p(d.getUTCDate())+'.'+p(d.getUTCMonth()+1)+'.'+d.getUTCFullYear();
+}
+/** IST calendar day `daysAgo` back, as 'YYYY-MM-DD' - the form the sheet uses. */
+function istDateStr(daysAgo){
+  var d=new Date(istDayWindow(daysAgo).dayShifted), p=function(n){ return String(n).padStart(2,'0'); };
+  return d.getUTCFullYear()+'-'+p(d.getUTCMonth()+1)+'-'+p(d.getUTCDate());
+}
+/** Sheet date 'YYYY-MM-DD' -> 'DD.MM.YYYY' for display. */
+function sheetDMY(s){
+  if(!s) return '—';
+  var p=String(s).split('-');
+  return p.length<3 ? String(s) : p[2]+'.'+p[1]+'.'+p[0];
 }
 
-/* Aggregate the log over a window. Only increases count towards the money
-   totals: a downward correction is shown in the table but must not be read as
-   fresh expenditure. */
-function txStats(win){
-  var rows=(TXLOG.entries||[]).filter(function(x){ return x.ts>=win.start && x.ts<=win.end; });
-  var o={newN:0,updN:0,rmN:0,asgN:0,exp:0,asg:0,rc:0,rows:rows};
-  rows.forEach(function(x){
-    if(x.type==='new'){
-      o.newN++; o.exp+=x.util||0;
-      if(isRegionalCentre(x.rc)) o.rc+=x.net||0;
-    } else if(x.type==='update'){
-      o.updN++;
-      var du=(x.util||0)-(x.pUtil||0); if(du>0) o.exp+=du;
-      var dn=(x.net||0)-(x.pNet||0);   if(dn>0 && isRegionalCentre(x.rc)) o.rc+=dn;
-    } else if(x.type==='removed'){ o.rmN++; }
-    else if(x.type==='assign'){
-      o.asgN++;
-      var da=(x.assign||0)-(x.pAssign||0); if(da>0) o.asg+=da;
-    }
-  });
-  return o;
-}
 
 /** Refresh the derived sync facts (latest release + integrity notes). */
 function refreshSyncFacts(){

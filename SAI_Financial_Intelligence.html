@@ -1948,7 +1948,7 @@ function viewDetail(){
   const k=sheetDayStats(yday);
   const asg=assignStats(istDayWindow(1));
   const range=state.txRange||'all';
-  const dayLabel=fmtDMY(yday);
+  const dayLabel=sheetDMY(yday);
 
   const dated=(DATA.txns||[]).filter(function(t){ return !!t.date; });
   const latest=dated.reduce(function(a,t){ return t.date>a?t.date:a; },'');
@@ -1991,7 +1991,7 @@ function viewDetail(){
   const body=rows.map(function(t){
     const ch=txChangeFor(t);
     return `<tr title="${esc(t.nar||'')}">
-      <td style="white-space:nowrap">${esc(fmtDMY(t.date))}</td>
+      <td style="white-space:nowrap">${esc(sheetDMY(t.date))}</td>
       <td>${esc(t.rc||'—')}</td>
       <td style="white-space:nowrap">${esc(t.voucher||'—')}</td>
       <td><b>${esc(t.sv||'—')}</b>${t.scat?`<div class="small muted">${esc(t.scat)}</div>`:''}</td>
@@ -2011,12 +2011,12 @@ function viewDetail(){
        </tr></thead><tbody>${body}</tbody></table></div>`
     : `<div class="dt-empty"><div class="e-ic">🗂</div>
        <div class="e-t">No transactions ${range==='1'?'dated '+esc(dayLabel):range==='7'?'in the last 7 days':'in the sheet'}</div>
-       <div class="e-s">${latest?'Most recent activity in the sheet is dated <b>'+esc(fmtDMY(latest))+'</b>.':''}</div></div>`;
+       <div class="e-s">${latest?'Most recent activity in the sheet is dated <b>'+esc(sheetDMY(latest))+'</b>.':''}</div></div>`;
 
   const stale=(range!=='all' && !rows.length && latest)
     ? `<div class="dki-note"><div class="ico">i</div><div>
          The sheet holds no releases dated ${esc(dayLabel)}. Its most recent entry is
-         <b>${esc(fmtDMY(latest))}</b> — switch to <b>All activity</b> to see the full record.
+         <b>${esc(sheetDMY(latest))}</b> — switch to <b>All activity</b> to see the full record.
        </div></div>` : '';
 
   const upd=txRecentUpdates();
@@ -2062,6 +2062,27 @@ function txChangeFor(t){
   }
   return '<span class="muted">—</span>';
 }
+/** Human before -> after for an observed revision. */
+function txChange(x){
+  if(x.type==='new')     return '<span style="color:var(--good);font-weight:600">Newly recorded</span>';
+  if(x.type==='removed') return '<span class="muted">Row withdrawn (was '+esc(crShort(x.pNet))+' released)</span>';
+  if(x.type==='assign'){
+    return esc(crShort(x.pAssign))+' → <b>'+esc(crShort(x.assign))+'</b> '+txDelta((x.assign||0)-(x.pAssign||0));
+  }
+  var bits=[];
+  if(Math.abs((x.net||0)-(x.pNet||0))>1)
+    bits.push('Released '+esc(crShort(x.pNet))+' → <b>'+esc(crShort(x.net))+'</b> '+txDelta((x.net||0)-(x.pNet||0)));
+  if(Math.abs((x.util||0)-(x.pUtil||0))>1)
+    bits.push('Utilised '+esc(crShort(x.pUtil))+' → <b>'+esc(crShort(x.util))+'</b> '+txDelta((x.util||0)-(x.pUtil||0)));
+  if(!bits.length && Math.abs((x.bal||0)-(x.pBal||0))>1)
+    bits.push('Balance '+esc(crShort(x.pBal))+' → <b>'+esc(crShort(x.bal))+'</b>');
+  return bits.join('<br>')||'<span class="muted">—</span>';
+}
+function txDelta(d){
+  var up=d>0;
+  return '<span style="color:'+(up?'var(--good)':'var(--critical)')+';font-weight:700">('+
+         (up?'+':'−')+esc(crShort(Math.abs(d)))+')</span>';
+}
 /** Most recent observed value revisions, newest first. */
 function txRecentUpdates(){
   return (TXLOG.entries||[]).filter(function(x){ return x.type==='update'||x.type==='removed'; })
@@ -2076,7 +2097,7 @@ function exportTxLog(){
   rows.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
   const head=['Date','Centre','Voucher','Component','Sub-category','Sanction','Released','Utilised','Balance'];
   const lines=[head.join(',')].concat(rows.map(function(t){
-    return [fmtDMY(t.date),t.rc,t.voucher,t.sv,t.scat,t.sanction,t.net,t.util,t.bal]
+    return [sheetDMY(t.date),t.rc,t.voucher,t.sv,t.scat,t.sanction,t.net,t.util,t.bal]
       .map(function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }).join(',');
   }));
   const blob=new Blob([lines.join('\n')],{type:'text/csv'}), url=URL.createObjectURL(blob), a=document.createElement('a');
@@ -2873,34 +2894,12 @@ function istDateStr(daysAgo){
   return d.getUTCFullYear()+'-'+p(d.getUTCMonth()+1)+'-'+p(d.getUTCDate());
 }
 /** Sheet date 'YYYY-MM-DD' -> 'DD.MM.YYYY' for display. */
-function fmtDMY(s){
+function sheetDMY(s){
   if(!s) return '—';
   var p=String(s).split('-');
   return p.length<3 ? String(s) : p[2]+'.'+p[1]+'.'+p[0];
 }
 
-/* Aggregate the log over a window. Only increases count towards the money
-   totals: a downward correction is shown in the table but must not be read as
-   fresh expenditure. */
-function txStats(win){
-  var rows=(TXLOG.entries||[]).filter(function(x){ return x.ts>=win.start && x.ts<=win.end; });
-  var o={newN:0,updN:0,rmN:0,asgN:0,exp:0,asg:0,rc:0,rows:rows};
-  rows.forEach(function(x){
-    if(x.type==='new'){
-      o.newN++; o.exp+=x.util||0;
-      if(isRegionalCentre(x.rc)) o.rc+=x.net||0;
-    } else if(x.type==='update'){
-      o.updN++;
-      var du=(x.util||0)-(x.pUtil||0); if(du>0) o.exp+=du;
-      var dn=(x.net||0)-(x.pNet||0);   if(dn>0 && isRegionalCentre(x.rc)) o.rc+=dn;
-    } else if(x.type==='removed'){ o.rmN++; }
-    else if(x.type==='assign'){
-      o.asgN++;
-      var da=(x.assign||0)-(x.pAssign||0); if(da>0) o.asg+=da;
-    }
-  });
-  return o;
-}
 
 /** Refresh the derived sync facts (latest release + integrity notes). */
 function refreshSyncFacts(){
