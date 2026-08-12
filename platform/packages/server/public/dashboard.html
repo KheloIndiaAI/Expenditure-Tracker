@@ -2532,54 +2532,116 @@ function txnBrief(t){
 }
 
 /* ---- Data-integrity audit (non-blocking) ------------------------------------
-   syncValidate() is the hard gate: it rejects a sheet whose columns do not sum,
-   so bad data is never displayed. This audit is the SOFT pass that runs on data
-   which already passed that gate - it catches figures that add up arithmetically
-   but contradict the scheme's own logic (money spent beyond what was assigned,
-   a centre drawing more than was released to it, a release utilised beyond its
-   own amount). Those are real source-sheet problems worth showing, not reasons
-   to refuse the update, so they surface as a NOTE and never block a sync.
+   Scope, deliberately narrow: this reports ONLY sums that do not add up and
+   arithmetic that contradicts itself. Business conditions are NOT errors and are
+   never flagged here - a component spending beyond its assignment, or a centre
+   drawing more than the limit released to it, are real operational states the
+   Attention Centre already surfaces, not calculation faults.
+
+   syncValidate() remains the hard gate that refuses a broken sheet outright.
+   This is the soft pass over data that already passed it, so anything found here
+   is shown as a NOTE and never blocks a sync.
+
+   Two families of check:
+     A. Internal arithmetic - identities that must hold within the summary
+        (exp = HQ-direct + centre actual, balance = assignment − expenditure,
+        centre columns roll up to their totals, parts sum to the grand total).
+     B. Cross-tab reconciliation - the transaction tabs against the summary tab.
+        This is what catches "the sheet was updated but the logic now defies":
+        a release recorded as utilised while the summary still shows nil, or a
+        summary edited without the matching release row.
+
+   Only (component, centre) pairs that actually carry release rows are compared,
+   because some components are funded outside the pulled transaction tabs and a
+   missing tab must never be reported as a mismatch.
    Tolerance of ₹1 throughout, matching syncValidate, so rounding never trips it. */
 function auditData(){
   var out=[], TOL=1;
   var subs=(DATA.subverticals||[]), rows=(DATA.txns||[]), g=(DATA.grand||{});
+  var off=function(a,b){ return Math.abs((a||0)-(b||0))>TOL; };
+  var sum=function(a,f){ var t=0; for(var i=0;i<a.length;i++) t+=(f(a[i])||0); return t; };
+  var few=function(list){ return list.slice(0,2).join(', ')+(list.length>2?' +'+(list.length-2)+' more':''); };
 
-  var over=subs.filter(function(s){ return (s.exp-s.assign)>TOL; });
-  over.forEach(function(s){
-    out.push('Expenditure exceeds assignment for “'+s.name+'” - '+crShort(s.exp)+' spent against '+
-             crShort(s.assign)+' assigned (over by '+crShort(s.exp-s.assign)+').');
+  /* ---- A. internal arithmetic ---- */
+  var idn=[], balErr=[], rollLim=[], rollAct=[];
+  subs.forEach(function(s){
+    if(off(s.exp,(s.ddoki||0)+(s.totAct||0))) idn.push(s.name);
+    if(off(s.bal,(s.assign||0)-(s.exp||0)))   balErr.push(s.name);
+    var bc=s.byCentre||{}, ks=Object.keys(bc);
+    if(ks.length){
+      if(off(sum(ks,function(k){return bc[k].lim;}), s.totLim)) rollLim.push(s.name);
+      if(off(sum(ks,function(k){return bc[k].act;}), s.totAct)) rollAct.push(s.name);
+    }
+  });
+  if(idn.length)     out.push('Expenditure ≠ HQ-direct + centre actual for '+few(idn)+'.');
+  if(balErr.length)  out.push('Balance ≠ assignment − expenditure for '+few(balErr)+'.');
+  if(rollLim.length) out.push('Centre limits do not add up to the component total for '+few(rollLim)+'.');
+  if(rollAct.length) out.push('Centre expenditure does not add up to the component total for '+few(rollAct)+'.');
+
+  var rowErr=0;
+  rows.forEach(function(t){ if(off(t.bal,(t.net||0)-(t.util||0))) rowErr++; });
+  if(rowErr) out.push(rowErr+' release'+(rowErr===1?'':'s')+' where balance ≠ released − utilised.');
+
+  if(off(g.exp,(g.ddoki||0)+(g.actual||0))) out.push('Scheme total: expenditure ≠ HQ-direct + centre actual.');
+  if(off(g.bal,(g.assign||0)-(g.exp||0)))   out.push('Scheme total: balance ≠ assignment − expenditure.');
+
+  [['assignment','assign','assign'],['expenditure','exp','exp'],
+   ['limit released','totLim','limit'],['centre expenditure','totAct','actual']
+  ].forEach(function(p){
+    var parts=sum(subs,function(s){ return s[p[1]]; }), whole=g[p[2]];
+    if(off(parts,whole)) out.push('Components do not sum to the scheme '+p[0]+' (out by '+crShort(parts-whole)+').');
   });
 
-  var drawn=subs.filter(function(s){ return (s.totAct-s.totLim)>TOL; });
-  drawn.forEach(function(s){
-    out.push('Centre expenditure exceeds the limit released for “'+s.name+'” - '+
-             crShort(s.totAct)+' drawn against '+crShort(s.totLim)+' released.');
-  });
-
-  var idn=subs.filter(function(s){ return Math.abs(s.exp-(s.ddoki+s.totAct))>TOL; });
-  if(idn.length) out.push(idn.length+' component'+(idn.length===1?'':'s')+
-             ' where expenditure does not equal HQ-direct + centre actual.');
-
-  var noAssign=subs.filter(function(s){ return s.exp>TOL && s.assign<=TOL; });
-  if(noAssign.length) out.push(noAssign.length+' component'+(noAssign.length===1?'':'s')+
-             ' carrying expenditure with no assignment recorded.');
-
-  var badRow=0, overRow=0, negRow=0;
-  rows.forEach(function(t){
-    if((t.util-t.net)>TOL) overRow++;
-    if(Math.abs((t.bal)-(t.net-t.util))>TOL) badRow++;
-    if(t.net<0||t.util<0||t.bal<0) negRow++;
-  });
-  if(overRow) out.push(overRow+' release'+(overRow===1?'':'s')+' utilised beyond the amount released.');
-  if(badRow)  out.push(badRow+' release'+(badRow===1?'':'s')+' where balance ≠ released − utilised.');
-  if(negRow)  out.push(negRow+' release'+(negRow===1?'':'s')+' carrying a negative figure.');
-
-  if(Math.abs((g.exp||0)-((g.ddoki||0)+(g.actual||0)))>TOL) out.push('Scheme total: expenditure ≠ HQ-direct + centre actual.');
-  if(Math.abs((g.bal||0)-((g.assign||0)-(g.exp||0)))>TOL)   out.push('Scheme total: balance ≠ assignment − expenditure.');
+  var st=DATA.sectionTotals||{}, sk=Object.keys(st);
+  if(sk.length){
+    if(off(sum(sk,function(k){return st[k].assign;}), g.assign)) out.push('Section assignments do not sum to the scheme total.');
+    if(off(sum(sk,function(k){return st[k].exp;}),    g.exp))    out.push('Section expenditure does not sum to the scheme total.');
+  }
 
   var m=DATA.releasesMeta;
-  if(m && m.count!=null && m.count!==rows.length)
-    out.push('Release count mismatch: sheet states '+m.count+', '+rows.length+' parsed.');
+  if(m){
+    if(m.count!=null && m.count!==rows.length)
+      out.push('Release count mismatch: sheet states '+m.count+', '+rows.length+' parsed.');
+    if(off(m.net,  sum(rows,function(t){return t.net;})))  out.push('Stated released total does not match the sum of releases.');
+    if(off(m.util, sum(rows,function(t){return t.util;}))) out.push('Stated utilised total does not match the sum of releases.');
+  }
+
+  /* ---- B. cross-tab reconciliation (transaction tabs vs summary tab) ---- */
+  var agg={};
+  rows.forEach(function(t){
+    var k=t.sv+' '+t.rc;
+    if(!agg[k]) agg[k]={net:0,util:0};
+    agg[k].net+=(t.net||0); agg[k].util+=(t.util||0);
+  });
+  var cross=[], seen={};
+  subs.forEach(function(s){
+    var bc=s.byCentre||{};
+    Object.keys(bc).forEach(function(c){
+      var a=agg[s.name+' '+c];
+      if(!a) return;                       // no releases pulled for this pair - not a mismatch
+      if(off(a.net,bc[c].lim)){
+        cross.push('“'+s.name+'” at '+c+': releases total '+crShort(a.net)+' but the summary shows '+
+                   crShort(bc[c].lim)+' released (out by '+crShort(a.net-bc[c].lim)+').');
+        seen[s.name]=1;
+      }
+      if(off(a.util,bc[c].act)){
+        cross.push('“'+s.name+'” at '+c+': releases show '+crShort(a.util)+' utilised but the summary shows '+
+                   crShort(bc[c].act)+' (out by '+crShort(a.util-bc[c].act)+').');
+        seen[s.name]=1;
+      }
+    });
+  });
+  out=out.concat(cross);
+
+  /* Component-level roll-up, only where no centre-level line already covers it. */
+  var cAgg={};
+  rows.forEach(function(t){ if(!cAgg[t.sv]) cAgg[t.sv]={net:0,util:0}; cAgg[t.sv].net+=(t.net||0); cAgg[t.sv].util+=(t.util||0); });
+  subs.forEach(function(s){
+    var a=cAgg[s.name];
+    if(!a || seen[s.name]) return;
+    if(off(a.net,s.totLim))  out.push('“'+s.name+'”: releases total '+crShort(a.net)+' against '+crShort(s.totLim)+' released in the summary.');
+    if(off(a.util,s.totAct)) out.push('“'+s.name+'”: releases show '+crShort(a.util)+' utilised against '+crShort(s.totAct)+' in the summary.');
+  });
 
   return out;
 }
