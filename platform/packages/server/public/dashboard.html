@@ -65,6 +65,9 @@ button{font-family:inherit}
 .fchip:hover{border-color:var(--primary);color:var(--primary)}
 .fchip.on{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:700;box-shadow:0 2px 12px rgba(37,106,191,.35),inset 0 0 0 1px rgba(255,255,255,.14)}
 .fchip.on:hover{color:#fff}
+.fchip-rc{border-color:var(--primary);color:var(--primary-hover);background:var(--primary-subtle);display:inline-flex;flex-direction:column;align-items:flex-start;gap:1px;padding:6px 14px;line-height:1.25}
+.fchip-rc.on{background:var(--primary);border-color:var(--primary);color:#fff}
+.fchip.lk{opacity:.4;pointer-events:none;filter:grayscale(.5)}
 .fchip.fchip-2l{display:inline-flex;flex-direction:column;align-items:flex-start;gap:1px;padding:6px 14px;line-height:1.25}
 .fchip-main{font-size:12.5px;font-weight:inherit}
 .fchip-sub{font-size:9.5px;font-weight:500;opacity:.75}
@@ -1000,10 +1003,10 @@ function applyFilter(){
   ACTIVE_CENTRES=f.CENTRES;
 }
 function setFilt(v){ state.filt=v; applyFilter(); render(); }
-function toggleDdoki(){ state.inclDdoki=!state.inclDdoki; render(); }
-function toggleMdsd(){ state.inclMdsd=!state.inclMdsd; render(); }
-function toggleHQ(){ state.inclHQ=state.inclHQ===false; render(); }
-function toggleInfraSai(){ state.inclInfraSai=state.inclInfraSai===false; render(); }
+function toggleDdoki(){ if(rcOnlyOn()) return; state.inclDdoki=!state.inclDdoki; render(); }
+function toggleMdsd(){ if(rcOnlyOn()) return; state.inclMdsd=!state.inclMdsd; render(); }
+function toggleHQ(){ if(rcOnlyOn()) return; state.inclHQ=state.inclHQ===false; render(); }
+function toggleInfraSai(){ if(rcOnlyOn()) return; state.inclInfraSai=state.inclInfraSai===false; render(); }
 
 /* ---- formatting ---- */
 function grpIN(v){ v=Math.round(v); const neg=v<0; let s=String(Math.abs(v)); if(s.length<=3) return (neg?'-':'')+s; let last3=s.slice(-3), rest=s.slice(0,-3); rest=rest.replace(/\B(?=(\d\d)+(?!\d))/g,','); return (neg?'-':'')+rest+','+last3; }
@@ -1153,6 +1156,7 @@ let state={view:'tracker', tr:{}, trSub:null, hsOpen:null, svOpen:null, filt:'Al
   inclDdoki:true, inclMdsd:false, inclHQ:true, inclInfraSai:true,
   mdsdSort:{key:'assign',dir:-1}, rcSort:{key:'bal',dir:-1}, sectSort:{key:'assign',dir:-1}, svSort:{key:'assign',dir:-1},
   dsort:{key:'act',dir:-1}, dfilt:{sv:'',rc:'',scat:'',q:''}, dmode:'alloc', cdOpen:null, sfOpen:null, tg:{}, _filtView:null, txRange:'all', txType:'',
+  rcOnly:false,
   taMetric:'all', taCum:false, taBucket:{m1:'W',m2:'W',m3:'W'}, taRc:'', taComp:'', taSub:''};
 
 /* ---- geometry / tooltip ---- */
@@ -2627,10 +2631,11 @@ function renderTopFilters(){
         <option value="Infrastructure"${f==='Infrastructure'?' selected':''}>Infrastructure</option>
       </select>
     </div>
-    <button class="fchip fchip-2l${state.inclDdoki?' on':''}" onclick="toggleDdoki()" title="Include or exclude DDO KI (HQ Direct) expenditure from every KPI, chart, table, drill-down and insight on the platform"><span class="fchip-main">DDO KI</span><span class="fchip-sub">(Direct expenditure)</span></button>
-    <button class="fchip${state.inclMdsd?' on':''}" onclick="toggleMdsd()" title="Include or exclude KI Infra (States/UTs) grants from every KPI, chart, table, drill-down and insight on the platform">KI Infra (States/UTs)</button>
-    <button class="fchip${state.inclHQ!==false?' on':''}" onclick="toggleHQ()" title="Include or exclude the DDO HQ centre - headquarters, not a Regional Centre. Unticking withdraws its limit and its actual expenditure from every figure on the platform and removes it from every table, dropdown and tooltip.">DDO HQ</button>
-    <button class="fchip${state.inclInfraSai!==false?' on':''}" onclick="toggleInfraSai()" title="Include or exclude the INFRA-SAI centre - SAI's own infrastructure wing. Unticking withdraws its limit and its actual expenditure from every figure on the platform and removes it from every table, dropdown and tooltip.">Infra-SAI</button>
+    <button class="fchip fchip-rc${rcOnlyOn()?' on':''}" onclick="toggleRcOnly()" title="Show only the 12 Regional Centres. Excludes DDO KI (HQ-direct expenditure), DDO HQ, INFRA-SAI and KI Infra (States/UTs), each of which carries its own separate data. Component assignment is a scheme-level budget and is not centre-attributable, so it is unchanged - limit released, expenditure and balance become Regional-Centre only."><span class="fchip-main">Regional Centres</span><span class="fchip-sub">only</span></button>
+    <button class="fchip fchip-2l${state.inclDdoki?' on':''}${rcOnlyOn()?' lk':''}" onclick="toggleDdoki()" title="Include or exclude DDO KI (HQ Direct) expenditure from every KPI, chart, table, drill-down and insight on the platform"><span class="fchip-main">DDO KI</span><span class="fchip-sub">(Direct expenditure)</span></button>
+    <button class="fchip${state.inclMdsd?' on':''}${rcOnlyOn()?' lk':''}" onclick="toggleMdsd()" title="Include or exclude KI Infra (States/UTs) grants from every KPI, chart, table, drill-down and insight on the platform">KI Infra (States/UTs)</button>
+    <button class="fchip${state.inclHQ!==false?' on':''}${rcOnlyOn()?' lk':''}" onclick="toggleHQ()" title="Include or exclude the DDO HQ centre - headquarters, not a Regional Centre. Unticking withdraws its limit and its actual expenditure from every figure on the platform and removes it from every table, dropdown and tooltip.">DDO HQ</button>
+    <button class="fchip${state.inclInfraSai!==false?' on':''}${rcOnlyOn()?' lk':''}" onclick="toggleInfraSai()" title="Include or exclude the INFRA-SAI centre - SAI's own infrastructure wing. Unticking withdraws its limit and its actual expenditure from every figure on the platform and removes it from every table, dropdown and tooltip.">Infra-SAI</button>
   `;
 }
 
@@ -2655,7 +2660,26 @@ const VIEW_FILTER_PRESETS = {
   kigroups: EXEC_FILTER_PRESET,
   saifmt:   ALL_FILTER_PRESET,
 };
+/* Regional-Centre mode is expressed through the four existing stream flags rather
+   than a parallel calculation, so every KPI, chart, table, drill-down and export
+   reaches it by the same code path the platform already uses - there is no second
+   definition of the figures that could drift. Re-asserted on every render, so the
+   mode survives navigation and outranks the per-panel defaults below. */
+function rcOnlyOn(){ return state.rcOnly===true; }
+function applyRcOnly(){
+  state.inclDdoki=false;      // DDO KI - HQ-direct expenditure
+  state.inclMdsd=false;       // KI Infra - States/UTs (MDSD)
+  state.inclHQ=false;         // DDO HQ centre
+  state.inclInfraSai=false;   // INFRA-SAI centre
+}
+function toggleRcOnly(){
+  state.rcOnly=!state.rcOnly;
+  if(state.rcOnly) applyRcOnly(); else Object.assign(state,EXEC_FILTER_PRESET);
+  state._filtView=state.view;
+  render();
+}
 function applyViewFilterDefaults(){
+  if(rcOnlyOn()){ applyRcOnly(); state._filtView=state.view; return; }
   if(state._filtView === state.view) return;        // same panel -> respect manual toggles
   const preset = VIEW_FILTER_PRESETS[state.view];
   if(preset) Object.assign(state, preset);          // listed panel -> apply its default
