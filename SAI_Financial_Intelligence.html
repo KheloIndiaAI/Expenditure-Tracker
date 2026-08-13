@@ -3343,13 +3343,54 @@ function isRegionalCentre(c){
 
 /* Compare an incoming build against the stored baseline and append what changed.
    Returns the number of entries added. Never throws into the sync path. */
+/* Diff the summary-tab figures of one snapshot against a set of incoming components.
+   Shared by both branches of txDetect so a Sheet3 edit is reported identically whether
+   it is caught between two syncs or on the very first sync of a browser. Only per-centre
+   pairs and DDO-KI are compared: the component totals are their sum, so reporting both
+   would count one edit twice. */
+function txSheetDiff(prevC, subs, now, syncDay, out){
+  var TOL=1;
+  (subs||[]).forEach(function(x){
+    var pc=prevC&&prevC[x.name];
+    if(!pc) return;                                   // component not previously seen
+    if(Math.abs((pc.dk||0)-(x.ddoki||0))>TOL)
+      out.push({ts:now,type:'sheet',sv:x.name,rc:'',voucher:'',scat:'',date:syncDay,
+                field:'DDO-KI direct expenditure',pVal:pc.dk||0,val:x.ddoki||0,net:0,util:0,bal:0});
+    var bc=x.byCentre||{};
+    Object.keys(bc).forEach(function(cn){
+      var pv=pc.bc&&pc.bc[cn];
+      if(!pv) return;
+      if(Math.abs(pv[0]-(bc[cn].lim||0))>TOL)
+        out.push({ts:now,type:'sheet',sv:x.name,rc:cn,voucher:'',scat:'',date:syncDay,
+                  field:'Limit assigned',pVal:pv[0],val:bc[cn].lim||0,net:0,util:0,bal:0});
+      if(Math.abs(pv[1]-(bc[cn].act||0))>TOL)
+        out.push({ts:now,type:'sheet',sv:x.name,rc:cn,voucher:'',scat:'',date:syncDay,
+                  field:'Actual expenditure',pVal:pv[1],val:bc[cn].act||0,net:0,util:0,bal:0});
+    });
+  });
+  return out;
+}
 function txDetect(b){
   try{
     var prev=lsGet(TBASE_KEY), snap=txSnapshot(b), now=Date.now();
-    if(!prev){                                  // first sync in this browser
+    if(!prev){
+      /* First sync in this browser. The release rows are adopted silently - the 275 rows
+         already in the sheet were not created at this instant and dating them "now" would
+         be false. The summary figures are different: the platform is on screen showing the
+         build-time seed, so a Sheet3 figure that differs from it is a change the viewer is
+         actually watching happen, and it is recorded. This is what catches an edit made
+         between the build and the browser's first sync - the 14.09 -> 14.90 infrastructure
+         move being exactly that case. */
+      var seed=txSnapshot({txns:[],subverticals:DATA.subverticals||[]});
+      var first=txSheetDiff(seed.c, b.subverticals, now, istDateStr(0), []);
+      if(first.length){
+        TXLOG.entries=TXLOG.entries.concat(first).slice(-TLOG_MAX);
+        if(!TXLOG.since) TXLOG.since=now;
+        lsSet(TLOG_KEY,TXLOG);
+      }
       lsSet(TBASE_KEY,snap);
       if(!TXLOG.since){ TXLOG.since=now; lsSet(TLOG_KEY,TXLOG); }
-      return 0;
+      return first.length;
     }
     var add=[], TOL=1, seen={};
     (b.txns||[]).forEach(function(t){
@@ -3384,24 +3425,8 @@ function txDetect(b){
         add.push({ts:now,type:'assign',rc:'',voucher:'',sv:x.name,scat:'',date:syncDay,
                   net:0,util:0,bal:0,assign:x.assign||0,pAssign:p});
 
-      var pc=prev.c&&prev.c[x.name];
-      if(!pc) return;                                  // component not previously seen
-      if(Math.abs((pc.dk||0)-(x.ddoki||0))>TOL)
-        add.push({ts:now,type:'sheet',sv:x.name,rc:'',voucher:'',scat:'',date:syncDay,
-                  field:'DDO-KI direct expenditure',pVal:pc.dk||0,val:x.ddoki||0,
-                  net:0,util:0,bal:0});
-      var bc=x.byCentre||{};
-      Object.keys(bc).forEach(function(cn){
-        var pv=pc.bc&&pc.bc[cn];
-        if(!pv) return;
-        if(Math.abs(pv[0]-(bc[cn].lim||0))>TOL)
-          add.push({ts:now,type:'sheet',sv:x.name,rc:cn,voucher:'',scat:'',date:syncDay,
-                    field:'Limit assigned',pVal:pv[0],val:bc[cn].lim||0,net:0,util:0,bal:0});
-        if(Math.abs(pv[1]-(bc[cn].act||0))>TOL)
-          add.push({ts:now,type:'sheet',sv:x.name,rc:cn,voucher:'',scat:'',date:syncDay,
-                    field:'Actual expenditure',pVal:pv[1],val:bc[cn].act||0,net:0,util:0,bal:0});
-      });
     });
+    txSheetDiff(prev.c, b.subverticals, now, syncDay, add);
     if(add.length){
       TXLOG.entries=TXLOG.entries.concat(add).slice(-TLOG_MAX);
       if(!TXLOG.since) TXLOG.since=now;
