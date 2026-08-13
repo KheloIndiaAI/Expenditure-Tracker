@@ -1018,7 +1018,15 @@ function pct(v,d){ d=d||0; return (v*100).toFixed(d)+'%'; }
    (AS_OF) until the first successful sync completes, so a subtitle is never blank
    or wrong. SYNC is defined later in the file; this is only ever called at render
    time, by which point it exists (the typeof guard covers any earlier call). */
-function fmtDMY(d){ return String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+d.getFullYear(); }
+/* A sync instant -> its IST calendar date, DD.MM.YYYY. Read in IST rather than the
+   browser's own zone so the position date is the same figure for every viewer: a sync
+   at 01:00 IST must not read as the previous day for someone opening the page abroad.
+   The 330-minute offset is written literally here because this runs long before the
+   IST_MIN constant further down the file. */
+function fmtDMY(d){
+  const x=new Date(d.getTime()+330*60000), p=function(n){ return String(n).padStart(2,'0'); };
+  return p(x.getUTCDate())+'.'+p(x.getUTCMonth()+1)+'.'+x.getUTCFullYear();
+}
 function syncedAsOf(){ return (typeof SYNC!=='undefined' && SYNC.last) ? fmtDMY(SYNC.last) : AS_OF; }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function jstr(v){ return esc(JSON.stringify(v)); }
@@ -1133,7 +1141,13 @@ function vAgg(node){ if(node.leaf) return node.leaf; const a=sum(node.subs,s=>s.
    dataset. Releases are scoped by the active Classification and centre chips like everything
    else, so an unticked DDO HQ / Infra-SAI removes its releases here too. */
 const AGE_DAYS=15, AGE_MIN=5000000;
-function ageRefDate(){ const p=String(AS_OF).split('.'); return new Date(+p[2],+p[1]-1,+p[0]); }
+/* The position date is the date the sheet was last synced into the platform - the same
+   figure every panel subtitle prints - so the 15-day window moves with each sync rather
+   than with the "AS ON" title typed into the workbook, which can sit unchanged for weeks.
+   syncedAsOf() falls back to that title date until the first sync completes, so the
+   window is always defined. Returned as local midnight of that calendar date; every
+   consumer compares calendar dates only, so no offset can shift the result. */
+function ageRefDate(){ const p=String(syncedAsOf()).split('.'); return new Date(+p[2],+p[1]-1,+p[0]); }
 /* Cutoff = position date − AGE_DAYS, recomputed from AS_OF on every render so it moves
    with the data. Built from the local Y/M/D parts rather than toISOString(): the ref date
    is local midnight, and converting that to UTC in a positive-offset zone such as IST
