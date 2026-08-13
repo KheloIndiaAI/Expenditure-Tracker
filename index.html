@@ -424,8 +424,8 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 .rcmini tr.t td{background:var(--bg-app);font-weight:700;border-top:1px solid var(--border)}
 .rcmini .un{color:var(--critical);font-weight:600}
 .rcmini .nilrow td{color:var(--text-muted);font-style:italic}
-/* three-step expenditure build-up in every drop-down: centres only -> add DDO KI HQ-direct
-   -> total, which always equals the component row above. Makes the HQ-direct component
+/* three-step expenditure build-up in every drop-down: centres only -> add DDO KI Direct
+   -> total, which always equals the component row above. Makes the DDO KI Direct component
    visible as an arithmetic step instead of a footnote. */
 .rcmini tr.sub-t td{background:var(--bg-app);font-weight:700;border-top:1px solid var(--border);color:var(--text-primary)}
 .rcmini tr.add-t td{background:#fbfcfe;font-weight:600;color:var(--text-secondary)}
@@ -882,7 +882,7 @@ function mdsdAsSubverticals(){
     byCentre:Object.fromEntries(CENTRES.map(c=>[c,{lim:0,act:0}]))
   }));
 }
-/* ---- master-dataset toggles (DDO KI · HQ Direct, Infrastructure MDSD) ----
+/* ---- master-dataset toggles (DDO KI Direct, Infrastructure MDSD) ----
    Both default ticked (included, matching the full source-Excel picture). Unticking a
    chip excludes its contribution at the lowest granularity - individual sub-vertical
    records - BEFORE any rollup, so every section/grand total below is summed fresh from
@@ -1053,6 +1053,44 @@ function idleByCentre(list){
     L.forEach(s=>{ const b=s.byCentre&&s.byCentre[c]; if(b){ lim+=b.lim; act+=b.act; } });
     return {key:c,lim,act,idle:lim-act};
   });
+}
+/* Tile titles grow additively with the chips: the two non-Regional-Centre rows are
+   named in the title whenever they are inside the figure, so the number on the tile
+   can never be read as centres-only when it is not. Driven off ACTIVE_CENTRES, so it
+   tracks the chips exactly. */
+function rcScopeTitle(base){
+  var extra=[];
+  if(ACTIVE_CENTRES.indexOf(HQ_KEY)>=0) extra.push('DDO HQ');
+  if(ACTIVE_CENTRES.indexOf(INFRA_KEY)>=0) extra.push('Infra-SAI');
+  return base+(extra.length?' + '+extra.join(' + '):'');
+}
+/* Itemised centre breakdown for any of the three measures - 'lim', 'act' or 'idle'.
+   Same table shape throughout: centres in descending order, a nil-centres line, the
+   Regional Centres subtotal, the two non-RC rows when they are in scope, the total,
+   and finally what the filter is holding out. */
+function rcTipRows(metric,label){
+  var rows=idleByCentre(SV);
+  var has=function(k){ return rows.some(function(r){ return r.key===k; }); };
+  var pick=function(k){ return rows.find(function(r){ return r.key===k; })||{key:k,lim:0,act:0,idle:0}; };
+  var hqOn=has(HQ_KEY), infraOn=has(INFRA_KEY);
+  var hq=pick(HQ_KEY), infra=pick(INFRA_KEY);
+  var rc=rows.filter(function(r){ return r.key!==HQ_KEY&&r.key!==INFRA_KEY; });
+  var val=function(r){ return r[metric]||0; };
+  var rcTot=sum(rc,val);
+  var tot=rcTot+(infraOn?val(infra):0)+(hqOn?val(hq):0);
+  var shown=rc.filter(function(r){ return Math.round(val(r))!==0; }).sort(function(a,b){ return val(b)-val(a); });
+  var nil=rc.length-shown.length;
+  var off=[!hqOn?'DDO HQ':null,!infraOn?'INFRA-SAI':null].filter(Boolean);
+  if(!shown.length && !hqOn && !infraOn) return '';
+  return '<div class="tipbd-h">'+esc(label)+'</div><table class="tipbd">'
+   + shown.map(function(r){ return '<tr><td>'+esc(r.key)+'</td><td>'+crShort(val(r))+'</td></tr>'; }).join('')
+   + (nil?'<tr class="nil"><td>'+nil+' other centre'+(nil===1?'':'s')+' · nil</td><td>–</td></tr>':'')
+   + '<tr class="sub"><td>Regional Centres ('+rc.length+')</td><td>'+crShort(rcTot)+'</td></tr>'
+   + (infraOn?'<tr class="infra"><td>INFRA-SAI</td><td>'+crShort(val(infra))+'</td></tr>':'')
+   + (hqOn?'<tr class="hq"><td>DDO HQ</td><td>'+crShort(val(hq))+'</td></tr>':'')
+   + '<tr class="tot"><td>Total</td><td>'+crShort(tot)+'</td></tr>'
+   + (off.length?'<tr class="nil"><td colspan="2">'+off.join(' and ')+' excluded by filter</td></tr>':'')
+   + '</table>';
 }
 function idleTipRows(list,posOnly){
   let rows=idleByCentre(list);
@@ -1258,7 +1296,7 @@ function legendRich(items){ const T=sum(items,r=>r.value)||1;
 function centreDetail(s){
   if(s.mdsd) return mdsdDetail(s);
   const rows=[];
-  if(s.ddoki>0) rows.push({name:'DDO KI · HQ Direct',lim:null,act:s.ddoki});
+  if(s.ddoki>0) rows.push({name:'DDO KI Direct',lim:null,act:s.ddoki});
   ACTIVE_CENTRES.forEach(c=>{ const b=s.byCentre[c]; if(b&&(b.lim>0||b.act>0)) rows.push({name:c,lim:b.lim,act:b.act}); });
   rows.sort((a,b)=>(b.act-a.act)||((b.lim||0)-(a.lim||0)));
   const body=rows.map(r=>{
@@ -1340,7 +1378,7 @@ function insightCards(){
     ['var(--serious)','₹',`<b>${esc(topBal.name)}</b> holds the largest unspent balance - <b>${crShort(topBal.bal)}</b> of ${crShort(topBal.assign)} assigned (${pct(topBal.assign?1-topBal.up:0,0)} unspent).`, topBal.mdsd?"go('mdsd')":"go('sv')"],
     ['var(--warn)','▲',`Overall utilisation is <b>${pct(G.assign?G.exp/G.assign:0,1)}</b> - <b>${crShort(G.bal)}</b> of the ${cr(G.assign)} assignment is still unspent.`,"go('tracker')"],
     ['var(--primary)','◧',`<b>${esc(topIdle.key)}</b> has the highest idle at a centre - <b>${crShort(topIdle.idle)}</b> of its ${crShort(topIdle.lim)} limit unspent.`,"go('rc')"],
-    ['var(--good)','₹',`<b>DDO KI (HQ direct)</b> expenditure is <b>${crShort(G.ddoki)}</b>, spent centrally outside the centre limits.`,"go('detail')"]
+    ['var(--good)','₹',`<b>DDO KI Direct</b> expenditure is <b>${crShort(G.ddoki)}</b>, spent centrally outside the centre limits.`,"go('detail')"]
   ];
   if(G.mdsdIncluded) cards.push(['var(--critical)','◆',`Infrastructure-MDSD: <b>${MDSD.zeroCount} of ${MDSD.items.length}</b> States/Institutes have utilised nothing yet - <b>${crShort(MDSD.grand.bal)}</b> of ${crShort(MDSD.grand.assign)} sanctioned remains unspent.`,"go('mdsd')"]);
   const hc={healthy:0,moderate:0,delayed:0,critical:0}; SVA.forEach(s=>{const h=healthForNode(s); if(hc[h.level]!=null) hc[h.level]++;});
@@ -1433,7 +1471,7 @@ const RC_CFG={ns:'rctbl',sortField:'rcSort',nameLabel:'Regional Centre',sancLabe
    separate column (col D), money spent centrally that never entered any centre limit, so
    removing it cannot change what was issued to, or drawn by, the centres - deducting it
    here would double-count. That figure is not a KPI on this page; it is reported in the
-   HQ-direct note above the cards, which does track the chip. The KI Infra chip moves none
+   DDO KI Direct note above the cards, which does track the chip. The KI Infra chip moves none
    of the three: MDSD State/Institute grants are released direct and carry no centre limit.
 
    Do not confuse the workbook's two "DDO HQ"-ish figures - they are ~44x apart:
@@ -1441,7 +1479,7 @@ const RC_CFG={ns:'rctbl',sortField:'rcSort',nameLabel:'Regional Centre',sancLabe
      - col D    "DDO KI · Direct Expenditure" (G.ddoki) - outside the centre-limit system. */
 function ddokiInScope(){
   /* classification-scoped DDO-KI total that deliberately ignores the DDO KI chip, so the
-     HQ-direct note can state exactly what is being withheld while the chip is unticked.
+     DDO KI Direct note can state exactly what is being withheld while the chip is unticked.
      MDSD rows never carry DDO-KI, so DATA.subverticals is the complete population here. */
   return sum(DATA.subverticals.filter(s=>SECTIONS.includes(s.section)), s=>s.ddoki||0);
 }
@@ -1453,21 +1491,32 @@ function rcKpis(){
   const scope=(state.filt==='All')?'all classifications':state.filt;
   const inc=[G.inclHQ?'DDO HQ':null,G.inclInfraSai?'INFRA-SAI':null].filter(Boolean);
   const exOut=(G.exCentres||[]);
-  const tieNote=`<br><span style="opacity:.75">Counts all ${n} active centres${inc.length?' including '+inc.map(x=>'<b>'+x+'</b>').join(' and '):''}, so this is exactly the matching column of the table below.${exOut.length?` <b>${exOut.join(' and ')}</b> ${exOut.length===1?'is':'are'} excluded by filter.`:''} Unaffected by the DDO KI chip - HQ-direct spend never sat inside a centre limit.</span>`;
-
-  const tipAssign=`<b>Assignment to Centres</b><br>Limit issued across the ${n} centres under <b>${scope}</b>.<br>${funded} carr${funded===1?'ies':'y'} a limit; ${n-funded} carr${n-funded===1?'ies':'y'} none.${tieNote}`;
-  const tipAct=`<b>Actual Expenditure by Centres</b><br>${cr(act)} drawn against ${cr(lim)} of limit (${pct(actUp,1)}).<br>${drawing} of ${funded} funded centre${funded===1?'':'s'} ha${drawing===1?'s':'ve'} spent something.${tieNote}`;
-  const tipIdle=`<b>Unspent by Centre</b><br>${cr(lim)} limit − ${cr(act)} actual = <b>${cr(idle)}</b>.<br>Money already released to the centres and still unspent - the sharpest execution-bottleneck signal on this page.${tieNote}${idleTipRows(SV)}`;
+  /* Every tooltip on this page follows one shape: the bridge equation first, then a
+     single short line of scope, then the itemised centre table with its subtotal,
+     total and filter note. No prose paragraphs. */
+  const eq=function(hl){
+    const w=function(k,v){ return hl===k ? '<b>'+cr(v)+'</b>' : cr(v); };
+    return w('lim',lim)+' limit − '+w('act',act)+' actual = '+w('idle',idle)+' unspent';
+  };
+  const tipAssign=`<b>${rcScopeTitle('Assignment to Centres')}</b><br>${eq('lim')}`
+    + `<br><span style="opacity:.75">Limit released to centres, not expenditure.</span>`
+    + rcTipRows('lim','Assignment by centre');
+  const tipAct=`<b>${rcScopeTitle('Actual Expenditure by Centres')}</b><br>${eq('act')}`
+    + `<br><span style="opacity:.75">Drawn by centres against limit released.</span>`
+    + rcTipRows('act','Expenditure by centre');
+  const tipIdle=`<b>${rcScopeTitle('Unspent by Centre')}</b><br>${eq('idle')}`
+    + `<br><span style="opacity:.75">Released to centres, not yet spent.</span>`
+    + rcTipRows('idle','Unspent by centre');
 
   return `<div class="kpi-grid k3">
-    <div class="kpi accent"${tattr(tipAssign)}><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">Assignment to Centres</div><div class="val tnum">${cr(lim)}</div></div></div><div class="sub"><b>limit released</b> to centres · not expenditure · ${funded} of ${n} funded</div></div>
-    <div class="kpi"${tattr(tipAct)}><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">Actual Expenditure by Centres</div><div class="val tnum">${cr(act)}</div></div></div><div class="sub" style="color:var(--serious)">${pct(actUp,1)} of centre limit drawn · centres only</div></div>
-    <div class="kpi"${tattr(tipIdle)}><div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('scale')}</span><div class="kpi-txt"><div class="lbl">Unspent by Centre</div><div class="val tnum neg">${cr(idle)}</div></div></div><div class="sub">${pct(idleUp,1)} of limit released, not spent</div></div>
+    <div class="kpi accent"${tattr(tipAssign)}><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">${rcScopeTitle('Assignment to Centres')}</div><div class="val tnum">${cr(lim)}</div></div></div><div class="sub"><b>limit released</b> to centres · not expenditure</div></div>
+    <div class="kpi"${tattr(tipAct)}><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">${rcScopeTitle('Actual Expenditure by Centres')}</div><div class="val tnum">${cr(act)}</div></div></div><div class="sub" style="color:var(--serious)">${pct(actUp,1)} of centre limit drawn · centres only</div></div>
+    <div class="kpi"${tattr(tipIdle)}><div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('scale')}</span><div class="kpi-txt"><div class="lbl">${rcScopeTitle('Unspent by Centre')}</div><div class="val tnum neg">${cr(idle)}</div></div></div><div class="sub">${pct(idleUp,1)} of limit released, not spent</div></div>
   </div>`;
 }
 /* ---- cross-page expenditure reconciliation -----------------------------------------
    This page reports what the centres spent; Financial Overview / Component Tracker report
-   what the SCHEME spent. They differ by DDO KI HQ-direct expenditure, which is real spend
+   what the SCHEME spent. They differ by DDO KI Direct expenditure, which is real spend
    that never passed through a centre limit. Both are correct, but seeing ₹60.60 Cr here and
    ₹99.76 Cr there with no visible bridge reads as a contradiction, so the identity is now
    stated explicitly and recomputed live from the same filtered bindings:
@@ -1482,13 +1531,12 @@ function rcReco(){
   const act=G.actual, dk=G.ddoki, ex=G.ex.exp, mdsdExp=G.mdsdIncluded?MDSD.grand.exp:0, all=ex+mdsdExp;
   const ok=Math.abs((act+dk)-ex)<1;
   if(!ok) return `<div class="reco" style="border-left-color:var(--critical)"><span class="rl" style="color:var(--critical)">Reconciliation error</span><span>centre actual ${cr(act)} + DDO KI ${cr(dk)} = ${cr(act+dk)}, but scheme expenditure is ${cr(ex)} (Δ ${cr(ex-act-dk)}). Figures on this page and Financial Overview will not agree - the source dataset is inconsistent.</span></div>`;
-  return `<div class="reco"${tattr(`<b>Why this page and Financial Overview differ</b><br>This page measures spend <b>by the centres</b>. Financial Overview measures spend <b>by the scheme</b>, which also includes DDO KI HQ-direct expenditure - money spent centrally that never passed through a centre limit.<br>${cr(act)} + ${cr(dk)} = <b>${cr(ex)}</b>${mdsdExp?`<br>+ KI Infra (States/UTs) ${cr(mdsdExp)} = <b>${cr(all)}</b>`:''}<br><span style="opacity:.75">Both figures are correct; they answer different questions.</span>`)}>
+  return `<div class="reco"${tattr(`<b>Why this page and Financial Overview differ</b><br>This page measures spend <b>by the centres</b>. Financial Overview measures spend <b>by the scheme</b>, which also includes DDO KI Direct expenditure - money spent centrally that never passed through a centre limit.<br>${cr(act)} + ${cr(dk)} = <b>${cr(ex)}</b>${mdsdExp?`<br>+ KI Infra (States/UTs) ${cr(mdsdExp)} = <b>${cr(all)}</b>`:''}<br><span style="opacity:.75">Both figures are correct; they answer different questions.</span>`)}>
     <span class="rl">Expenditure bridge</span>
     <span>Centres <span class="rv">${cr(act)}</span></span><span class="op">+</span>
-    <span>DDO KI HQ-direct <span class="rv">${cr(dk)}</span></span><span class="op">=</span>
+    <span>DDO KI Direct <span class="rv">${cr(dk)}</span></span><span class="op">=</span>
     <span>Scheme total <span class="rv" style="color:var(--primary)">${cr(ex)}</span></span>
     ${mdsdExp?`<span class="op">+</span><span>KI Infra <span class="rv">${cr(mdsdExp)}</span><span class="op"> = </span><span class="rv">${cr(all)}</span></span>`:''}
-    <span class="rt">matches <b>Expenditure to date</b> on Financial Overview</span>
   </div>`;
 }
 /* ---- SAI Format Summary -----------------------------------------------------------------
@@ -1503,7 +1551,7 @@ function rcReco(){
 
    Grant (A) is the MDSD sanction, grant (B) the SAI sanction; A + B is the assignment total
    that Financial Overview reports. (C) is expenditure on the same basis (centre actual + DDO
-   KI HQ-direct), and the Balance line is A + B − C, shown in red.
+   KI DDO KI Direct), and the Balance line is A + B − C, shown in red.
 
    Every component row expands to a Regional-Centre breakdown - limit assigned, expenditure
    done, unspent - summed from exactly the sub-verticals that feed that row, so a drop-down
@@ -1587,7 +1635,7 @@ function saifRCDetail(row){
       ${items.slice().sort((a,b)=>b.assign-a.assign).map(s=>`<tr><td>${esc(s.name)}</td><td>${crShort(s.assign)}</td><td>${crShort(s.exp)}</td><td class="un">${crShort(Math.max(0,s.bal))}</td></tr>`).join('')}
       </tbody><tfoot>
         <tr class="sub-t"><td>Sub-total · ${items.length} States / Institutes</td><td>${crShort(T.a)}</td><td>${crShort(T.e)}</td><td class="un">${crShort(Math.max(0,T.a-T.e))}</td></tr>
-        <tr class="add-t nilv"><td><span class="plus">+</span>DDO KI · HQ Direct <span class="nb">· not applicable to MDSD grants</span></td><td>–</td><td>₹0</td><td>–</td></tr>
+        <tr class="add-t nilv"><td><span class="plus">+</span>DDO KI Direct <span class="nb">· not applicable to MDSD grants</span></td><td>–</td><td>₹0</td><td>–</td></tr>
         <tr class="grand"><td>Total · MDSD<span class="tick">✓ matches row above</span></td><td>${crShort(T.a)}</td><td>${crShort(T.e)}</td><td class="un">${crShort(Math.max(0,T.a-T.e))}</td></tr>
       </tfoot></table>`;
   }
@@ -1598,7 +1646,7 @@ function saifRCDetail(row){
     <tr class="nilrow"><td>No centre carries a limit for this component</td><td>–</td><td>–</td><td>–</td></tr>
     </tbody><tfoot>
       <tr class="sub-t"><td>Sub-total · ${ACTIVE_CENTRES.length} Regional Centres</td><td>₹0</td><td>₹0</td><td class="un">₹0</td></tr>
-      <tr class="add-t nilv"><td><span class="plus">+</span>DDO KI · HQ Direct <span class="nb">· spent centrally, outside centre limits</span></td><td>–</td><td>₹0</td><td>–</td></tr>
+      <tr class="add-t nilv"><td><span class="plus">+</span>DDO KI Direct <span class="nb">· spent centrally, outside centre limits</span></td><td>–</td><td>₹0</td><td>–</td></tr>
       <tr class="grand"><td>Total · ${esc(row.label)}<span class="tick">✓ matches row above</span></td><td>₹0</td><td>₹0</td><td class="un">₹0</td></tr>
     </tfoot></table>`;
   const rc=ACTIVE_CENTRES.map(c=>{ let lim=0,act=0;
@@ -1609,16 +1657,16 @@ function saifRCDetail(row){
   const T={l:sum(rc,r=>r.lim),a:sum(rc,r=>r.act)};
   const dk=sum(subs,s=>s.ddoki||0);
   /* Footer is a three-step build-up rather than a single total plus a footnote:
-       Sub-total (centres only) -> Add DDO KI HQ-direct -> Total.
+       Sub-total (centres only) -> Add DDO KI Direct -> Total.
      The Total line is exactly the component row above, so the drop-down proves the row.
      DDO KI carries no centre limit and no unspent balance, so those two columns stay blank
      on the add step - only Expenditure moves. */
   const foot=`
     <tr class="sub-t"><td>Sub-total · ${ACTIVE_CENTRES.length} Regional Centres</td><td>${crShort(T.l)}</td><td>${crShort(T.a)}</td><td class="un">${crShort(Math.max(0,T.l-T.a))}</td></tr>
-    <tr class="add-t${dk?'':' nilv'}"><td><span class="plus">+</span>DDO KI · HQ Direct <span class="nb">· spent centrally, outside centre limits</span></td><td>–</td><td>${dk?crShort(dk):'₹0'}</td><td>–</td></tr>
+    <tr class="add-t${dk?'':' nilv'}"><td><span class="plus">+</span>DDO KI Direct <span class="nb">· spent centrally, outside centre limits</span></td><td>–</td><td>${dk?crShort(dk):'₹0'}</td><td>–</td></tr>
     <tr class="grand"><td>Total · ${esc(row.label)}<span class="tick">✓ matches row above</span></td><td>${crShort(T.l)}</td><td>${crShort(T.a+dk)}</td><td class="un">${crShort(Math.max(0,T.l-T.a))}</td></tr>`;
   if(!shown.length) return `<div class="ih">Regional Centre detail · ${esc(row.label)}</div>
-    <div class="saif-note" style="margin-bottom:9px">No Regional Centre limit has been issued for <b>${esc(row.label)}</b> under the current filter${dk?`, so all of its expenditure is DDO KI HQ-direct.`:'.'}</div>
+    <div class="saif-note" style="margin-bottom:9px">No Regional Centre limit has been issued for <b>${esc(row.label)}</b> under the current filter${dk?`, so all of its expenditure is DDO KI Direct.`:'.'}</div>
     <table class="rcmini"><thead><tr><th>Regional Centre</th><th>Limit assigned</th><th>Expenditure done</th><th>Unspent amount</th></tr></thead><tbody>
     <tr class="nilrow"><td>No centre carries a limit for this component</td><td>–</td><td>–</td><td>–</td></tr>
     </tbody><tfoot>${foot}</tfoot></table>`;
@@ -1644,7 +1692,7 @@ function viewSAIFmt(){
 
   const kpis=`<div class="kpi-grid">
     <div class="kpi accent"${tattr(`<b>Total Grant (A + B)</b><br>MDSD sanction ${cr(G0.A)} + SAI sanction ${cr(G0.B.tot)} = <b>${cr(G0.T.tot)}</b>.<br><span style="opacity:.75">Equals Total Assignment on Financial Overview.</span>`)}><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">Total Grant (A + B)</div><div class="val tnum">${cr(G0.T.tot)}</div></div></div><div class="sub">SAI ${crShort(G0.B.tot)} · MDSD ${crShort(G0.A)}</div></div>
-    <div class="kpi"${tattr(`<b>Total Expenditure (C)</b><br>Recurring ${cr(C.rec)} · Non-Recurring ${cr(C.nrec)} · Infra SAI ${cr(C.isai)} · MDSD ${cr(C.mdsd)}.<br><span style="opacity:.75">Centre actual plus DDO KI HQ-direct, the same basis as every other page.</span>`)}><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">Total Expenditure (C)</div><div class="val tnum">${cr(C.tot)}</div></div></div><div class="sub" style="color:var(--serious)">${pct(up,1)} of total grant</div></div>
+    <div class="kpi"${tattr(`<b>Total Expenditure (C)</b><br>Recurring ${cr(C.rec)} · Non-Recurring ${cr(C.nrec)} · Infra SAI ${cr(C.isai)} · MDSD ${cr(C.mdsd)}.<br><span style="opacity:.75">Centre actual plus DDO KI Direct, the same basis as every other page.</span>`)}><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">Total Expenditure (C)</div><div class="val tnum">${cr(C.tot)}</div></div></div><div class="sub" style="color:var(--serious)">${pct(up,1)} of total grant</div></div>
     <div class="kpi"${tattr(`<b>Balance Grant (A + B − C)</b><br>${cr(G0.T.tot)} − ${cr(C.tot)} = <b>${cr(B.tot)}</b> unspent (${pct(G0.T.tot?B.tot/G0.T.tot:0,1)}).`)}><div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('scale')}</span><div class="kpi-txt"><div class="lbl">Balance Grant (A + B − C)</div><div class="val tnum neg">${cr(B.tot)}</div></div></div><div class="sub">${pct(G0.T.tot?B.tot/G0.T.tot:0,1)} still unspent</div></div>
     <div class="kpi"${tattr(`<b>Unspent by Centre</b><br>Limit released to the centres and not yet drawn.${idleTipRows(SV)}`)}><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('gauge')}</span><div class="kpi-txt"><div class="lbl">Unspent by Centre</div><div class="val tnum neg">${cr(G.limit-G.actual)}</div></div></div><div class="sub">of ${crShort(G.limit)} limit released</div></div>
   </div>`;
@@ -1771,7 +1819,7 @@ function kiGroupBlock(g){
   const top=funded.slice().sort((a,b)=>b.exp-a.exp)[0];
   const dkShare=g.exp?g.ddoki/g.exp:0;
   const tipA=`<b>${g.tag} · Assignment</b><br>Sum of the Ministry assignment for ${funded.length} funded component${funded.length===1?'':'s'}.<br><span style="opacity:.75">${pct(G.ex.assign?g.assign/G.ex.assign:0,1)} of the ${cr(G.ex.assign)} scheme total (ex-KI Infra).</span>`;
-  const tipE=`<b>${g.tag} · Expenditure</b><br>Centre actual ${cr(g.act)} + DDO KI HQ-direct ${cr(g.ddoki)} = <b>${cr(g.exp)}</b>.<br>DDO KI is ${pct(dkShare,1)} of this block's spend.<br><span style="opacity:.75">Same build-up as every other page - see the expenditure bridge on Regional Centres.</span>`;
+  const tipE=`<b>${g.tag} · Expenditure</b><br>Centre actual ${cr(g.act)} + DDO KI Direct ${cr(g.ddoki)} = <b>${cr(g.exp)}</b>.<br>DDO KI is ${pct(dkShare,1)} of this block's spend.<br><span style="opacity:.75">Same build-up as every other page - see the expenditure bridge on Regional Centres.</span>`;
   const tipB=`<b>${g.tag} · Balance</b><br>${cr(g.assign)} assigned − ${cr(g.exp)} spent = <b>${cr(g.bal)}</b> still unspent (${pct(g.assign?g.bal/g.assign:0,1)}).`;
   const tipI=`<b>${g.tag} · Unspent by Centre</b><br>${cr(g.lim)} limit released to centres − ${cr(g.act)} drawn = <b>${cr(g.idle)}</b>.<br><span style="opacity:.75">Money already with the centres and still unspent. Excludes DDO KI, which never sat in a centre limit.</span>${idleTipRows(g.subs)}`;
   return `<div class="kig-sec">
@@ -1839,15 +1887,6 @@ function viewRC(){
   return pageHead('Regional Centre Dashboard','How is each centre using its assigned limit? (as on '+syncedAsOf()+')')
    + rcKpis()
    + rcReco()
-   /* HQ-direct note. The limit/actual/idle totals that used to sit here now have their own
-      KPI cards directly above, so only the genuinely separate figure - DDO KI direct
-      expenditure, the workbook's col D, which is NOT part of any centre limit and so appears
-      in no card - is reported here. This line is the one element on the page that tracks the
-      DDO KI chip. Note "DDO KI" (this figure) is a different thing from the "DDO HQ" centre
-      row in the table below, which carries its own limit and is counted in the cards above. */
-   + `<div class="dki-note"><div class="ico">HQ</div><div>${G.inclDdoki!==false
-        ? `<b>DDO KI · HQ Direct expenditure ${crShort(G.ddoki)}</b> - spent centrally by headquarters, <b>outside</b> the ${ACTIVE_CENTRES.length} centre limits below, so it is deliberately absent from the three cards above.`
-        : `<b>DDO KI · HQ Direct expenditure is excluded</b> - the DDO KI chip is unticked, withholding ${crShort(ddokiInScope())} platform-wide. It never sat inside a centre limit, so the three cards above are unchanged by it.`}${G.mdsdIncluded?` &nbsp;Infrastructure-MDSD (${crShort(MDSD.grand.assign)} sanctioned to ${MDSD.items.length} States/Institutes) is also released direct, outside these centre limits - see <span style="color:var(--primary);cursor:pointer;font-weight:600" onclick="go('mdsd')">KI Infra (States/UTs) →</span>.`:''}</div></div>`
    + `<div class="card" style="padding:0;overflow:hidden"><div class="card-hd" style="padding:16px 18px 0"><h3>Centre utilisation</h3></div>${entityUtilTable(items,RC_CFG)}</div>`;
 }
 /* small, honest per-sub-vertical iconography - one recognisable glyph per scheme
@@ -1983,7 +2022,7 @@ function viewExc(){
 function detailRows(){ let all=[];
   SV.forEach(s=>{
     if(s.mdsd){ all.push({sv:s.name,section:s.section,centre:'Direct · State/Institute (MDSD)',lim:s.assign,act:s.exp,idle:s.bal,up:s.up}); return; }
-    if(s.ddoki>0) all.push({sv:s.name,section:s.section,centre:'DDO KI · HQ Direct',lim:null,act:s.ddoki,idle:null,up:null});
+    if(s.ddoki>0) all.push({sv:s.name,section:s.section,centre:'DDO KI Direct',lim:null,act:s.ddoki,idle:null,up:null});
     ACTIVE_CENTRES.forEach(c=>{const b=s.byCentre[c]; if(b&&(b.lim>0||b.act>0)) all.push({sv:s.name,section:s.section,centre:c,lim:b.lim,act:b.act,idle:b.lim-b.act,up:b.lim?b.act/b.lim:0});});
   });
   return all; }
@@ -2236,7 +2275,7 @@ function exportTxLog(){
    COVERAGE. Dated releases cover Rs 89.20 Cr of the Rs 99.80 Cr the summary
    reports as released. The gap is one component - New Sports Infrastructure
    Projects - whose releases are not itemised in the transaction tabs, plus
-   HQ-direct expenditure which has no release rows by design. Rather than
+   DDO KI Direct expenditure which has no release rows by design. Rather than
    spread those over dates that do not exist, the panel charts what is dated
    and states the coverage on screen, so the trend can never silently
    contradict the totals on the other pages.
@@ -2453,7 +2492,7 @@ function viewTrend(){
   const cov=`<div class="dki-note"><div class="ico">i</div><div>
       Trends are built from <b>itemised release rows</b>, the only records in the workbook that carry a date.
       In the current filter that is <b>${crShort(covered)}</b> across ${scoped.length} releases.
-      Component assignment has no date column and is never inferred onto the timeline; HQ-direct expenditure
+      Component assignment has no date column and is never inferred onto the timeline; DDO KI Direct expenditure
       and the New Sports Infrastructure Projects releases are not itemised, so they sit outside these curves.
       <span class="muted">Figures here reconcile to the release tables, not to the scheme-wide assignment total.</span>
     </div></div>`;
@@ -2651,8 +2690,8 @@ function renderTopFilters(){
         <option value="Infrastructure"${f==='Infrastructure'?' selected':''}>Infrastructure</option>
       </select>
     </div>
-    <button class="fchip fchip-rc${rcOnlyOn()?' on':''}" onclick="toggleRcOnly()" title="Show only the 12 Regional Centres. Excludes DDO KI (HQ-direct expenditure), DDO HQ, INFRA-SAI and KI Infra (States/UTs), each of which carries its own separate data. Component assignment is a scheme-level budget and is not centre-attributable, so it is unchanged - limit released, expenditure and balance become Regional-Centre only."><span class="fchip-main">Regional Centres</span><span class="fchip-sub">only</span></button>
-    <button class="fchip fchip-2l${state.inclDdoki?' on':''}${rcOnlyOn()?' lk':''}" onclick="toggleDdoki()" title="Include or exclude DDO KI (HQ Direct) expenditure from every KPI, chart, table, drill-down and insight on the platform"><span class="fchip-main">DDO KI</span><span class="fchip-sub">(Direct expenditure)</span></button>
+    <button class="fchip fchip-rc${rcOnlyOn()?' on':''}" onclick="toggleRcOnly()" title="Show only the 12 Regional Centres. Excludes DDO KI Direct expenditure, DDO HQ, INFRA-SAI and KI Infra (States/UTs), each of which carries its own separate data. Component assignment is a scheme-level budget and is not centre-attributable, so it is unchanged - limit released, expenditure and balance become Regional-Centre only."><span class="fchip-main">Regional Centres</span><span class="fchip-sub">only</span></button>
+    <button class="fchip fchip-2l${state.inclDdoki?' on':''}${rcOnlyOn()?' lk':''}" onclick="toggleDdoki()" title="Include or exclude DDO KI Direct expenditure from every KPI, chart, table, drill-down and insight on the platform"><span class="fchip-main">DDO KI</span><span class="fchip-sub">(Direct expenditure)</span></button>
     <button class="fchip${state.inclMdsd?' on':''}${rcOnlyOn()?' lk':''}" onclick="toggleMdsd()" title="Include or exclude KI Infra (States/UTs) grants from every KPI, chart, table, drill-down and insight on the platform">KI Infra (States/UTs)</button>
     <button class="fchip${state.inclHQ!==false?' on':''}${rcOnlyOn()?' lk':''}" onclick="toggleHQ()" title="Include or exclude the DDO HQ centre - headquarters, not a Regional Centre. Unticking withdraws its limit and its actual expenditure from every figure on the platform and removes it from every table, dropdown and tooltip.">DDO HQ</button>
     <button class="fchip${state.inclInfraSai!==false?' on':''}${rcOnlyOn()?' lk':''}" onclick="toggleInfraSai()" title="Include or exclude the INFRA-SAI centre - SAI's own infrastructure wing. Unticking withdraws its limit and its actual expenditure from every figure on the platform and removes it from every table, dropdown and tooltip.">Infra-SAI</button>
@@ -2687,7 +2726,7 @@ const VIEW_FILTER_PRESETS = {
    mode survives navigation and outranks the per-panel defaults below. */
 function rcOnlyOn(){ return state.rcOnly===true; }
 function applyRcOnly(){
-  state.inclDdoki=false;      // DDO KI - HQ-direct expenditure
+  state.inclDdoki=false;      // DDO KI Direct expenditure
   state.inclMdsd=false;       // KI Infra - States/UTs (MDSD)
   state.inclHQ=false;         // DDO HQ centre
   state.inclInfraSai=false;   // INFRA-SAI centre
@@ -3111,7 +3150,7 @@ function txnBrief(t){
 
    Two families of check:
      A. Internal arithmetic - identities that must hold within the summary
-        (exp = HQ-direct + centre actual, balance = assignment − expenditure,
+        (exp = DDO KI Direct + centre actual, balance = assignment − expenditure,
         centre columns roll up to their totals, parts sum to the grand total).
      B. Cross-tab reconciliation - the transaction tabs against the summary tab.
         This is what catches "the sheet was updated but the logic now defies":
@@ -3140,7 +3179,7 @@ function auditData(){
       if(off(sum(ks,function(k){return bc[k].act;}), s.totAct)) rollAct.push(s.name);
     }
   });
-  if(idn.length)     out.push('Expenditure ≠ HQ-direct + centre actual for '+few(idn)+'.');
+  if(idn.length)     out.push('Expenditure ≠ DDO KI Direct + centre actual for '+few(idn)+'.');
   if(balErr.length)  out.push('Balance ≠ assignment − expenditure for '+few(balErr)+'.');
   if(rollLim.length) out.push('Centre limits do not add up to the component total for '+few(rollLim)+'.');
   if(rollAct.length) out.push('Centre expenditure does not add up to the component total for '+few(rollAct)+'.');
@@ -3149,7 +3188,7 @@ function auditData(){
   rows.forEach(function(t){ if(off(t.bal,(t.net||0)-(t.util||0))) rowErr++; });
   if(rowErr) out.push(rowErr+' release'+(rowErr===1?'':'s')+' where balance ≠ released − utilised.');
 
-  if(off(g.exp,(g.ddoki||0)+(g.actual||0))) out.push('Scheme total: expenditure ≠ HQ-direct + centre actual.');
+  if(off(g.exp,(g.ddoki||0)+(g.actual||0))) out.push('Scheme total: expenditure ≠ DDO KI Direct + centre actual.');
   if(off(g.bal,(g.assign||0)-(g.exp||0)))   out.push('Scheme total: balance ≠ assignment − expenditure.');
 
   [['assignment','assign','assign'],['expenditure','exp','exp'],
