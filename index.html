@@ -1531,7 +1531,7 @@ function rcReco(){
   const act=G.actual, dk=G.ddoki, ex=G.ex.exp, mdsdExp=G.mdsdIncluded?MDSD.grand.exp:0, all=ex+mdsdExp;
   const ok=Math.abs((act+dk)-ex)<1;
   if(!ok) return `<div class="reco" style="border-left-color:var(--critical)"><span class="rl" style="color:var(--critical)">Reconciliation error</span><span>centre actual ${cr(act)} + DDO KI ${cr(dk)} = ${cr(act+dk)}, but scheme expenditure is ${cr(ex)} (Δ ${cr(ex-act-dk)}). Figures on this page and Financial Overview will not agree - the source dataset is inconsistent.</span></div>`;
-  return `<div class="reco"${tattr(`<b>Why this page and Financial Overview differ</b><br>This page measures spend <b>by the centres</b>. Financial Overview measures spend <b>by the scheme</b>, which also includes DDO KI Direct expenditure - money spent centrally that never passed through a centre limit.<br>${cr(act)} + ${cr(dk)} = <b>${cr(ex)}</b>${mdsdExp?`<br>+ KI Infra (States/UTs) ${cr(mdsdExp)} = <b>${cr(all)}</b>`:''}<br><span style="opacity:.75">Both figures are correct; they answer different questions.</span>`)}>
+  return `<div class="reco">
     <span class="rl">Expenditure bridge</span>
     <span>Centres <span class="rv">${cr(act)}</span></span><span class="op">+</span>
     <span>DDO KI Direct <span class="rv">${cr(dk)}</span></span><span class="op">=</span>
