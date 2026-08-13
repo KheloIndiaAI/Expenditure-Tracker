@@ -2112,14 +2112,20 @@ function viewDetail(){
        </div></div>` : '';
 
   const upd=txRecentUpdates();
+  const nSheet=upd.filter(function(x){ return x.type==='sheet'||x.type==='assign'; }).length;
   const updBlock=upd.length
-    ? `<div class="card"><div class="card-hd"><h3>Value revisions observed</h3></div>
-       <div class="qh">Figures changed in the sheet after they were first recorded, detected by comparing successive syncs</div>
-       <div class="tscroll"><table class="dt"><thead><tr><th>Observed</th><th>Centre</th><th>Voucher</th><th>Component</th><th>Change</th></tr></thead><tbody>
-       ${upd.map(function(x){ return `<tr><td style="white-space:nowrap">${esc(istStamp(x.ts))}</td><td>${esc(x.rc||'—')}</td>
+    ? `<div class="card"><div class="card-hd"><h3>Revisions observed</h3></div>
+       <div class="qh">Figures changed after they were first recorded, detected by comparing successive syncs${
+         nSheet?' · includes <b>'+nSheet+'</b> edit'+(nSheet===1?'':'s')+' made directly in the summary sheet':''}</div>
+       <div class="tscroll"><table class="dt"><thead><tr><th>Recorded</th><th>Source</th><th>Centre</th><th>Voucher</th><th>Component</th><th>Change</th></tr></thead><tbody>
+       ${upd.map(function(x){ return `<tr><td style="white-space:nowrap">${esc(istStamp(x.ts))}</td>
+         <td>${txSource(x.type)}</td><td>${esc(x.rc||'—')}</td>
          <td style="white-space:nowrap">${esc(x.voucher||'—')}</td><td>${esc(x.sv||'—')}</td>
          <td class="small">${txChange(x)}</td></tr>`; }).join('')}
-       </tbody></table></div></div>` : '';
+       </tbody></table></div>
+       <div class="qh" style="margin-top:9px">Summary-sheet edits carry no date in the workbook, so they are recorded
+       under the date of the sync that observed them. They are shown for audit and are not added to the daily
+       expenditure card, because a release-row edit already moves both the transaction tab and the summary.</div></div>` : '';
 
   return pageHead('Transaction Record','Activity recorded in the sync sheet · KPI cards cover '+dayLabel+' (IST)')
    + kpis + stale + `<div class="card">${filterbar}${table}</div>` + updBlock;
@@ -2156,6 +2162,8 @@ function txChangeFor(t){
 }
 /** Human before -> after for an observed revision. */
 function txChange(x){
+  if(x.type==='sheet')
+    return esc(x.field)+': '+esc(crShort(x.pVal))+' → <b>'+esc(crShort(x.val))+'</b> '+txDelta((x.val||0)-(x.pVal||0));
   if(x.type==='new')     return '<span style="color:var(--good);font-weight:600">Newly recorded</span>';
   if(x.type==='removed') return '<span class="muted">Row withdrawn (was '+esc(crShort(x.pNet))+' released)</span>';
   if(x.type==='assign'){
@@ -2177,8 +2185,20 @@ function txDelta(d){
 }
 /** Most recent observed value revisions, newest first. */
 function txRecentUpdates(){
-  return (TXLOG.entries||[]).filter(function(x){ return x.type==='update'||x.type==='removed'; })
-    .sort(function(a,b){ return b.ts-a.ts; }).slice(0,25);
+  return (TXLOG.entries||[]).filter(function(x){
+      return x.type==='update'||x.type==='removed'||x.type==='sheet'||x.type==='assign'; })
+    .sort(function(a,b){ return b.ts-a.ts; }).slice(0,40);
+}
+/** Direct summary-tab edits only - used by the Live sync card. */
+function sheetEdits(){
+  return (TXLOG.entries||[]).filter(function(x){ return x.type==='sheet'||x.type==='assign'; })
+    .sort(function(a,b){ return b.ts-a.ts; });
+}
+/** Where a logged revision came from, for the Transaction Record table. */
+function txSource(t){
+  return (t==='sheet'||t==='assign')
+    ? '<span style="display:inline-block;padding:1px 8px;border-radius:16px;font-size:11px;font-weight:700;background:#ece8fa;color:#4a3aa7;white-space:nowrap">Summary sheet</span>'
+    : '<span style="display:inline-block;padding:1px 8px;border-radius:16px;font-size:11px;font-weight:700;background:#e9f0fb;color:#1d5aa6;white-space:nowrap">Release row</span>';
 }
 function setTxRange(v){ state.txRange=v; render(); }
 function exportTxLog(){
@@ -3236,9 +3256,19 @@ function txKey(t){ return (t.rc||'')+'|'+(t.voucher||''); }
 
 /** Value snapshot used to diff one sync against the next. */
 function txSnapshot(b){
-  var s={t:{},a:{}};
+  var s={t:{},a:{},c:{}};
   (b.txns||[]).forEach(function(t){ s.t[txKey(t)]={n:t.net||0,u:t.util||0,b:t.bal||0}; });
-  (b.subverticals||[]).forEach(function(x){ s.a[x.name]=x.assign||0; });
+  (b.subverticals||[]).forEach(function(x){
+    s.a[x.name]=x.assign||0;
+    /* Summary-tab figures. These come from Sheet3 and can be typed straight into
+       the workbook without any release row existing, so they must be snapshotted
+       separately or a direct edit leaves no trace anywhere in the platform.
+       Per-centre pairs are stored rather than the component totals, because the
+       totals are just their sum - recording both would double-report one edit. */
+    var bc=x.byCentre||{}, cc={};
+    Object.keys(bc).forEach(function(k){ cc[k]=[bc[k].lim||0, bc[k].act||0]; });
+    s.c[x.name]={dk:x.ddoki||0, bc:cc};
+  });
   return s;
 }
 
@@ -3274,13 +3304,39 @@ function txDetect(b){
       add.push({ts:now,type:'removed',rc:parts[0]||'',voucher:parts[1]||'',sv:'',scat:'',date:'',
                 net:0,util:0,bal:0,pNet:p.n,pUtil:p.u,pBal:p.b});
     });
-    (b.subverticals||[]).forEach(function(x){          // assignment revisions
+    /* Sheet3 (summary tab) direct edits.
+       Sheet3 carries no date column of its own, so an edit made straight into the
+       summary - a corrected expenditure figure, a revised limit, a change to
+       DDO-KI direct - cannot be dated from the workbook. Such entries are stamped
+       with the date of the sync that observed them, which is the earliest point
+       the change is known to exist. They are recorded for audit only and are
+       deliberately kept out of the daily expenditure KPI: a release row edit
+       moves both the transaction tab and the summary, so counting both would
+       report the same rupee twice. */
+    var syncDay=istDateStr(0);
+    (b.subverticals||[]).forEach(function(x){
       var p=prev.a[x.name];
-      if(p==null) return;                              // component not previously seen
-      var now2=x.assign||0;
-      if(Math.abs(p-now2)>TOL)
-        add.push({ts:now,type:'assign',rc:'',voucher:'',sv:x.name,scat:'',date:'',
-                  net:0,util:0,bal:0,assign:now2,pAssign:p});
+      if(p!=null && Math.abs(p-(x.assign||0))>TOL)
+        add.push({ts:now,type:'assign',rc:'',voucher:'',sv:x.name,scat:'',date:syncDay,
+                  net:0,util:0,bal:0,assign:x.assign||0,pAssign:p});
+
+      var pc=prev.c&&prev.c[x.name];
+      if(!pc) return;                                  // component not previously seen
+      if(Math.abs((pc.dk||0)-(x.ddoki||0))>TOL)
+        add.push({ts:now,type:'sheet',sv:x.name,rc:'',voucher:'',scat:'',date:syncDay,
+                  field:'DDO-KI direct expenditure',pVal:pc.dk||0,val:x.ddoki||0,
+                  net:0,util:0,bal:0});
+      var bc=x.byCentre||{};
+      Object.keys(bc).forEach(function(cn){
+        var pv=pc.bc&&pc.bc[cn];
+        if(!pv) return;
+        if(Math.abs(pv[0]-(bc[cn].lim||0))>TOL)
+          add.push({ts:now,type:'sheet',sv:x.name,rc:cn,voucher:'',scat:'',date:syncDay,
+                    field:'Limit assigned',pVal:pv[0],val:bc[cn].lim||0,net:0,util:0,bal:0});
+        if(Math.abs(pv[1]-(bc[cn].act||0))>TOL)
+          add.push({ts:now,type:'sheet',sv:x.name,rc:cn,voucher:'',scat:'',date:syncDay,
+                    field:'Actual expenditure',pVal:pv[1],val:bc[cn].act||0,net:0,util:0,bal:0});
+      });
     });
     if(add.length){
       TXLOG.entries=TXLOG.entries.concat(add).slice(-TLOG_MAX);
@@ -3373,6 +3429,18 @@ function renderSyncPill(){
           : '<span class="v mut">None yet</span>';
         let facts='<div class="sy-kv"><span class="k">New this session</span><span class="v">'+fresh+'</span></div>';
         if(SYNC.updates>0) facts+='<div class="sy-kv"><span class="k">Updates applied</span><span class="v">'+SYNC.updates+'</span></div>';
+        /* Direct edits to the summary tab - these move the headline figures without
+           any release row changing, so they are called out explicitly. */
+        var se=(typeof sheetEdits==='function')?sheetEdits():[];
+        if(se.length){
+          var s0=se[0];
+          facts+='<div class="sy-kv"><span class="k">Summary sheet</span><span class="v">'
+               + se.length+' direct edit'+(se.length===1?'':'s')+'</span></div>'
+               + '<div class="sy-kv"><span class="k"></span><span class="v mut">'
+               + esc(s0.sv||'')+(s0.rc?' · '+esc(s0.rc):'')+'<br>'
+               + esc(s0.field||'Assignment')+' '+esc(crShort(s0.pVal!=null?s0.pVal:s0.pAssign))
+               + ' → '+esc(crShort(s0.val!=null?s0.val:s0.assign))+'</span></div>';
+        }
         facts+='<div class="sy-kv"><span class="k">Last sync</span><span class="v">'
              +(SYNC.last?esc(SYNC.last.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}))
                         +' <span style="color:var(--text-muted);font-weight:500">('+esc(syncAgo(SYNC.last))+')</span>'
