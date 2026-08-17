@@ -71,10 +71,6 @@ button{font-family:inherit}
 .fchip.fchip-2l{display:inline-flex;flex-direction:column;align-items:flex-start;gap:1px;padding:6px 14px;line-height:1.25}
 .fchip-main{font-size:12.5px;font-weight:inherit}
 .fchip-sub{font-size:9.5px;font-weight:500;opacity:.75}
-.topbar .search{flex:0 1 190px;max-width:190px;min-width:120px;position:relative}
-.topbar .search input{width:100%;padding:8px 12px 8px 34px;border:1px solid var(--border);border-radius:8px;background:var(--bg-surface);font-size:14px;color:var(--text-primary)}
-.topbar .search input:focus{outline:2px solid var(--primary);outline-offset:0;border-color:var(--primary)}
-.topbar .search svg{position:absolute;left:10px;top:9px;color:var(--text-muted)}
 .verchip{margin-left:auto;font-size:12px;color:var(--text-secondary);background:var(--bg-surface);border:1px solid var(--border);border-radius:20px;padding:5px 12px;white-space:nowrap}
 /* four filter chips plus the Classification select need the room on laptop widths, so the
    data-as-of chip (duplicated in every page sub-heading) yields first. */
@@ -89,13 +85,7 @@ button{font-family:inherit}
 .syncp b{color:var(--text-primary);font-weight:600}
 .syncp .rf{color:var(--primary);font-weight:700;font-size:11px}
 @keyframes pulseD{0%,100%{opacity:.35}50%{opacity:1}}
-@media(max-width:1120px){.topbar .search{flex:0 1 150px;max-width:150px}}
 .rolechip{font-size:12px;color:#fff;background:var(--primary);border-radius:20px;padding:5px 12px;font-weight:600}
-.searchres{position:absolute;top:40px;left:0;right:0;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--elev-3);max-height:360px;overflow-y:auto;display:none;z-index:40}
-.searchres.show{display:block}
-.searchres .sr{padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}
-.searchres .sr:hover{background:var(--primary-subtle)}
-.searchres .sr .t{font-size:10px;text-transform:uppercase;color:var(--text-muted);letter-spacing:.05em}
 
 .content{padding:22px 28px 60px;max-width:1440px;width:100%}
 .pagehead{margin:2px 0 4px}
@@ -367,7 +357,7 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
   body.print-saif{background:#fff}
   body.print-saif .sidebar,body.print-saif .topbar,body.print-saif .sbBackdrop,
   body.print-saif .sidebar-backdrop,body.print-saif #tip,body.print-saif .pagehead,
-  body.print-saif .kpi-grid,body.print-saif .reco,body.print-saif .searchres{display:none!important}
+  body.print-saif .kpi-grid,body.print-saif .reco{display:none!important}
   body.print-saif .app{display:block}
   body.print-saif .content{padding:0!important}
   body.print-saif .saif-page{max-width:none;margin:0}
@@ -690,8 +680,6 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
   .topbar .chip-sel{padding:6px 8px}
   .topbar #filtSel{max-width:84px;font-size:12px}
   .fchip{padding:6px 10px;font-size:11.5px}
-  .topbar .search{max-width:none}
-  .topbar .search input{font-size:16px}
   .chip-sel.dfind input{width:100%;font-size:16px}
   .filterbar{width:100%}
   .pagehead h1{font-size:20px}
@@ -749,9 +737,6 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 
 /* ---- Phone (<=640px) ---- */
 @media(max-width:640px){
-  /* Search drops onto its own full-width row beneath the hamburger + filters */
-  .topbar .search{order:9;flex:1 1 100%;max-width:none;min-width:0}
-
   /* Thumb-friendly controls (WCAG ~44px target where practical) */
   .btn,.fchip,.chip-sel{min-height:40px;display:inline-flex;align-items:center}
   .toggle button{padding:8px 14px;font-size:13px}
@@ -988,11 +973,6 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
   <div class="main">
     <div class="topbar">
       <button class="hamburger" onclick="toggleSidebar()" aria-label="Open menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
-      <div class="search">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-        <input id="search" placeholder="Search sub-vertical or centre…" autocomplete="off"/>
-        <div class="searchres" id="searchres"></div>
-      </div>
       <button class="filtbtn" id="filtBtn" onclick="toggleFilterSheet()" aria-expanded="false" aria-controls="topFilters" aria-label="Filters">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M7 12h10M10 19h4"/></svg>
         <span>Filters</span><span class="filtbtn-n" id="filtBtnN"></span>
@@ -3201,25 +3181,6 @@ function labelTableCells(){
     if(foot) foot.classList.add('dt-foot');
   }
 }
-
-/* ---- search ---- */
-const si=document.getElementById('search'), sr=document.getElementById('searchres');
-si.addEventListener('input',function(){
-  const q=this.value.trim().toLowerCase();
-  if(!q){ sr.classList.remove('show'); sr.innerHTML=''; return; }
-  const res=[];
-  SV.filter(s=>s.assign>0||s.exp>0).forEach(s=>{ if(s.name.toLowerCase().includes(q)) res.push(s.mdsd?{t:'KI Infra (States/UTs)',n:s.name,go:`state.view='mdsd'`}:{t:'Sub-Vertical',n:s.name,go:`state.view='sv';state.svOpen=${jstr(s.name)}`}); });
-  ACTIVE_CENTRES.forEach(c=>{ if(c.toLowerCase().includes(q)) res.push({t:'Regional Centre',n:c,go:`state.view='rc'`}); });
-  KI_GROUPS.forEach(g=>{ if((g.tag+' '+g.name+' '+g.note).toLowerCase().includes(q)) res.push({t:'Delivery Block',n:g.tag+' · '+g.name,go:`state.view='kigroups'`}); });
-  SAIFMT.forEach(g=>{ const hit=(g.no+' '+g.title).toLowerCase().includes(q); if(hit) res.push({t:'SAI Format Summary',n:g.no+'. '+g.title,go:`state.view='saifmt'`});
-    (g.items||[]).forEach(it=>{ if(it.label.toLowerCase().includes(q)) res.push({t:'SAI Format · component',n:it.label,go:`state.view='saifmt';state.sfOpen=${jstr(g.no+it.k)}`}); });
-    if(g.leaf&&g.leaf.label.toLowerCase().includes(q)) res.push({t:'SAI Format · component',n:g.leaf.label,go:`state.view='saifmt';state.sfOpen=${jstr(g.no)}`}); });
-  if(!res.length){ sr.innerHTML='<div class="sr"><div class="t">No match</div></div>'; sr.classList.add('show'); return; }
-  res=res.filter(function(r){ var mm=/state\.view='([a-z]+)'/.exec(r.go||''); return !mm||!viewHidden(mm[1]); });
-  sr.innerHTML=res.slice(0,8).map(r=>`<div class="sr" onclick="${r.go};document.getElementById('search').value='';document.getElementById('searchres').classList.remove('show');render();window.scrollTo(0,0)">${esc(r.n)}<div class="t">${r.t}</div></div>`).join('');
-  sr.classList.add('show');
-});
-document.addEventListener('click',e=>{ if(!e.target.closest('.search')) sr.classList.remove('show'); });
 
 /* ============================================================================
    SAI live-sync module — parses the Google Sheet into the platform's DATA shape.
