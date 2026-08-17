@@ -2117,7 +2117,7 @@ function ageRow(t){
 function viewExc(){
   const by=ageingByCentre(), rows=ageingReleases();
   const tot=sum(rows,r=>r.bal);
-  const head=pageHead('Attention Centre','Releases of more than '+crShort(AGE_MIN)+' still unspent '+AGE_DAYS+'+ days after issue (as on '+syncedAsOf()+')');
+  const head=pageHead('Attention Centre','');
   const rule=`<div class="reco">
       <span class="rl">Flagging rule</span>
       <span>Unspent <span class="rv">&gt; ${crShort(AGE_MIN)}</span></span><span class="op">and</span>
