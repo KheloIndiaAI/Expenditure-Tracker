@@ -822,6 +822,146 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
     position:sticky;bottom:8px;box-shadow:var(--elev-2)}
   .cardify table.dt tfoot.dt-foot td:first-child{border-bottom-color:var(--primary)}
 
+  /* ---- The component tree as cards -------------------------------------
+     Its rows are a hierarchy, not records, so it cannot use the layout above:
+     the expander has to stay tappable and a sub-vertical has to keep looking
+     like a child of the component above it. Each row becomes three bands —
+     the name, the utilisation, then the three figures side by side — and the
+     nesting is carried by an inset rather than by indentation, which a phone
+     has no width to spare for.                                              */
+  .tscroll.treecards{overflow-x:visible}
+  .treecards table.dt.tree{display:block;width:100%;min-width:0}
+  .treecards table.dt.tree thead{display:none}
+  .treecards table.dt.tree tbody{display:block}
+
+  .treecards table.dt.tree tr{
+    display:grid;grid-template-columns:1fr 1fr 1fr;
+    grid-template-areas:"nm nm nm" "ut ut ut" "as ex ba";
+    gap:9px 10px;margin:0 0 9px;padding:11px 12px;
+    background:var(--bg-surface);border:1px solid var(--border);
+    border-radius:var(--radius-md);box-shadow:var(--elev-1)}
+  .treecards table.dt.tree tr:not(.det)>td{
+    display:block;padding:0;border:0;background:transparent;
+    white-space:normal;min-width:0;width:auto;text-align:left}
+  .treecards table.dt.tree td:nth-child(1){grid-area:nm}
+  .treecards table.dt.tree td:nth-child(2){grid-area:as}
+  .treecards table.dt.tree td:nth-child(3){grid-area:ex}
+  .treecards table.dt.tree td:nth-child(4){grid-area:ba}
+  /* The totals row ends in a spacer cell left over from the table layout. It
+     has no named area, so left alone the grid would auto-place it and open a
+     stray fourth band under the figures. */
+  .treecards table.dt.tree tr:not(.det)>td:nth-child(n+6){display:none}
+
+  /* Assignment / Expenditure / Balance carry their heading above the figure. */
+  .treecards table.dt.tree td:nth-child(n+2):nth-child(-n+4){
+    font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums}
+  .treecards table.dt.tree td:nth-child(n+2):nth-child(-n+4)::before{
+    content:attr(data-label);display:block;font-size:9.5px;letter-spacing:.04em;
+    text-transform:uppercase;font-weight:600;color:var(--text-muted);margin-bottom:2px}
+
+  /* Utilisation reads as a percentage followed by a bar across the card. */
+  .treecards table.dt.tree tr:not(.det)>td:nth-child(5){
+    grid-area:ut;display:flex;align-items:center;gap:10px;
+    font-size:12px;font-weight:700;color:var(--text-secondary)}
+  .treecards table.dt.tree td:nth-child(5) .ubar{
+    flex:1;width:auto;max-width:none;margin:0;height:7px}
+
+  /* The name wraps in full rather than being clipped to a column width. */
+  .treecards table.dt.tree td:nth-child(1) .nm{
+    max-width:none;white-space:normal;overflow:visible;text-overflow:clip;
+    align-items:flex-start;gap:7px;font-size:13.5px;color:var(--text-primary)}
+  .treecards table.dt.tree .vname{font-weight:700}
+  .treecards table.dt.tree .subname{padding-left:0}
+  .treecards table.dt.tree .chev{margin:1px 0 0}
+
+  /* Sections read as a band; sub-verticals sit inset beneath their parent. */
+  .treecards table.dt.tree tr.secrow{
+    background:var(--primary-subtle);border-color:rgba(37,106,191,.28);box-shadow:none}
+  .treecards table.dt.tree tr.secrow>td:nth-child(1){
+    font-size:11px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.04em;color:var(--primary-hover)}
+  .treecards table.dt.tree tr.subrow{margin-left:13px;border-left:3px solid rgba(37,106,191,.30)}
+  .treecards table.dt.tree tr.comprow.open,
+  .treecards table.dt.tree tr.subrow.open{border-color:var(--primary)}
+  .treecards table.dt.tree tr.comprow.open>td:nth-child(1),
+  .treecards table.dt.tree tr.subrow.open>td:nth-child(1){color:var(--primary-hover)}
+
+  /* The opened detail keeps its own layout, tucked under the row it belongs to. */
+  .treecards table.dt.tree tr.det{
+    display:block;margin:-6px 0 10px 13px;padding:0;
+    background:transparent;border:0;box-shadow:none}
+  .treecards table.dt.tree tr.det>td{
+    display:block;padding:11px 12px;border:1px solid var(--border);border-top:0;
+    border-radius:0 0 var(--radius-md) var(--radius-md)}
+
+  .treecards table.dt.tree tr.total{
+    background:var(--primary-subtle);border-color:var(--primary);
+    position:sticky;bottom:calc(78px + env(safe-area-inset-bottom));
+    box-shadow:var(--elev-2)}
+  .treecards table.dt.tree tr.total>td:nth-child(1){
+    font-size:12px;font-weight:800;letter-spacing:.04em}
+
+  /* ---- The drill-down that opens inside a row -----------------------------
+     Same five columns as the tree, so it gets the same three-band card, one
+     per centre. It is the innermost thing on the page, so it stays flatter:
+     no shadow, a lighter border, and the height cap lifted, since a phone
+     scrolls the page rather than a 290px box inside it.                     */
+  .usage.usagecards{max-height:none;overflow:visible;border:0;box-shadow:none;
+    background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .usage.usagecards table{display:block;width:100%}
+  .usage.usagecards thead{display:none}
+  .usage.usagecards tbody{display:block}
+  .usage.usagecards tbody tr:not(.txrow){
+    display:grid;grid-template-columns:1fr 1fr 1fr;
+    grid-template-areas:"nm nm nm" "as ex ba";
+    gap:7px 10px;margin:0 0 8px;padding:10px 11px;
+    background:var(--bg-surface);border:1px solid var(--border);border-radius:11px}
+  .usage.usagecards tbody tr:not(.txrow):hover{background:var(--bg-surface)}
+  .usage.usagecards tbody tr:not(.txrow)>td,
+  .usage.usagecards tbody tr:not(.txrow):hover>td{
+    display:block;padding:0;border:0;background:transparent;
+    text-align:left;vertical-align:baseline;white-space:normal}
+  .usage.usagecards tbody tr:not(.txrow)>td:nth-child(1){
+    grid-area:nm;font-size:13px;padding-right:44px}
+  .usage.usagecards tbody tr:not(.txrow)>td:nth-child(2){grid-area:as}
+  .usage.usagecards tbody tr:not(.txrow)>td:nth-child(3){grid-area:ex}
+  .usage.usagecards tbody tr:not(.txrow)>td:nth-child(4){grid-area:ba}
+  /* "Used" rides in the top-right corner of the name band rather than taking
+     a column of its own, which would squeeze the three figures below. */
+  .usage.usagecards tbody tr:not(.txrow)>td:nth-child(5){
+    grid-area:nm;justify-self:end;align-self:start;padding:0;
+    font-size:11.5px;font-weight:700;color:var(--text-secondary)}
+  .usage.usagecards tbody tr:not(.txrow)>td:nth-child(n+2):nth-child(-n+4){
+    font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums}
+  .usage.usagecards tbody tr:not(.txrow)>td:nth-child(n+2):nth-child(-n+4)::before{
+    content:attr(data-label);display:block;font-size:9px;letter-spacing:.03em;
+    text-transform:uppercase;font-weight:600;color:var(--text-muted);margin-bottom:1px}
+  /* The voucher list an expanded centre reveals keeps its own full-width layout. */
+  .usage.usagecards tbody tr.txrow{display:block;margin:-5px 0 9px;padding:0;background:transparent}
+  .usage.usagecards tbody tr.txrow>td,
+  .usage.usagecards tbody tr.txrow:hover>td{
+    display:block;padding:0;border:0;background:transparent}
+
+  /* ---- The voucher list, deepest level of the drill-down ----------------- */
+  table.txcards{display:block;width:100%;min-width:0}
+  table.txcards thead{display:none}
+  table.txcards tbody{display:block}
+  table.txcards tbody tr{
+    display:block;margin:0 0 7px;padding:9px 10px;
+    background:var(--bg-surface);border:1px solid var(--border);border-radius:10px}
+  table.txcards tbody td{
+    display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+    width:auto;padding:3px 0;border:0;text-align:right;font-size:12.5px}
+  table.txcards tbody td::before{
+    content:attr(data-label);flex:none;text-align:left;font-size:9px;
+    letter-spacing:.03em;text-transform:uppercase;font-weight:600;color:var(--text-muted)}
+  /* The voucher line and its narration lead the card, full width. */
+  table.txcards tbody td:first-child{
+    display:block;text-align:left;padding:0 0 7px;margin-bottom:4px;
+    border-bottom:1px solid var(--border-subtle);font-size:12.5px}
+  table.txcards tbody td:first-child::before{display:none}
+  table.txcards .txnar{max-width:none;-webkit-line-clamp:4}
+
   /* ---- The KPI band leads with one hero figure, then supporting numbers ---- */
   .kpi-grid,.kpi-grid.k3{grid-template-columns:repeat(2,1fr);gap:10px}
   .kpi-grid>.kpi:first-child{grid-column:1/-1}
@@ -3137,23 +3277,38 @@ function longestTextRun(el){
   return max;
 }
 function labelTableCells(){
-  const wraps=document.querySelectorAll('#content .tscroll');
+  /* Three shapes get the treatment, each with its own marker so the stylesheet
+     can lay them out differently: the panel tables, the component tree, and the
+     drill-down that opens inside a row (`.usage`, shared by the component and
+     regional-centre expansions). */
+  const wraps=document.querySelectorAll('#content .tscroll, #content .usage');
   for(let w=0;w<wraps.length;w++){
-    const wrap=wraps[w], tbl=wrap.querySelector('table.dt');
-    if(!tbl||tbl.classList.contains('tree')) continue;
+    const wrap=wraps[w], tbl=wrap.querySelector('table');
+    if(!tbl||(!tbl.classList.contains('dt')&&!wrap.classList.contains('usage'))) continue;
+    /* The component tree becomes cards too, but of a different shape: its rows
+       are a hierarchy, and the expander and the parent/child relationship have
+       to survive. It gets its own marker so the stylesheet can lay it out as a
+       name, a utilisation bar and three figures, with sub-verticals inset. */
+    const isTree=tbl.classList.contains('tree');
 
     /* Column headings carry sort controls (▲▼) inside them; strip those from a
-       throwaway clone so the label reads "Balance", not "Balance▲▼". */
-    const ths=tbl.querySelectorAll('thead th'), labels=[];
+       throwaway clone so the label reads "Balance", not "Balance▲▼".
+
+       Every selector here is scoped to the table's own direct children. A row
+       can open a nested table inside one of its cells — the voucher list under
+       an expanded centre does exactly that — and an unscoped `thead th` or
+       `tbody tr` reaches straight into it, which would label the inner table's
+       headings with the outer table's columns. */
+    const ths=tbl.querySelectorAll(':scope > thead > tr > th'), labels=[];
     for(let i=0;i<ths.length;i++){
       const c=ths[i].cloneNode(true), sorts=c.querySelectorAll('.mdsd-sort');
       for(let j=0;j<sorts.length;j++) sorts[j].remove();
       labels.push((c.textContent||'').replace(/\s+/g,' ').trim());
     }
     if(!labels.length) continue;
-    wrap.classList.add('cardify');
+    wrap.classList.add(wrap.classList.contains('usage')?'usagecards':isTree?'treecards':'cardify');
 
-    const rows=tbl.querySelectorAll('tbody tr, tfoot tr');
+    const rows=tbl.querySelectorAll(':scope > tbody > tr, :scope > tfoot > tr');
     for(let r=0;r<rows.length;r++){
       const tds=rows[r].children;
       let spans=false;
@@ -3177,8 +3332,26 @@ function labelTableCells(){
           tds[c2].classList.add('dt-long');
       }
     }
-    const foot=tbl.querySelector('tfoot');
+    const foot=tbl.querySelector(':scope > tfoot');
     if(foot) foot.classList.add('dt-foot');
+  }
+
+  /* The voucher list sits one level deeper again — inside a centre inside a
+     sub-vertical — and is a table in its own right rather than a wrapped one,
+     so it is picked up separately. Without this the deepest level of the
+     drill-down would be the only thing left scrolling sideways. */
+  const minis=document.querySelectorAll('#content table.txmini');
+  for(let m=0;m<minis.length;m++){
+    const t=minis[m], hs=t.querySelectorAll(':scope > thead > tr > th'), ls=[];
+    for(let i=0;i<hs.length;i++) ls.push((hs[i].textContent||'').replace(/\s+/g,' ').trim());
+    if(!ls.length) continue;
+    t.classList.add('txcards');
+    const rs=t.querySelectorAll(':scope > tbody > tr');
+    for(let r=0;r<rs.length;r++){
+      const cs=rs[r].children;
+      if(cs.length!==ls.length) continue;
+      for(let c=0;c<cs.length;c++) if(ls[c]) cs[c].setAttribute('data-label',ls[c]);
+    }
   }
 }
 
