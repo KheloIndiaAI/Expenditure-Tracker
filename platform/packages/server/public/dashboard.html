@@ -1389,8 +1389,13 @@ function crC(v){ return v?(v/1e7).toFixed(2):'<span class="muted-cell">–</span
 function kpiScheme(){
   const ex=G.ex, inc=G.mdsdIncluded;
   const exUp=ex.assign?ex.exp/ex.assign:0;
-  const nsv=SV.filter(s=>s.assign>0&&!s.mdsd).length;
   const cap=(v)=>inc?`<div class="sub" style="margin-top:5px;padding-top:5px;border-top:1px dashed var(--border);color:var(--text-muted);font-size:11px">Incl. KI Infra <b class="tnum" style="color:var(--text-secondary)">${cr(v)}</b></div>`:'';
+  /* Q2 inside the CURRENT scope, so the tile's "Previous" figure is always the
+     headline minus the tranche under the very same chips and classification.
+     Deriving it by subtraction rather than summing assignQ1 is deliberate: when a
+     chip withdraws a centre, svWithoutCentres reduces assign by that centre's
+     limit, and subtraction carries the reduction through, whereas a raw assignQ1
+     sum would report a base the headline no longer matches. */
   const q2In=sum(SV,function(x){ return x.q2||0; });
   const tipAssign=`<b>Total Assignment</b><br>${cr(ex.assign)} (ex-MDSD)${inc?`<br>+ Infrastructure-MDSD ₹${(MDSD.grand.assign/1e7).toFixed(2)} Cr = ${cr(G.assign)}`:''}`
     + (q2In?`<br><br>Q1 base ${cr(ex.assign-q2In)} + <b>Q2 tranche ${cr(q2In)}</b>`:'');
@@ -1398,7 +1403,7 @@ function kpiScheme(){
   const tipBal=`<b>Balance</b><br>${cr(ex.bal)} (ex-MDSD)${inc?`<br>+ Infrastructure-MDSD ₹${(MDSD.grand.bal/1e7).toFixed(2)} Cr = ${cr(G.bal)}`:''}`;
   const tipIdle=`<b>Unspent by Centre</b><br>${cr(ex.idle)} (Regional Centres + DDO HQ)${inc?`<br>+ Infrastructure-MDSD unspent ₹${(G.mdsdIdle/1e7).toFixed(2)} Cr = ${cr(G.idle)}`:''}${idleTipRows(SV)}`;
   return `<div class="kpi-grid">
-    <div class="kpi accent"${tattr(tipAssign)}><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">Total Assignment</div><div class="val tnum">${cr(ex.assign)}</div></div></div><div class="sub">from Ministry · ${nsv} sub-verticals${q2In?` · <b>Q2 Limit: ${cr(q2In)}</b>`:''}</div>${cap(G.assign)}</div>
+    <div class="kpi accent"${tattr(tipAssign)}><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">Total Assignment</div><div class="val tnum">${cr(ex.assign)}</div></div></div><div class="sub">Previous ${cr(ex.assign-q2In)} · <b>Q2 Limit: ${cr(q2In)}</b></div>${cap(G.assign)}</div>
     <div class="kpi"${tattr(tipExp)}><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">Expenditure to date</div><div class="val tnum">${cr(ex.exp)}</div></div></div><div class="sub" style="color:var(--serious)">${pct(exUp,1)} of assignment</div>${cap(G.exp)}</div>
     <div class="kpi"${tattr(tipBal)}><div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('scale')}</span><div class="kpi-txt"><div class="lbl">Balance</div><div class="val tnum">${cr(ex.bal)}</div></div></div><div class="sub">${pct(ex.assign?ex.bal/ex.assign:0,1)} unspent</div>${cap(G.bal)}</div>
     <div class="kpi"${tattr(tipIdle)}><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('gauge')}</span><div class="kpi-txt"><div class="lbl">Unspent by Centre</div><div class="val tnum neg">${cr(ex.idle)}</div></div></div><div class="sub">limit assigned, not spent</div>${cap(G.idle)}</div>
