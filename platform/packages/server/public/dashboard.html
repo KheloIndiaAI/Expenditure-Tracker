@@ -97,6 +97,8 @@ button{font-family:inherit}
 
 .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:16px 0}
 .kpi-grid.k3{grid-template-columns:repeat(3,1fr)}
+/* Two cards, one of which is a list of centres: give the list the wider half. */
+.kpi-grid.k2{grid-template-columns:minmax(0,1fr) minmax(0,1.35fr)}
 .kpi{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px 16px 14px;box-shadow:var(--elev-1);min-width:0;transition:transform .2s,box-shadow .2s,border-color .2s}
 .kpi:hover{transform:translateY(-2px);box-shadow:var(--elev-2);border-color:rgba(37,106,191,.30)}
 .kpi .lbl{font-size:12.5px;color:var(--text-muted);font-weight:500;display:flex;align-items:center;gap:6px}
@@ -913,24 +915,34 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
   .usage.usagecards tbody{display:block}
   .usage.usagecards tbody tr:not(.txrow){
     display:grid;grid-template-columns:1fr 1fr 1fr;
-    grid-template-areas:"nm nm nm" "as ex ba";
-    gap:7px 10px;margin:0 0 8px;padding:10px 11px;
-    background:var(--bg-surface);border:1px solid var(--border);border-radius:11px}
+    grid-template-areas:"nm nm pct" "as ex ba";
+    gap:7px 10px;margin:0 0 8px;padding:11px 12px;
+    background:var(--bg-surface);border:1px solid var(--border);border-radius:12px}
+  /* Rows that state a utilisation get the split bar between name and figures,
+     so the card matches the centre card it was opened from. */
+  .usage.usagecards tbody tr.ub{grid-template-areas:"nm nm pct" "bar bar bar" "as ex ba"}
+  .usage.usagecards tbody tr.ub::after{
+    content:'';grid-area:bar;height:9px;border-radius:5px;
+    background:linear-gradient(90deg,
+      var(--good) 0 calc(var(--up,0)*1%),
+      var(--serious) calc(var(--up,0)*1%) 100%)}
   .usage.usagecards tbody tr:not(.txrow):hover{background:var(--bg-surface)}
   .usage.usagecards tbody tr:not(.txrow)>td,
   .usage.usagecards tbody tr:not(.txrow):hover>td{
     display:block;padding:0;border:0;background:transparent;
     text-align:left;vertical-align:baseline;white-space:normal}
   .usage.usagecards tbody tr:not(.txrow)>td:nth-child(1){
-    grid-area:nm;font-size:13px;padding-right:44px}
+    grid-area:nm;font-size:13px;font-weight:600;color:var(--text-primary)}
   .usage.usagecards tbody tr:not(.txrow)>td:nth-child(2){grid-area:as}
   .usage.usagecards tbody tr:not(.txrow)>td:nth-child(3){grid-area:ex}
   .usage.usagecards tbody tr:not(.txrow)>td:nth-child(4){grid-area:ba}
-  /* "Used" rides in the top-right corner of the name band rather than taking
-     a column of its own, which would squeeze the three figures below. */
+  /* "Used" reads as a pill in the top-right corner rather than taking a column
+     of its own, which would squeeze the three figures below. */
   .usage.usagecards tbody tr:not(.txrow)>td:nth-child(5){
-    grid-area:nm;justify-self:end;align-self:start;padding:0;
-    font-size:11.5px;font-weight:700;color:var(--text-secondary)}
+    grid-area:pct;justify-self:end;align-self:start;
+    padding:2px 9px;border-radius:20px;white-space:nowrap;
+    background:var(--bg-page);color:var(--text-secondary);
+    font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
   .usage.usagecards tbody tr:not(.txrow)>td:nth-child(n+2):nth-child(-n+4){
     font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums}
   .usage.usagecards tbody tr:not(.txrow)>td:nth-child(n+2):nth-child(-n+4)::before{
@@ -964,6 +976,9 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 
   /* ---- The KPI band leads with one hero figure, then supporting numbers ---- */
   .kpi-grid,.kpi-grid.k3{grid-template-columns:repeat(2,1fr);gap:10px}
+  /* A two-card band stacks: half a phone's width is too narrow for a list of
+     centre names and amounts to sit side by side with anything. */
+  .kpi-grid.k2{grid-template-columns:1fr}
   .kpi-grid>.kpi:first-child{grid-column:1/-1}
   .kpi-grid>.kpi:first-child .val{font-size:30px;letter-spacing:-.02em}
   .kpi-grid>.kpi:first-child .kpi-ic{width:36px;height:36px}
@@ -1772,6 +1787,7 @@ function svDetailForCentre(centre){
   </div>`;
 }
 
+
 /* ---- classified RC releases (voucher detail, linked to component) ---- */
 function txForSV(n){ return TXN.filter(t=>t.sv===n).sort((a,b)=>b.net-a.net); }
 function txForCentre(c){ return TXN.filter(t=>t.rc===c).sort((a,b)=> a.section<b.section?-1:a.section>b.section?1:(a.sv<b.sv?-1:a.sv>b.sv?1:(b.net-a.net))); }
@@ -2388,19 +2404,22 @@ function viewSV(){
    (rank, icon, section pill, utilisation gauge, health tier, ₹ context). ---- */
 function excKpis(){
   const rows=ageingReleases(), by=ageingByCentre();
-  const tot=sum(rows,r=>r.bal), oldest=rows.length?Math.max.apply(null,rows.map(r=>r.age)):0;
-  const worst=rows.slice().sort((a,b)=>b.age-a.age)[0];
+  const tot=sum(rows,r=>r.bal);
   const nC=ACTIVE_CENTRES.length;
   const relTot=sum(TXN.filter(t=>SECTIONS.includes(t.section)&&excludedCentres().indexOf(t.rc)<0),t=>t.bal);
   const share=relTot?tot/relTot:0;
-  return `<div class="kpi-grid">
+  /* Two cards: how much is parked, and who is holding it. The count of flagged
+     releases and the age of the oldest one have been withdrawn — the table
+     below states both per release, and neither is something anyone acts on.
+     "Centres to Talk To" now lists every centre holding ageing funds rather
+     than the top four and a remainder, since the whole point of the card is
+     knowing who to call. */
+  return `<div class="kpi-grid k2">
     <div class="kpi accent"><div class="kpi-top"><span class="kpi-ic ic-red">${kpiIcon('alert')}</span><div class="kpi-txt"><div class="lbl">Idle Beyond ${AGE_DAYS} Days</div><div class="val tnum neg">${cr(tot)}</div></div></div><div class="sub">released on or before <b>${fmtD(ageCutoffISO())}</b> · ${pct(share,0)} of unspent</div></div>
-    <div class="kpi"><div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">Releases Flagged</div><div class="val tnum">${rows.length}</div></div></div><div class="sub">of ${TXN.filter(t=>SECTIONS.includes(t.section)).length} releases in scope</div></div>
     <div class="kpi"><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('gauge')}</span><div class="kpi-txt"><div class="lbl">Centres to Talk To</div>
-      ${by.length?`<div class="agc-klist">${by.slice(0,4).map(g=>`<div class="agc-kl"><span>${esc(g.rc)}</span><b>${crShort(g.bal)}</b></div>`).join('')}${by.length>4?`<div class="agc-kl more"><span>+${by.length-4} more centre${by.length-4===1?'':'s'}</span><b>${crShort(sum(by.slice(4),g=>g.bal))}</b></div>`:''}</div>`
+      ${by.length?`<div class="agc-klist">${by.map(g=>`<div class="agc-kl"><span>${esc(g.rc)}</span><b>${crShort(g.bal)}</b></div>`).join('')}</div>`
         :`<div class="val tnum" style="color:var(--good)">None</div>`}
     </div></div><div class="sub">${by.length?by.length+' of '+nC+' centres holding ageing funds':'no centre holding ageing funds'}</div></div>
-    <div class="kpi"><div class="kpi-top"><span class="kpi-ic ic-red">${kpiIcon('scale')}</span><div class="kpi-txt"><div class="lbl">Oldest Ageing</div><div class="val tnum neg">${oldest}<span class="small muted" style="font-weight:500"> days</span></div></div></div><div class="sub">${worst?esc(worst.rc)+' · '+esc(worst.voucher):'—'}</div></div>
   </div>`;
 }
 function ageRow(t){
@@ -3334,6 +3353,23 @@ function labelTableCells(){
     }
     const foot=tbl.querySelector(':scope > tfoot');
     if(foot) foot.classList.add('dt-foot');
+  }
+
+  /* A drill-down row reads as a card on a phone, and a card here should look
+     like the centre card it opened from: name, utilisation, then a bar split
+     green/orange before the figures. The row already states its utilisation as
+     a percentage in its last cell, so lifting that number onto the row as a
+     custom property lets the stylesheet draw the bar with no change to any
+     render function. Rows with no limit (a direct expenditure, say) show "-"
+     and simply get no bar. */
+  const ucards=document.querySelectorAll('#content .usagecards > table > tbody > tr');
+  for(let i=0;i<ucards.length;i++){
+    const row=ucards[i], cells=row.children;
+    if(row.classList.contains('txrow')||!cells.length) continue;
+    const m=/(\d+(?:\.\d+)?)\s*%/.exec(cells[cells.length-1].textContent||'');
+    if(!m) continue;
+    row.style.setProperty('--up',Math.max(0,Math.min(100,parseFloat(m[1]))));
+    row.classList.add('ub');
   }
 
   /* The voucher list sits one level deeper again — inside a centre inside a
