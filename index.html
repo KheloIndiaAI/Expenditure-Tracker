@@ -841,6 +841,67 @@ DATA.mdsd = {"asOf":"31.07.2026","source":"Proposed Expenditure Format - 31.07.2
 let AS_OF=DATA.asOf; const SCHEME=DATA.scheme, FY=DATA.fy;
 const CENTRES=DATA.centres;
 let VERTICALS=DATA.verticals;
+/* ============================================================================
+   Q2 TRANCHE - additional limit assigned to components in the second quarter
+   ============================================================================
+   Held as its own table rather than folded into the seeded assignment figures,
+   so the tranche stays auditable: every component keeps the Q1 base it had
+   before (assignQ1) alongside the Q2 amount (q2), and the assignment the rest
+   of the platform reads is simply their sum. That is what lets the KPI card
+   state the tranche exactly, and it means the addition can be checked, or
+   reversed, without unpicking the base data.
+
+   Every amount is recurring, so each maps to the RECURRING component of that
+   name. Two of the mappings deserve stating plainly:
+     * "Sports Academies" goes to Sports Academies (Rec), not to the
+       Non-Recurring Sports Academies component of the same name.
+     * "Khelo India Centres" goes to the Recurring component, not to
+       Khelo India Centres (N-Rec).
+   "Monitoring" carries 0.00 in the tranche and has no component here, so it
+   adds nothing; it is listed for completeness of the reconciliation.
+   Figures are exact rupees: 23.38 Cr = 23,38,00,000. */
+const Q2_TRANCHE={
+  'Khelo India Games':                  233800000,   // 23.38 Cr
+  'Talent Identification & Development': 267400000,  // 26.74 Cr
+  'Community Coaching & Development':            0,  //  0.00 Cr
+  'Khelo India Centres':                310000000,   // 31.00 Cr
+  'Sports Academies (Rec)':              49800000,   //  4.98 Cr
+  'Fit India Movement':                 129900000,   // 12.99 Cr
+  'Sports for Peace and Development':    60000000,   //  6.00 Cr
+  'Sports for rural/indigenous/tribal':  12800000,   //  1.28 Cr
+  'Sports for disabled sportspersons':           0,  //  0.00 Cr
+  'Sports for Women':                   150000000    // 15.00 Cr
+};
+const Q2_TOTAL=Object.keys(Q2_TRANCHE).reduce(function(a,k){ return a+Q2_TRANCHE[k]; },0);
+
+/* Fold the tranche into the assignment every view reads, and keep the seeded
+   rollups in step so nothing reads a pre-tranche total before the first render. */
+(function applyQ2Tranche(){
+  var unmatched=Object.keys(Q2_TRANCHE);
+  (DATA.subverticals||[]).forEach(function(s){
+    var q=Q2_TRANCHE[s.name]||0;
+    s.assignQ1=s.assign||0;
+    s.q2=q;
+    if(!q) return;
+    unmatched.splice(unmatched.indexOf(s.name),1);
+    s.assign=s.assignQ1+q;
+    s.bal=s.assign-(s.exp||0);
+    s.up=s.assign?(s.exp||0)/s.assign:0;
+  });
+  if(unmatched.filter(function(k){ return Q2_TRANCHE[k]>0; }).length)
+    console.warn('Q2 tranche: no component matched for', unmatched);
+  // seeded section and grand rollups
+  var byS={};
+  (DATA.subverticals||[]).forEach(function(s){
+    byS[s.section]=(byS[s.section]||0)+(s.q2||0);
+  });
+  Object.keys(DATA.sectionTotals||{}).forEach(function(k){
+    var t=DATA.sectionTotals[k], add=byS[k]||0;
+    if(!add) return;
+    t.assign+=add; t.bal=t.assign-t.exp;
+  });
+  if(DATA.grand){ DATA.grand.assign+=Q2_TOTAL; DATA.grand.bal=DATA.grand.assign-DATA.grand.exp; }
+})();
 let SV=DATA.subverticals;
 let SVA=SV.filter(s=>s.assign>0||s.exp>0);
 let SECT=DATA.sectionTotals;
@@ -1302,12 +1363,14 @@ function kpiScheme(){
   const exUp=ex.assign?ex.exp/ex.assign:0;
   const nsv=SV.filter(s=>s.assign>0&&!s.mdsd).length;
   const cap=(v)=>inc?`<div class="sub" style="margin-top:5px;padding-top:5px;border-top:1px dashed var(--border);color:var(--text-muted);font-size:11px">Incl. KI Infra <b class="tnum" style="color:var(--text-secondary)">${cr(v)}</b></div>`:'';
-  const tipAssign=`<b>Total Assignment</b><br>${cr(ex.assign)} (ex-MDSD)${inc?`<br>+ Infrastructure-MDSD ₹${(MDSD.grand.assign/1e7).toFixed(2)} Cr = ${cr(G.assign)}`:''}`;
+  const q2In=sum(SV,function(x){ return x.q2||0; });
+  const tipAssign=`<b>Total Assignment</b><br>${cr(ex.assign)} (ex-MDSD)${inc?`<br>+ Infrastructure-MDSD ₹${(MDSD.grand.assign/1e7).toFixed(2)} Cr = ${cr(G.assign)}`:''}`
+    + (q2In?`<br><br>Q1 base ${cr(ex.assign-q2In)} + <b>Q2 tranche ${cr(q2In)}</b>`:'');
   const tipExp=`<b>Expenditure to date</b><br>${cr(ex.exp)} (ex-MDSD)${inc?`<br>+ Infrastructure-MDSD ₹${(MDSD.grand.exp/1e7).toFixed(2)} Cr = ${cr(G.exp)}`:''}`;
   const tipBal=`<b>Balance</b><br>${cr(ex.bal)} (ex-MDSD)${inc?`<br>+ Infrastructure-MDSD ₹${(MDSD.grand.bal/1e7).toFixed(2)} Cr = ${cr(G.bal)}`:''}`;
   const tipIdle=`<b>Unspent by Centre</b><br>${cr(ex.idle)} (Regional Centres + DDO HQ)${inc?`<br>+ Infrastructure-MDSD unspent ₹${(G.mdsdIdle/1e7).toFixed(2)} Cr = ${cr(G.idle)}`:''}${idleTipRows(SV)}`;
   return `<div class="kpi-grid">
-    <div class="kpi accent"${tattr(tipAssign)}><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">Total Assignment</div><div class="val tnum">${cr(ex.assign)}</div></div></div><div class="sub">from Ministry · ${nsv} sub-verticals</div>${cap(G.assign)}</div>
+    <div class="kpi accent"${tattr(tipAssign)}><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">Total Assignment</div><div class="val tnum">${cr(ex.assign)}</div></div></div><div class="sub">from Ministry · ${nsv} sub-verticals${q2In?` · <b>Q2 Limit: ${cr(q2In)}</b>`:''}</div>${cap(G.assign)}</div>
     <div class="kpi"${tattr(tipExp)}><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">Expenditure to date</div><div class="val tnum">${cr(ex.exp)}</div></div></div><div class="sub" style="color:var(--serious)">${pct(exUp,1)} of assignment</div>${cap(G.exp)}</div>
     <div class="kpi"${tattr(tipBal)}><div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('scale')}</span><div class="kpi-txt"><div class="lbl">Balance</div><div class="val tnum">${cr(ex.bal)}</div></div></div><div class="sub">${pct(ex.assign?ex.bal/ex.assign:0,1)} unspent</div>${cap(G.bal)}</div>
     <div class="kpi"${tattr(tipIdle)}><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('gauge')}</span><div class="kpi-txt"><div class="lbl">Unspent by Centre</div><div class="val tnum neg">${cr(ex.idle)}</div></div></div><div class="sub">limit assigned, not spent</div>${cap(G.idle)}</div>
@@ -3017,7 +3080,7 @@ function syncBuild(summaryRows,txRows){
     const ddoki=m2?m2.ddoki:0, totLim=m2?m2.totLim:0, totAct=m2?m2.totAct:0;
     const exp=ddoki+totAct;
     return {name:n,short:o.short,parent:o.parent,section:o.section,code:o.code,idx:o.idx,
-      assign:o.assign,ddoki:ddoki,totLim:totLim,totAct:totAct,exp:exp,
+      assign:o.assign,assignQ1:o.assignQ1,q2:o.q2,ddoki:ddoki,totLim:totLim,totAct:totAct,exp:exp,
       bal:o.assign-exp,up:o.assign?exp/o.assign:0,byCentre:bc};
   });
   const byName={}; subs.forEach(function(x){ byName[x.name]=x; });
