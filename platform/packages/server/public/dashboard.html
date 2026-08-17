@@ -71,7 +71,7 @@ button{font-family:inherit}
 .fchip.fchip-2l{display:inline-flex;flex-direction:column;align-items:flex-start;gap:1px;padding:6px 14px;line-height:1.25}
 .fchip-main{font-size:12.5px;font-weight:inherit}
 .fchip-sub{font-size:9.5px;font-weight:500;opacity:.75}
-.topbar .search{flex:0 1 250px;max-width:250px;min-width:132px;position:relative}
+.topbar .search{flex:0 1 190px;max-width:190px;min-width:120px;position:relative}
 .topbar .search input{width:100%;padding:8px 12px 8px 34px;border:1px solid var(--border);border-radius:8px;background:var(--bg-surface);font-size:14px;color:var(--text-primary)}
 .topbar .search input:focus{outline:2px solid var(--primary);outline-offset:0;border-color:var(--primary)}
 .topbar .search svg{position:absolute;left:10px;top:9px;color:var(--text-muted)}
@@ -89,7 +89,7 @@ button{font-family:inherit}
 .syncp b{color:var(--text-primary);font-weight:600}
 .syncp .rf{color:var(--primary);font-weight:700;font-size:11px}
 @keyframes pulseD{0%,100%{opacity:.35}50%{opacity:1}}
-@media(max-width:1120px){.topbar .search{flex:0 1 190px;max-width:190px}}
+@media(max-width:1120px){.topbar .search{flex:0 1 150px;max-width:150px}}
 .rolechip{font-size:12px;color:#fff;background:var(--primary);border-radius:20px;padding:5px 12px;font-weight:600}
 .searchres{position:absolute;top:40px;left:0;right:0;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--elev-3);max-height:360px;overflow-y:auto;display:none;z-index:40}
 .searchres.show{display:block}
@@ -1286,7 +1286,7 @@ let state={view:'tracker', tr:{}, trSub:null, hsOpen:null, svOpen:null, filt:'Al
      Institutes and are not SAI's own expenditure, so the platform opens on the SAI-only
      picture. Ticking the chip folds them back in everywhere, as before. */
   inclDdoki:true, inclMdsd:false, inclHQ:true, inclInfraSai:true,
-  mdsdSort:{key:'assign',dir:-1}, rcSort:{key:'bal',dir:-1}, sectSort:{key:'assign',dir:-1}, svSort:{key:'assign',dir:-1},
+  mdsdSort:{key:'bal',dir:-1}, rcSort:{key:'bal',dir:-1}, sectSort:{key:'assign',dir:-1}, svSort:{key:'assign',dir:-1},
   dsort:{key:'act',dir:-1}, dfilt:{sv:'',rc:'',scat:'',q:''}, dmode:'alloc', cdOpen:null, sfOpen:null, tg:{}, _filtView:null, txRange:'all', txType:'',
   rcOnly:false,
   taMetric:'all', taCum:false, taBucket:{m1:'W',m2:'W',m3:'W'}, taRc:'', taComp:'', taSub:''};
