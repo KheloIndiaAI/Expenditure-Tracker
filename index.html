@@ -2821,17 +2821,21 @@ function renderTopFilters(){
      • Financial Overview / Component Tracker /
        SAI KI 1, KI 2 & Infra -> DDO KI + DDO HQ + Infra-SAI  (KI Infra off)
      • SAI Format Summary -> all four streams ON   (full statutory picture)
+     • KI Infra (States/UTs) -> KI Infra only      (the page is about MDSD
+       grants alone, so the three SAI streams are switched off)
    Panels not listed here keep the platform's global, persistent filters
    (the previous behaviour), i.e. they inherit whatever the user last set.
 --------------------------------------------------------------------------- */
 const EXEC_FILTER_PRESET = { inclDdoki:true, inclMdsd:false, inclHQ:true,  inclInfraSai:true  };
 const ALL_FILTER_PRESET  = { inclDdoki:true, inclMdsd:true,  inclHQ:true,  inclInfraSai:true  };
+const MDSD_FILTER_PRESET = { inclDdoki:false, inclMdsd:true, inclHQ:false, inclInfraSai:false };
 const VIEW_FILTER_PRESETS = {
   rc:       { inclDdoki:true, inclMdsd:false, inclHQ:false, inclInfraSai:false },
   command:  EXEC_FILTER_PRESET,
   tracker:  EXEC_FILTER_PRESET,
   kigroups: EXEC_FILTER_PRESET,
   saifmt:   ALL_FILTER_PRESET,
+  mdsd:     MDSD_FILTER_PRESET,
 };
 /* Regional-Centre mode is expressed through the four existing stream flags rather
    than a parallel calculation, so every KPI, chart, table, drill-down and export
