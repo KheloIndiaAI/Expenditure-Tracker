@@ -1545,16 +1545,13 @@ function viewTracker(){
        <div class="tscroll"><table class="dt tree"><thead><tr><th>Scheme component / sub-vertical</th><th class="num">Assignment</th><th class="num">Expenditure</th><th class="num">Balance</th><th class="num">Used</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 function viewCommand(){
-  const secItems=SECTIONS.map(sec=>({key:sec,value:SECT[sec].assign,color:SECTCOL[sec]}));
-  /* Order: KPI cards -> section utilisation -> supporting analysis. The section table is the
-     first real breakdown of the headline figures, so it sits directly beneath the cards;
-     the insight list and assignment donut are commentary and follow it. Same reading order
-     as KI Infra (States/UTs) and the KI block page. */
-  return pageHead('Executive Financial Overview','')
+  /* KPI cards, then the section breakdown of those same headline figures.
+     The insight list and the assignment donut that used to follow have been
+     withdrawn: the first duplicated the Attention Centre, the second restated
+     the section table beside it. */
+  return pageHead('Financial Overview','')
    + kpiScheme()
-   + `<div class="card" style="padding:0;overflow:hidden"><div class="card-hd" style="padding:16px 18px 0"><h3>Expenditure vs balance by section</h3></div>${sectionUtilTable()}</div>`
-   + `<div class="grid2"><div><div class="card"><div class="card-hd"><h3>What needs attention</h3><span class="link" onclick="go('exceptions')">Attention Centre →</span></div><div class="qh">Auto-generated from the current data</div>${insightCards()}</div></div>
-      <div><div class="card"><h3>Assignment by section</h3><div class="qh">share of the ${cr(G.assign)} total</div><div class="chartwrap"><div class="cc">${donutChart(secItems)}</div><div style="flex:1;min-width:150px">${legendRich(secItems)}</div></div></div></div></div>`;
+   + `<div class="card" style="padding:0;overflow:hidden"><div class="card-hd" style="padding:16px 18px 0"><h3>Expenditure vs balance by section</h3></div>${sectionUtilTable()}</div>`;
 }
 function svMiniTable(rows){ return `<div class="tscroll"><table class="dt"><thead><tr><th>Sub-Vertical</th><th class="num">Assignment</th><th class="num">Expenditure</th><th class="num">Balance</th><th class="num">Used</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.key)}</td><td class="num tnum">${crShort(r.net)}</td><td class="num tnum">${crShort(r.util)}</td><td class="num tnum">${crShort(r.bal)}</td><td class="num tnum">${pct(r.up,0)}</td></tr>`).join('')}</tbody></table></div>`; }
 /* ---- section-level utilisation (Recurring / Infrastructure / Non-Recurring) - same shared
