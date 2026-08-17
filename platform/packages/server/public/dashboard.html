@@ -1273,7 +1273,10 @@ function healthTip(h){
     `<b>${h.emoji} ${h.label}</b><br>Utilisation ${pct(h.up,0)} · Idle ${pct(h.idleR,0)} of assignment · Balance ${pct(h.balR,0)}<br>Health score ${h.score.toFixed(0)}/100`;
 }
 function healthTattr(h){ const dt=String(healthTip(h)).replace(/"/g,'&quot;'); return ` data-tip="${dt}" onmousemove="event.stopPropagation();tipShow(event,this.getAttribute('data-tip'))" onmouseleave="event.stopPropagation();tipHide()"`; }
-function healthBadge(h){ if(!h) return ''; return `<span class="badge hbadge ${h.cls}"${healthTattr(h)}>${h.emoji} ${h.label}</span>`; }
+/* Health pill withdrawn from the platform. Kept as an inert stub so any call site
+   left anywhere renders nothing rather than throwing; the scoring helpers below are
+   still used for row ordering and colour elsewhere. */
+function healthBadge(){ return ''; }
 function healthPctPill(h,cls){ if(!h) return ''; return `<span class="badge ${h.cls} ${cls||''}"${healthTattr(h)}>${pct(h.up,0)}</span>`; }
 const HEALTH_LEGEND='<span class="small muted">🟢 Healthy · 🟡 Moderate · 🟠 Delayed · 🔴 Critical - by utilisation, idle funds &amp; balance</span>';
 
@@ -1317,11 +1320,36 @@ const ICON={
  kig:'M3 4h7v7H3zM14 4h7v4h-7zM14 12h7v8h-7zM3 15h7v5H3z',
  saif:'M5 3h11l3 3v15H5zM16 3v4h3M8 11h8M8 15h8M8 19h5'
 };
-const NAV=[{g:'ANALYSIS'},{v:'command',t:'Financial Overview',i:'command'},{v:'tracker',t:'Component Tracker',i:'tracker',feat:1},{v:'kigroups',t:'SAI KI 1, KI 2 & Infra',i:'kig'},{v:'saifmt',t:'SAI Format Summary',i:'saif'},{v:'mdsd',t:'KI Infra (States/UTs)',i:'mdsd'},{v:'rc',t:'Regional Centres',i:'rc'},{v:'sv',t:'Sub-Vertical Analysis',i:'sv'},{g:'INTELLIGENCE'},{v:'trend',t:'Trend Analytics',i:'trend'},{v:'exceptions',t:'Attention Centre',i:'exceptions',badge:1},{v:'detail',t:'Transaction Record',i:'detail'}];
+/* ---- Navigation ---------------------------------------------------------
+   One group. The former INTELLIGENCE section is gone and Attention Centre now
+   sits with the rest of the analysis panels.
+
+   HIDDEN_VIEWS withholds a panel from the sidebar without removing anything
+   that builds it - the view, its data and its logic all stay intact, so a
+   hidden panel is one edit away from returning. Delete a name to restore that
+   panel; empty the array to restore them all. Search results and direct
+   navigation honour the same list, so a hidden panel cannot be reached by a
+   side door and leave the sidebar looking wrong. */
+const HIDDEN_VIEWS=['saifmt','sv','trend','detail'];
+function viewHidden(v){ return HIDDEN_VIEWS.indexOf(v)>=0; }
+
+const NAV=[{g:'ANALYSIS'},
+  {v:'command',   t:'Financial Overview',      i:'command'},
+  {v:'tracker',   t:'Component Tracker',       i:'tracker', feat:1},
+  {v:'kigroups',  t:'SAI KI 1, KI 2 & Infra',  i:'kig'},
+  {v:'saifmt',    t:'SAI Format Summary',      i:'saif'},
+  {v:'mdsd',      t:'KI Infra (States/UTs)',   i:'mdsd'},
+  {v:'rc',        t:'Regional Centres',        i:'rc'},
+  {v:'sv',        t:'Sub-Vertical Analysis',   i:'sv'},
+  {v:'exceptions',t:'Attention Centre',        i:'exceptions', badge:1},
+  {v:'trend',     t:'Trend Analytics',         i:'trend'},
+  {v:'detail',    t:'Transaction Record',      i:'detail'}];
 function svgIcon(i){ return `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[i]}"/>${i==='rc'?'<circle cx="12" cy="10" r="2.4"/>':''}</svg>`; }
 function renderNav(){
   const n=attentionCount();
-  document.getElementById('nav').innerHTML=NAV.map(it=>{
+  const items=NAV.filter(it=>it.g||!viewHidden(it.v))
+    .filter((it,i,a)=>!it.g || a.slice(i+1).some(x=>!x.g));   // no empty group headers
+  document.getElementById('nav').innerHTML=items.map(it=>{
     if(it.g) return `<div class="navgroup">${it.g}</div>`;
     const active=state.view===it.v?' active':'';
     if(it.feat) return `<button class="navitem feat${active}" onclick="go('${it.v}')"><span class="ic-chip">${svgIcon(it.i)}</span>${it.t}</button>`;
@@ -1329,7 +1357,7 @@ function renderNav(){
     return `<button class="navitem${active}" onclick="go('${it.v}')">${svgIcon(it.i)}${it.t}${badge}</button>`;
   }).join('');
 }
-function go(v){ state.view=v; render(); window.scrollTo(0,0); if(innerWidth<=980) closeSidebar(); }
+function go(v){ if(viewHidden(v)) return; state.view=v; render(); window.scrollTo(0,0); if(innerWidth<=980) closeSidebar(); }
 function toggleSidebar(){ const sb=document.getElementById('sidebar'),open=sb.classList.toggle('open'); document.getElementById('sbBackdrop').classList.toggle('show',open); }
 function closeSidebar(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sbBackdrop').classList.remove('show'); }
 /* Sign out: clear the server session cookie, then return to the login page.
@@ -1483,7 +1511,7 @@ function insightCards(){
 function treeCells(x,health){ const up=x.assign?x.exp/x.assign:0;
   const expCell=x.exp?`<span style="color:var(--good)">${crC(x.exp)}</span>`:crC(x.exp);
   const balCell=x.bal?`<span style="color:var(--serious)">${crC(x.bal)}</span>`:crC(x.bal);
-  return `<td class="num tnum">${crC(x.assign)}</td><td class="num tnum">${expCell}</td><td class="num tnum">${balCell}</td><td class="num tnum">${x.assign?pct(up,0):'-'}<div class="ubar"><span style="width:${(up*100).toFixed(0)}%"></span></div></td><td>${health?healthBadge(health):''}</td>`; }
+  return `<td class="num tnum">${crC(x.assign)}</td><td class="num tnum">${expCell}</td><td class="num tnum">${balCell}</td><td class="num tnum">${x.assign?pct(up,0):'-'}<div class="ubar"><span style="width:${(up*100).toFixed(0)}%"></span></div></td>`; }
 function viewTracker(){
   let rows='';
   SECTIONS.forEach(sec=>{
@@ -1509,7 +1537,7 @@ function viewTracker(){
   return pageHead('Component Expenditure Tracker','Khelo India Scheme · '+FY+' - assignment vs expenditure, as on '+syncedAsOf())
     + kpiScheme()
     + `<div class="card"><div class="card-hd"><h3>Expenditure by scheme component</h3><span class="small muted">figures in ₹ Cr</span></div>
-       <div class="tscroll"><table class="dt tree"><thead><tr><th>Scheme component / sub-vertical</th><th class="num">Assignment</th><th class="num">Expenditure</th><th class="num">Balance</th><th class="num">Used</th><th>Health</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+       <div class="tscroll"><table class="dt tree"><thead><tr><th>Scheme component / sub-vertical</th><th class="num">Assignment</th><th class="num">Expenditure</th><th class="num">Balance</th><th class="num">Used</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 function viewCommand(){
   const secItems=SECTIONS.map(sec=>({key:sec,value:SECT[sec].assign,color:SECTCOL[sec]}));
@@ -1523,7 +1551,7 @@ function viewCommand(){
    + `<div class="grid2"><div><div class="card"><div class="card-hd"><h3>What needs attention</h3><span class="link" onclick="go('exceptions')">Attention Centre →</span></div><div class="qh">Auto-generated from the current data</div>${insightCards()}</div></div>
       <div><div class="card"><h3>Assignment by section</h3><div class="qh">share of the ${cr(G.assign)} total</div><div class="chartwrap"><div class="cc">${donutChart(secItems)}</div><div style="flex:1;min-width:150px">${legendRich(secItems)}</div></div></div></div></div>`;
 }
-function svMiniTable(rows){ return `<div class="tscroll"><table class="dt"><thead><tr><th>Sub-Vertical</th><th class="num">Assignment</th><th class="num">Expenditure</th><th class="num">Balance</th><th class="num">Used</th><th>Health</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.key)}</td><td class="num tnum">${crShort(r.net)}</td><td class="num tnum">${crShort(r.util)}</td><td class="num tnum">${crShort(r.bal)}</td><td class="num tnum">${pct(r.up,0)}</td><td>${healthBadge(healthForNode(r.sv))}</td></tr>`).join('')}</tbody></table></div>`; }
+function svMiniTable(rows){ return `<div class="tscroll"><table class="dt"><thead><tr><th>Sub-Vertical</th><th class="num">Assignment</th><th class="num">Expenditure</th><th class="num">Balance</th><th class="num">Used</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.key)}</td><td class="num tnum">${crShort(r.net)}</td><td class="num tnum">${crShort(r.util)}</td><td class="num tnum">${crShort(r.bal)}</td><td class="num tnum">${pct(r.up,0)}</td></tr>`).join('')}</tbody></table></div>`; }
 /* ---- section-level utilisation (Recurring / Infrastructure / Non-Recurring) - same shared
    entityUtilTable component used by Infrastructure MDSD and Regional Centres, so the
    Financial Overview's section view stays pixel-for-pixel consistent with those two panels. */
@@ -1892,12 +1920,11 @@ function kiCompTable(g){
   /* No "Used %" column - the utilisation bar already carries that figure, and the block
      header states it too. Balance is rendered red wherever it is genuinely outstanding;
      a nil balance stays muted so red always means "money still unspent". */
-  return `<div class="tscroll"><table class="dt"><thead><tr><th>Component</th><th class="num">Assignment</th><th class="num">Expenditure</th><th class="num">Balance</th><th class="num">Unspent</th><th class="barcell">Utilisation</th><th>Health</th></tr></thead><tbody>
+  return `<div class="tscroll"><table class="dt"><thead><tr><th>Component</th><th class="num">Assignment</th><th class="num">Expenditure</th><th class="num">Balance</th><th class="num">Unspent</th><th class="barcell">Utilisation</th></tr></thead><tbody>
     ${rows.map(s=>`<tr><td><div class="kig-cn"><span class="kig-dot" style="background:${SVCOL[s.name]||g.col}"></span>${esc(s.name)}</div><div class="kig-cp">${secPill(s.section)}</div></td>
       <td class="num tnum">${crShort(s.assign)}</td><td class="num tnum">${crShort(s.exp)}</td><td class="num tnum${Math.round(s.bal)===0?'':(s.bal<0?' bal-over':' bal-red')}">${crShort(s.bal)}</td>
       <td class="num tnum">${crShort(Math.max(0,(s.totLim||0)-(s.totAct||0)))}</td>
-      <td class="barcell">${s.assign?utilBar(s.up,'Used','Bal'):'<span class="muted-cell">–</span>'}</td>
-      <td>${healthBadge(healthForNode(s))}</td></tr>`).join('')}
+      <td class="barcell">${s.assign?utilBar(s.up,'Used','Bal'):'<span class="muted-cell">–</span>'}</td></tr>`).join('')}
   </tbody><tfoot><tr><td><b>${g.tag} total</b></td><td class="num tnum"><b>${crShort(g.assign)}</b></td><td class="num tnum"><b>${crShort(g.exp)}</b></td><td class="num tnum${Math.round(g.bal)===0?'':(g.bal<0?' bal-over':' bal-red')}"><b>${crShort(g.bal)}</b></td><td class="num tnum"><b>${crShort(Math.max(0,g.idle))}</b></td><td class="barcell">${g.assign?utilBar(g.up,'Used','Bal'):''}</td><td></td></tr></tfoot></table></div>`;
 }
 function kiGroupBlock(g){
@@ -1920,8 +1947,7 @@ function kiGroupBlock(g){
       <span class="kig-badge" style="background:${g.col}">${g.tag}</span>
       <div class="kig-id"><div class="kig-name">${g.name}</div><div class="kig-tag">${g.note}</div></div>
       <div class="kig-right"><div class="kig-rv" style="color:${g.col}">${pct(g.up,1)}</div><div class="kig-rl">utilised</div></div>
-      <div class="kig-right" style="margin-left:14px">${healthBadge(h)}</div>
-    </div>
+          </div>
     <div class="kig-body">
       <div class="kpi-grid">
         <div class="kpi accent"${tattr(tipA)}><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">${g.tag} Assignment</div><div class="val tnum">${cr(g.assign)}</div></div></div><div class="sub">${funded.length} funded component${funded.length===1?'':'s'} · ${pct(G.ex.assign?g.assign/G.ex.assign:0,1)} of scheme</div></div>
@@ -1954,11 +1980,10 @@ function viewKI(){
   const shown=groups.filter(g=>g.assign>0);
   const share=shown.map(g=>`<span style="flex:${Math.max(g.assign,1)} 1 0;background:${g.col}" title="${esc(g.tag)} ${cr(g.assign)}">${T.assign&&g.assign/T.assign>0.07?`${g.tag} ${pct(g.assign/T.assign,0)}`:''}</span>`).join('');
   const cmp=`<table class="kig-cmp">
-    <thead><tr><th>Block</th><th>Assignment</th><th>Expenditure</th><th>Balance</th><th>Unspent by Centre</th><th class="barcell" style="text-align:left">Utilisation</th><th style="text-align:left">Health</th></tr></thead>
+    <thead><tr><th>Block</th><th>Assignment</th><th>Expenditure</th><th>Balance</th><th>Unspent by Centre</th><th class="barcell" style="text-align:left">Utilisation</th></tr></thead>
     <tbody>${groups.map(g=>`<tr><td><span class="kig-dot" style="background:${g.col}"></span><b>${g.tag}</b> <span class="muted" style="font-size:12px">${g.subs.length} comp.</span></td>
       <td class="tnum">${crShort(g.assign)}</td><td class="tnum">${crShort(g.exp)}</td><td class="tnum${Math.round(g.bal)===0?'':(g.bal<0?' bal-over':' bal-red')}">${crShort(g.bal)}</td><td class="tnum">${crShort(Math.max(0,g.idle))}</td>
-      <td class="barcell">${g.assign?utilBar(g.up,'Used','Bal'):'<span class="muted">–</span>'}</td>
-      <td style="text-align:left">${healthBadge(healthForNode({assign:g.assign,exp:g.exp,bal:g.bal,idle:g.idle}))}</td></tr>`).join('')}</tbody>
+      <td class="barcell">${g.assign?utilBar(g.up,'Used','Bal'):'<span class="muted">–</span>'}</td></tr>`).join('')}</tbody>
     <tfoot><tr><td>Scheme total <span class="muted" style="font-weight:500;font-size:12px">(ex-KI Infra)</span></td><td class="tnum">${crShort(T.assign)}</td><td class="tnum">${crShort(T.exp)}</td><td class="tnum${Math.round(T.bal)===0?'':(T.bal<0?' bal-over':' bal-red')}">${crShort(T.bal)}</td><td class="tnum">${crShort(Math.max(0,T.idle))}</td><td class="barcell">${utilBar(T.up,'Used','Bal')}</td><td></td></tr></tfoot></table>`;
   return pageHead('SAI KI 1, KI 2 &amp; Infra','How the scheme splits across its three delivery blocks (as on '+syncedAsOf()+')')
    + warn
@@ -2657,7 +2682,7 @@ function mdsdDetail(x){
   const shareA=MDSD.grand.assign?x.assign/MDSD.grand.assign:0;
   const vsAvg=x.up-MDSD.grand.up;
   return `<div class="grp-drop">
-    <div class="small" style="margin:0 4px 9px;font-weight:600">${esc(x.name)} - detail <span style="margin-left:6px">${healthBadge(healthForNode(x))}</span></div>
+    <div class="small" style="margin:0 4px 9px;font-weight:600">${esc(x.name)} - detail</div>
     <div class="small" style="margin:0 4px 4px;color:var(--text-secondary)">Rank <b>#${rank}</b> of ${MDSD.items.length} States/Institutes by assignment · <b>${pct(shareA,1)}</b> of total Infrastructure-MDSD assignment</div>
     <div class="small" style="margin:0 4px 4px;color:var(--text-secondary)">Utilisation <b>${pct(x.up,1)}</b> vs Infrastructure-MDSD average <b>${pct(MDSD.grand.up,1)}</b> (${vsAvg>=0?'+':'−'}${pct(Math.abs(vsAvg),1)} ${vsAvg>=0?'above':'below'} average)</div>
     <div class="small" style="margin-top:9px;color:var(--text-secondary)">Assignment <b>${crShort(x.assign)}</b> &nbsp;·&nbsp; Expenditure <b>${crShort(x.exp)}</b> &nbsp;·&nbsp; Balance <b>${crShort(x.bal)}</b> &nbsp;·&nbsp; Utilisation <b>${pct(x.up,1)}</b></div>
@@ -2851,6 +2876,7 @@ si.addEventListener('input',function(){
     (g.items||[]).forEach(it=>{ if(it.label.toLowerCase().includes(q)) res.push({t:'SAI Format · component',n:it.label,go:`state.view='saifmt';state.sfOpen=${jstr(g.no+it.k)}`}); });
     if(g.leaf&&g.leaf.label.toLowerCase().includes(q)) res.push({t:'SAI Format · component',n:g.leaf.label,go:`state.view='saifmt';state.sfOpen=${jstr(g.no)}`}); });
   if(!res.length){ sr.innerHTML='<div class="sr"><div class="t">No match</div></div>'; sr.classList.add('show'); return; }
+  res=res.filter(function(r){ var mm=/state\.view='([a-z]+)'/.exec(r.go||''); return !mm||!viewHidden(mm[1]); });
   sr.innerHTML=res.slice(0,8).map(r=>`<div class="sr" onclick="${r.go};document.getElementById('search').value='';document.getElementById('searchres').classList.remove('show');render();window.scrollTo(0,0)">${esc(r.n)}<div class="t">${r.t}</div></div>`).join('');
   sr.classList.add('show');
 });
@@ -3629,6 +3655,7 @@ function syncStart(){
   setInterval(renderSyncPill,60000);   // keep the "x min ago" honest between syncs
 }
 
+if(viewHidden(state.view)){ var f=NAV.filter(function(x){return x.v&&!viewHidden(x.v);})[0]; if(f) state.view=f.v; }
 renderNav(); refreshSyncFacts(); render(); syncStart();
 </script>
 </body>
