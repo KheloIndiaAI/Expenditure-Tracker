@@ -876,30 +876,60 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
   .treecards table.dt.tree .subname{padding-left:0}
   .treecards table.dt.tree .chev{margin:1px 0 0}
 
-  /* Sections read as a band; sub-verticals sit inset beneath their parent. */
+  /* ---- Sections are the navigation ---------------------------------------
+     Each wears its own colour from SECTCOL — the same one it carries on the
+     classification pill elsewhere — as a tinted card, and that colour runs
+     down the left edge of everything belonging to it, so a component is
+     placeable at a glance without reading back up to the heading.          */
+  .treecards table.dt.tree tr.sec-hidden{display:none}
+
   .treecards table.dt.tree tr.secrow{
-    background:var(--primary-subtle);border-color:rgba(37,106,191,.28);box-shadow:none}
+    background:var(--scbg);border-color:var(--scbd);box-shadow:none;
+    cursor:pointer;margin-bottom:8px;-webkit-tap-highlight-color:transparent}
+  .treecards table.dt.tree tr.secrow.sec-open{margin-bottom:10px}
+  .treecards table.dt.tree tr.secrow:active{background:var(--scbg);filter:brightness(.97)}
   .treecards table.dt.tree tr.secrow>td:nth-child(1){
-    font-size:11px;font-weight:700;text-transform:uppercase;
-    letter-spacing:.04em;color:var(--primary-hover)}
-  .treecards table.dt.tree tr.subrow{margin-left:13px;border-left:3px solid rgba(37,106,191,.30)}
+    display:flex;align-items:center;gap:8px;
+    font-size:11.5px;font-weight:800;text-transform:uppercase;
+    letter-spacing:.05em;color:var(--sc)}
+  /* The chevron is drawn rather than marked up, so the desktop row — which is
+     not a control — gains nothing it should not have. */
+  .treecards table.dt.tree tr.secrow>td:nth-child(1)::before{
+    content:'';flex:none;width:0;height:0;
+    border-left:5.5px solid currentColor;
+    border-top:4.5px solid transparent;border-bottom:4.5px solid transparent;
+    transition:transform .18s ease;transform-origin:35% 50%}
+  .treecards table.dt.tree tr.secrow.sec-open>td:nth-child(1)::before{transform:rotate(90deg)}
+  .treecards table.dt.tree tr.secrow>td:nth-child(5) .ubar>span{background:var(--sc)}
+
+  /* Components and sub-verticals sit inside their section's colour. */
+  .treecards table.dt.tree tr.comprow{
+    margin-left:10px;border-left:3px solid var(--scbd)}
+  .treecards table.dt.tree tr.subrow{
+    margin-left:22px;border-left:3px solid var(--scbd)}
   .treecards table.dt.tree tr.comprow.open,
-  .treecards table.dt.tree tr.subrow.open{border-color:var(--primary)}
+  .treecards table.dt.tree tr.subrow.open{
+    border-color:var(--sc);border-left-color:var(--sc);
+    box-shadow:var(--elev-2)}
   .treecards table.dt.tree tr.comprow.open>td:nth-child(1),
-  .treecards table.dt.tree tr.subrow.open>td:nth-child(1){color:var(--primary-hover)}
+  .treecards table.dt.tree tr.subrow.open>td:nth-child(1){color:var(--sc)}
+  .treecards table.dt.tree tr.comprow>td:nth-child(5) .ubar>span,
+  .treecards table.dt.tree tr.subrow>td:nth-child(5) .ubar>span{background:var(--sc)}
 
   /* The opened detail keeps its own layout, tucked under the row it belongs to. */
   .treecards table.dt.tree tr.det{
-    display:block;margin:-6px 0 10px 13px;padding:0;
+    display:block;margin:-6px 0 10px 22px;padding:0;
     background:transparent;border:0;box-shadow:none}
   .treecards table.dt.tree tr.det>td{
-    display:block;padding:11px 12px;border:1px solid var(--border);border-top:0;
+    display:block;padding:11px 12px;
+    border:1px solid var(--scbd);border-top:0;border-left:3px solid var(--sc);
     border-radius:0 0 var(--radius-md) var(--radius-md)}
 
+  /* The grand total is no longer pinned to the bottom of the screen. A card
+     floating over the list cost a strip of every scroll and repeated what the
+     figures above already add up to; it now simply ends the list. */
   .treecards table.dt.tree tr.total{
-    background:var(--primary-subtle);border-color:var(--primary);
-    position:sticky;bottom:calc(78px + env(safe-area-inset-bottom));
-    box-shadow:var(--elev-2)}
+    background:var(--primary-subtle);border-color:var(--primary);margin-top:2px}
   .treecards table.dt.tree tr.total>td:nth-child(1){
     font-size:12px;font-weight:800;letter-spacing:.04em}
 
@@ -3263,7 +3293,86 @@ function render(){ applyViewFilterDefaults(); applyFilter(); renderNav(); render
   const html = v==='command'?viewCommand():v==='rc'?viewRC():v==='sv'?viewSV():v==='mdsd'?viewMDSD():v==='kigroups'?viewKI():v==='saifmt'?viewSAIFmt():v==='trend'?viewTrend():v==='exceptions'?viewExc():v==='detail'?viewDetail():viewTracker();
   document.getElementById('content').innerHTML=html;
   labelTableCells();
+  groupTreeSections();
   renderTabbar();
+}
+
+/* ---------------------------------------------------------------------------
+   Scheme-component tree: sections as groups (phones only)
+   ---------------------------------------------------------------------------
+   Nine components under three headings is a long scroll on a phone, and the
+   headings did nothing but sit there. They become the way you navigate instead:
+   tap Recurring, Non-Recurring or Infrastructure to open its components.
+
+   This is presentational only. The table is rendered in full either way and the
+   rows are hidden here afterwards, so the desktop table — where nine rows cost
+   nothing and a collapsed section would only get in the way — is untouched, and
+   nothing downstream has to know the difference. The toggle no-ops above the
+   phone breakpoint for the same reason.
+
+   Each section carries its own colour from SECTCOL, the same one it already
+   wears on the classification pill everywhere else in the platform, so a
+   component is recognisable as Recurring or Infrastructure at a glance.
+--------------------------------------------------------------------------- */
+const TREE_SEC_OPEN=Object.create(null);
+let treeSecReady=false;
+function treeSectionsInit(){
+  if(treeSecReady) return;
+  treeSecReady=true;
+  /* Recurring carries the bulk of the scheme, so that is the one worth landing
+     on; the other two are a tap away. */
+  const lead=SECTIONS.indexOf('Recurring')>=0?'Recurring':SECTIONS[0];
+  SECTIONS.forEach(function(s){ TREE_SEC_OPEN[s]=(s===lead); });
+}
+function toggleTreeSection(sec){
+  TREE_SEC_OPEN[sec]=!TREE_SEC_OPEN[sec];
+  groupTreeSections();          /* re-marks in place — no re-render, no scroll jump */
+}
+const TREE_PHONE=window.matchMedia?window.matchMedia('(max-width:640px)'):null;
+function groupTreeSections(){
+  const tbl=document.querySelector('#content .treecards table.dt.tree');
+  if(!tbl) return;
+  treeSectionsInit();
+  /* Above the phone breakpoint the headings are not controls and every section
+     stays open, so the row is left exactly as the table rendered it. */
+  const phone=TREE_PHONE?TREE_PHONE.matches:innerWidth<=640;
+  const rows=tbl.querySelectorAll(':scope > tbody > tr');
+  let sec=null;
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];
+    if(r.classList.contains('total')){ sec=null; continue; }
+    if(r.classList.contains('secrow')){
+      const name=(r.children[0].textContent||'').trim();
+      sec=name;
+      paintSection(r,name);
+      /* A dedicated class, not `open`: `table.dt tr.open` already means
+         "expanded drill-down" and tints the row on every screen. */
+      r.classList.toggle('sec-open',!!TREE_SEC_OPEN[name]);
+      if(phone){
+        r.setAttribute('role','button');
+        r.setAttribute('aria-expanded',TREE_SEC_OPEN[name]?'true':'false');
+        r.onclick=function(){ toggleTreeSection(name); };
+      }else{
+        r.removeAttribute('role'); r.removeAttribute('aria-expanded'); r.onclick=null;
+      }
+      continue;
+    }
+    if(!sec) continue;
+    paintSection(r,sec);
+    r.classList.toggle('sec-hidden',phone&&!TREE_SEC_OPEN[sec]);
+  }
+}
+/* Crossing the breakpoint changes whether the headings are controls at all, so
+   re-mark rather than leave a resized window in the other mode's state. */
+if(TREE_PHONE&&TREE_PHONE.addEventListener) TREE_PHONE.addEventListener('change',groupTreeSections);
+/* Hand the row its section's identity colour, pre-mixed, so the stylesheet can
+   tint a card and a rule without needing to know how to blend a hex value. */
+function paintSection(row,sec){
+  const c=SECTCOL[sec]||'#88909f';
+  row.setAttribute('data-sec',sec);
+  row.style.setProperty('--sc',c);
+  row.style.setProperty('--scbg',hexToRgba(c,.10));
+  row.style.setProperty('--scbd',hexToRgba(c,.32));
 }
 
 /* ============================================================================
