@@ -139,7 +139,11 @@ table.dt th.num,table.dt td.num{text-align:right}
 table.dt td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
 table.dt tr:hover td{background:var(--bg-raised)}
 table.dt tr.click{cursor:pointer}
-table.dt tr.open>td{background:var(--primary-subtle)}
+/* No blanket `tr.open` rule here on purpose. `open` means "this row's drill-down
+   is expanded", and the rows that use it — the tree's components and
+   sub-verticals, and the SAI Format rows — each say so themselves below, at a
+   higher specificity. A catch-all on `table.dt` only lay in wait for the next
+   row type that happened to be called open and tinted it by accident. */
 .dt tr.rc-det>td{padding:0}
 .dt tr.rc-open>td,.dt tr.rc-open:hover>td{background:var(--primary-subtle)}
 .dt tr.rc-open>td:first-child{box-shadow:inset 3px 0 0 var(--primary)}
@@ -809,6 +813,20 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
     font-size:12.5px;line-height:1.45;color:var(--text-secondary)}
   .cardify table.dt td.dt-long::before{display:block;margin-bottom:4px}
 
+  /* ---- Narrations are set in full inside a card ---------------------------
+     Both places that carry a release's narration clamp it on a desktop row —
+     to three lines in the Attention Centre, two in the voucher list — because
+     there it shares a cell with four money columns. A card has the whole width
+     and nothing competing for it, so clamping only hid the half of the sentence
+     that says what the money was actually for. Note it is `display:block` that
+     lifts the clamp: -webkit-line-clamp only bites inside a -webkit-box.
+     Both are set identically, so the same sentence reads the same way wherever
+     it appears.                                                             */
+  .cardify .agc-det,table.txcards .txnar{
+    display:block;max-width:none;overflow:visible;
+    font-size:12.5px;line-height:1.45;color:var(--text-secondary);
+    overflow-wrap:anywhere}
+
   /* Cells carrying nothing shouldn't leave an empty line behind. */
   .cardify table.dt td:empty,.cardify table.dt td.dt-extra:empty{display:none}
 
@@ -999,10 +1017,10 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
     letter-spacing:.03em;text-transform:uppercase;font-weight:600;color:var(--text-muted)}
   /* The voucher line and its narration lead the card, full width. */
   table.txcards tbody td:first-child{
-    display:block;text-align:left;padding:0 0 7px;margin-bottom:4px;
+    display:block;text-align:left;padding:0 0 8px;margin-bottom:5px;
     border-bottom:1px solid var(--border-subtle);font-size:12.5px}
   table.txcards tbody td:first-child::before{display:none}
-  table.txcards .txnar{max-width:none;-webkit-line-clamp:4}
+  table.txcards .txnar{margin-top:6px}
 
   /* ---- The KPI band leads with one hero figure, then supporting numbers ---- */
   .kpi-grid,.kpi-grid.k3{grid-template-columns:repeat(2,1fr);gap:10px}
