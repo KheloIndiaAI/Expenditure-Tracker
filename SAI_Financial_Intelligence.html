@@ -660,6 +660,10 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 .hs-det .grp-drop{margin:7px 0 2px}
 @media(max-width:640px){.hs-row{grid-template-columns:120px 1fr 126px;gap:8px}.hs-seglab{display:none}.hs-name{font-size:10.5px;line-height:1.2}.hv-k{font-size:9px}.hv-v{font-size:11px}.hs-legend-m{display:flex}}
 .chartwrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.mdsd-split{gap:30px;align-items:center;padding:4px 0 2px}
+.mdsd-split .lg-fill{flex:1;min-width:240px}
+.mdsd-split .legend-rich{gap:11px 28px}
+@media(max-width:720px){.mdsd-split{gap:14px}.mdsd-split .lg-fill{min-width:0}.mdsd-split .legend-rich{gap:9px 16px}}
 .chartwrap .cc{flex:none}
 .hamburger{display:none;width:38px;height:38px;border:1px solid var(--border);background:var(--bg-surface);border-radius:9px;cursor:pointer;align-items:center;justify-content:center;flex:none;color:var(--text-secondary);padding:0}
 .hamburger:hover{border-color:var(--primary);color:var(--primary)}
@@ -2779,16 +2783,17 @@ function viewMDSD(){
 
   const secItems=items.map((x,i)=>({key:x.name,value:x.assign,color:SVCOL[x.name]||SERIES[i%SERIES.length]}));
 
-  /* Order: KPI cards -> the State / Institute utilisation table -> supporting analysis.
-     The per-entity table is the substance of this page, so it sits directly under the KPI
-     cards; Executive insights and the assignment donut are commentary on that table and
-     now follow it, matching the "headline figures, then detail, then analysis" reading
-     order the other pages use. */
+  /* Order: KPI cards -> the State / Institute utilisation table -> the assignment
+     split. The Executive insights list has been withdrawn: every line it produced
+     was already legible from the table directly above it. With it gone the donut
+     takes the full width rather than sitting in a half column, so the chart is
+     larger and its legend has room to run in two columns instead of one. */
   return pageHead('KI Infra (States/UTs)','')
    + kpis
    + `<div class="card" style="padding:0;overflow:hidden"><div class="card-hd" style="padding:16px 18px 0"><h3>State / Institute utilisation</h3></div>${entityUtilTable(items,MDSD_CFG)}</div>`
-   + `<div class="grid2"><div><div class="card"><div class="card-hd"><h3>Executive insights</h3></div><div class="qh">Auto-generated from the Infrastructure-MDSD block of the source workbook</div>${mdsdInsightCards()}</div></div>
-      <div><div class="card"><h3>Assignment by State / Institute</h3><div class="qh">share of the ${cr(Gm.assign)} KI Infra total</div><div class="chartwrap"><div class="cc">${donutChart(secItems)}</div><div style="flex:1;min-width:150px">${legendRich(secItems)}</div></div></div></div></div>`;
+   + `<div class="card"><h3>Assignment by State / Institute</h3><div class="qh">share of the ${cr(Gm.assign)} KI Infra total</div>
+      <div class="chartwrap mdsd-split"><div class="cc">${donutChart(secItems)}</div>
+      <div class="lg-fill">${legendRich(secItems)}</div></div></div>`;
 }
 
 /* ---- render ---- */
