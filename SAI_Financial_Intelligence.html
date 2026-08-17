@@ -1539,7 +1539,7 @@ function viewTracker(){
     });
   });
   rows+=`<tr class="total"><td>GRAND TOTAL</td><td class="num tnum">${(G.assign/1e7).toFixed(2)}</td><td class="num tnum" style="color:var(--good)">${(G.exp/1e7).toFixed(2)}</td><td class="num tnum" style="color:var(--serious)">${(G.bal/1e7).toFixed(2)}</td><td class="num tnum">${pct(G.assign?G.exp/G.assign:0,0)}</td><td></td></tr>`;
-  return pageHead('Component Expenditure Tracker','Khelo India Scheme · '+FY+' - assignment vs expenditure, as on '+syncedAsOf())
+  return pageHead('Component Expenditure Tracker','')
     + kpiScheme()
     + `<div class="card"><div class="card-hd"><h3>Expenditure by scheme component</h3><span class="small muted">figures in ₹ Cr</span></div>
        <div class="tscroll"><table class="dt tree"><thead><tr><th>Scheme component / sub-vertical</th><th class="num">Assignment</th><th class="num">Expenditure</th><th class="num">Balance</th><th class="num">Used</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
@@ -1987,7 +1987,7 @@ function viewKI(){
       <td class="tnum">${crShort(g.assign)}</td><td class="tnum">${crShort(g.exp)}</td><td class="tnum${Math.round(g.bal)===0?'':(g.bal<0?' bal-over':' bal-red')}">${crShort(g.bal)}</td><td class="tnum">${crShort(Math.max(0,g.idle))}</td>
       <td class="barcell">${g.assign?utilBar(g.up,'Used','Bal'):'<span class="muted">–</span>'}</td></tr>`).join('')}</tbody>
     <tfoot><tr><td>Scheme total <span class="muted" style="font-weight:500;font-size:12px">(ex-KI Infra)</span></td><td class="tnum">${crShort(T.assign)}</td><td class="tnum">${crShort(T.exp)}</td><td class="tnum${Math.round(T.bal)===0?'':(T.bal<0?' bal-over':' bal-red')}">${crShort(T.bal)}</td><td class="tnum">${crShort(Math.max(0,T.idle))}</td><td class="barcell">${utilBar(T.up,'Used','Bal')}</td><td></td></tr></tfoot></table>`;
-  return pageHead('SAI KI 1, KI 2 &amp; Infra','How the scheme splits across its three delivery blocks (as on '+syncedAsOf()+')')
+  return pageHead('SAI KI 1, KI 2 &amp; Infra','')
    + warn
    + `<div class="reco"${tattr(`<b>Partition check</b><br>The three blocks are a complete, non-overlapping split of every component except the KI Infra States/UTs grants.<br>${cr(groups[0].assign)} + ${cr(groups[1].assign)} + ${cr(groups[2].assign)} = <b>${cr(T.assign)}</b><br><span style="opacity:.75">Equals Total Assignment on Financial Overview exactly.</span>`)}>
       <span class="rl">Partition check</span>
@@ -2004,7 +2004,7 @@ function viewKI(){
 }
 function viewRC(){
   const items=utilSorted(centreAgg().map(c=>({name:c.key,assign:c.lim,exp:c.act,bal:c.idle,up:c.up})),state.rcSort);
-  return pageHead('Regional Centre Dashboard','How is each centre using its assigned limit? (as on '+syncedAsOf()+')')
+  return pageHead('Regional Centre Dashboard','')
    + rcKpis()
    + rcReco()
    + `<div class="card" style="padding:0;overflow:hidden"><div class="card-hd" style="padding:16px 18px 0"><h3>Centre utilisation</h3></div>${entityUtilTable(items,RC_CFG)}</div>`;
@@ -2134,7 +2134,6 @@ function viewExc(){
       <div class="agc-body"><div class="tscroll"><table class="dt agc-tbl">
         <thead><tr><th>Release / Sub-vertical</th><th>Details</th><th class="num">Released on</th><th class="num">Age</th><th class="num">Amount</th><th class="num">Utilised</th><th class="num">Unspent</th></tr></thead>
         <tbody>${g.rows.map(t=>ageRow(t)).join('')}</tbody>
-        <tfoot><tr><td colspan="4"><b>${esc(g.rc)} total</b></td><td class="num tnum"><b>${crShort(g.net)}</b></td><td class="num tnum"><b>${crShort(g.util)}</b></td><td class="num tnum bal-red"><b>${crShort(g.bal)}</b></td></tr></tfoot>
       </table></div></div>
     </div>`).join('');
 }
