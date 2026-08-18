@@ -113,6 +113,20 @@ button{font-family:inherit}
 /* The spend rates sit last on their card, under the KI Infra caption, so they
    need a little more air than a sub that follows the headline directly. */
 .kpi .sub.kpi-rates{margin-top:6px}
+
+/* Every card in the band closes with the same footer: a dashed rule, a muted
+   label, one figure and an optional rate. Giving the Budget Estimate card one
+   too is what squares the row up — it used to carry a single short line while
+   its four neighbours each carried two, so it read as unfinished.
+   Deliberately no auto-margin trickery to bottom-align the rules: it needs
+   :has() to spare the one card whose footer is not last, and every card now
+   carries the same two rows, so they line up on their own. */
+.kpi .sub.kpi-foot{
+  margin-top:7px;padding-top:6px;
+  border-top:1px dashed var(--border);
+  color:var(--text-muted);font-size:11px;line-height:1.5}
+.kpi .sub.kpi-foot b{color:var(--text-secondary);font-weight:700}
+.kpi .sub.kpi-foot .kpi-foot-x{color:var(--text-muted);font-weight:600;white-space:nowrap}
 .kpi .val.sm{font-size:23px}
 .kpi .val.neg{color:var(--critical)}
 .kpi.accent{background:linear-gradient(180deg,#f4f8fe,#ffffff)}
@@ -1799,7 +1813,10 @@ function kpiScheme(){
      is a fact about the scheme, not about which pills happen to be lit, and a
      reader comparing panels should not have to remember what state they left
      the chips in. */
-  const cap=(v)=>infraIn?`<div class="sub" style="margin-top:5px;padding-top:5px;border-top:1px dashed var(--border);color:var(--text-muted);font-size:11px">Incl. KI Infra <b class="tnum" style="color:var(--text-secondary)">${cr(v)}</b></div>`:'';
+  /* One footer treatment for every card in the band, so the dashed rules line up
+     across the row instead of appearing on four cards and not the fifth. */
+  const capRow=(label,v,tail)=>`<div class="sub kpi-foot">${label} <b class="tnum">${cr(v)}</b>${tail?` <span class="kpi-foot-x">${tail}</span>`:''}</div>`;
+  const cap=(v)=>infraIn?capRow('Incl. KI Infra',v):'';
 
   /* The BE is a scheme-wide ceiling that covers KI Infra, so the spend measured
      against it counts KI Infra too — otherwise part of the outlay would be
@@ -1825,7 +1842,7 @@ function kpiScheme(){
     + (mExp?`<br><span style="color:var(--text-muted)">Both count KI Infra (States/UTs) — ${crShort(mExp)} spent of ${crShort(mAssign)} — whether or not its chip is ticked, since the BE covers it.</span>`:'')
     + `<br><span style="color:var(--text-muted)">A fixed scheme-level ceiling, not read from the expenditure sheet, so the chips and classification do not move it.</span>`;
   return `<div class="kpi-grid k5">
-    <div class="kpi"${tattr(tipBE)}><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('bank')}</span><div class="kpi-txt"><div class="lbl">Budget Allotment</div><div class="val tnum">${cr(BUDGET_BE)}</div></div></div><div class="sub">Budget Estimates</div></div>
+    <div class="kpi"${tattr(tipBE)}><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('bank')}</span><div class="kpi-txt"><div class="lbl">Budget Allotment</div><div class="val tnum">${cr(BUDGET_BE)}</div></div></div><div class="sub">Budget Estimates · ${esc(FY)}</div>${capRow('Assigned',asgBE,pct(BUDGET_BE?asgBE/BUDGET_BE:0,1)+' of BE')}</div>
     <div class="kpi accent"${tattr(tipAssign)}><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">Total Assignment</div><div class="val tnum">${cr(ex.assign)}</div></div></div><div class="sub">Previous ${cr(ex.assign-q2In)}<br><b>Q2 Limit: ${cr(q2In)}</b></div>${cap(ex.assign+mAssign)}</div>
     <div class="kpi"${tattr(tipExp)}><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">Expenditure to date</div><div class="val tnum">${cr(ex.exp)}</div></div></div>${cap(ex.exp+mExp)}<div class="sub kpi-rates" style="color:var(--serious)">${pct(beUp,1)} of Budget allotment <span style="color:var(--text-muted)">|</span> ${pct(exUp,1)} of assignment</div></div>
     <div class="kpi"${tattr(tipBal)}><div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('scale')}</span><div class="kpi-txt"><div class="lbl">Balance</div><div class="val tnum">${cr(ex.bal)}</div></div></div><div class="sub">${pct(ex.assign?ex.bal/ex.assign:0,1)} unspent</div>${cap(ex.bal+mBal)}</div>
