@@ -106,7 +106,10 @@ button{font-family:inherit}
 .kpi:hover{transform:translateY(-2px);box-shadow:var(--elev-2);border-color:rgba(37,106,191,.30)}
 .kpi .lbl{font-size:12.5px;color:var(--text-muted);font-weight:500;display:flex;align-items:center;gap:6px}
 .kpi .val{font-size:28px;font-weight:700;margin-top:8px;letter-spacing:-.01em}
-.kpi .sub{font-size:12.5px;color:var(--text-secondary);margin-top:3px}
+/* Two of the five cards carry their sub on two lines (the Q2 tranche under the
+   previous assignment, the two denominators under the spend). A tighter leading
+   keeps that pair from towering over the three single-line cards beside them. */
+.kpi .sub{font-size:12.5px;color:var(--text-secondary);margin-top:3px;line-height:1.45}
 .kpi .val.sm{font-size:23px}
 .kpi .val.neg{color:var(--critical)}
 .kpi.accent{background:linear-gradient(180deg,#f4f8fe,#ffffff)}
@@ -1820,8 +1823,8 @@ function kpiScheme(){
     + `<br><span style="color:var(--text-muted)">A fixed scheme-level ceiling, not read from the expenditure sheet, so the chips and classification do not move it.</span>`;
   return `<div class="kpi-grid k5">
     <div class="kpi"${tattr(tipBE)}><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('bank')}</span><div class="kpi-txt"><div class="lbl">Budget Allotment</div><div class="val tnum">${cr(BUDGET_BE)}</div></div></div><div class="sub">Budget Estimates</div></div>
-    <div class="kpi accent"${tattr(tipAssign)}><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">Total Assignment</div><div class="val tnum">${cr(ex.assign)}</div></div></div><div class="sub">Previous ${cr(ex.assign-q2In)} · <b>Q2 Limit: ${cr(q2In)}</b></div>${cap(ex.assign+mAssign)}</div>
-    <div class="kpi"${tattr(tipExp)}><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">Expenditure to date</div><div class="val tnum">${cr(ex.exp)}</div></div></div><div class="sub" style="color:var(--serious)">${pct(beUp,1)} of Budget allotment <span style="color:var(--text-muted)">|</span> ${pct(exUp,1)} of assignment</div>${cap(ex.exp+mExp)}</div>
+    <div class="kpi accent"${tattr(tipAssign)}><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">Total Assignment</div><div class="val tnum">${cr(ex.assign)}</div></div></div><div class="sub">Previous ${cr(ex.assign-q2In)}<br><b>Q2 Limit: ${cr(q2In)}</b></div>${cap(ex.assign+mAssign)}</div>
+    <div class="kpi"${tattr(tipExp)}><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">Expenditure to date</div><div class="val tnum">${cr(ex.exp)}</div></div></div><div class="sub" style="color:var(--serious)">${pct(beUp,1)} of Budget allotment<br>${pct(exUp,1)} of assignment</div>${cap(ex.exp+mExp)}</div>
     <div class="kpi"${tattr(tipBal)}><div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('scale')}</span><div class="kpi-txt"><div class="lbl">Balance</div><div class="val tnum">${cr(ex.bal)}</div></div></div><div class="sub">${pct(ex.assign?ex.bal/ex.assign:0,1)} unspent</div>${cap(ex.bal+mBal)}</div>
     <div class="kpi"${tattr(tipIdle)}><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('gauge')}</span><div class="kpi-txt"><div class="lbl">Unspent by Centre</div><div class="val tnum neg">${cr(ex.idle)}</div></div></div><div class="sub">limit assigned, not spent</div>${cap(ex.idle+mBal)}</div>
   </div>`;
