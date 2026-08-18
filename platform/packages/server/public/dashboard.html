@@ -2511,7 +2511,7 @@ function viewKI(){
     <tfoot><tr><td>Scheme total <span class="muted" style="font-weight:500;font-size:12px">(ex-KI Infra)</span></td><td class="tnum">${crShort(T.assign)}</td><td class="tnum">${crShort(T.exp)}</td><td class="tnum${Math.round(T.bal)===0?'':(T.bal<0?' bal-over':' bal-red')}">${crShort(T.bal)}</td><td class="tnum">${crShort(Math.max(0,T.idle))}</td><td class="barcell">${utilBar(T.up,'Used','Bal')}</td><td></td></tr></tfoot></table>`;
   return pageHead('SAI KI 1, KI 2 &amp; Infra','')
    + warn
-   + `<div class="reco"${tattr(`<b>Partition check</b><br>The three blocks are a complete, non-overlapping split of every component except the KI Infra States/UTs grants.<br>${cr(groups[0].assign)} + ${cr(groups[1].assign)} + ${cr(groups[2].assign)} = <b>${cr(T.assign)}</b><br><span style="opacity:.75">Equals Total Assignment on Financial Overview exactly.</span>`)}>
+   + `<div class="reco">
       <span class="rl">Partition check</span>
       <span>KI 1 <span class="rv">${cr(groups[0].assign)}</span></span><span class="op">+</span>
       <span>KI 2 <span class="rv">${cr(groups[1].assign)}</span></span><span class="op">+</span>
