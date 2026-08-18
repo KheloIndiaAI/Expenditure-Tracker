@@ -1674,7 +1674,7 @@ function healthPctPill(h,cls){ if(!h) return ''; return `<span class="badge ${h.
 const HEALTH_LEGEND='<span class="small muted">🟢 Healthy · 🟡 Moderate · 🟠 Delayed · 🔴 Critical - by utilisation, idle funds &amp; balance</span>';
 
 /* ---- state ---- */
-let state={view:'tracker', tr:{}, trSub:null, hsOpen:null, svOpen:null, filt:'All',
+let state={view:'command', tr:{}, trSub:null, hsOpen:null, svOpen:null, filt:'All',
   /* KI Infra (States/UTs) starts UNTICKED: MDSD grants are released direct to States and
      Institutes and are not SAI's own expenditure, so the platform opens on the SAI-only
      picture. Ticking the chip folds them back in everywhere, as before. */
@@ -1727,8 +1727,12 @@ const HIDDEN_VIEWS=['saifmt','sv','trend','detail'];
 function viewHidden(v){ return HIDDEN_VIEWS.indexOf(v)>=0; }
 
 const NAV=[{g:'ANALYSIS'},
-  {v:'command',   t:'Financial Overview',      i:'command'},
-  {v:'tracker',   t:'Component Tracker',       i:'tracker', feat:1},
+  /* The feature chip marks the panel the platform opens on, so it travels with
+     the landing view rather than staying pinned to whichever panel happened to
+     hold it first. `.navitem.feat.active` already covers the two states
+     coinciding, which they now do on load. */
+  {v:'command',   t:'Financial Overview',      i:'command', feat:1},
+  {v:'tracker',   t:'Component Tracker',       i:'tracker'},
   {v:'kigroups',  t:'SAI KI 1, KI 2 & Infra',  i:'kig'},
   {v:'saifmt',    t:'SAI Format Summary',      i:'saif'},
   {v:'mdsd',      t:'KI Infra (States/UTs)',   i:'mdsd'},
