@@ -461,6 +461,57 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 .saif-note{font-size:12.5px;color:var(--text-secondary);background:var(--bg-surface);border:1px dashed var(--border);border-radius:8px;padding:10px 13px}
 @media(max-width:720px){.saif{font-size:12px}.saif td,.saif th{padding:6px 7px}.saif .num{width:78px}}
 /* ---- SAI KI 1 / KI 2 / Infra delivery blocks ---- */
+/* ---- KI 1 / KI 2 / Infra: pick a block, then look inside it ---------------
+   Each pill wears its block's colour, the same one the comparison bar and the
+   band header use, so the pill and the section it opens read as one thing. */
+.kig-pills{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 16px}
+.kig-pill{
+  display:flex;align-items:center;gap:9px;flex:1 1 190px;min-width:0;
+  padding:11px 14px;border:1px solid var(--border);border-radius:12px;
+  background:var(--bg-surface);box-shadow:var(--elev-1);cursor:pointer;
+  font-family:inherit;font-size:13.5px;font-weight:600;color:var(--text-secondary);
+  text-align:left;transition:border-color .14s,background .14s,box-shadow .14s;
+  -webkit-tap-highlight-color:transparent}
+.kig-pill:hover{border-color:var(--kcbd);color:var(--text-primary)}
+.kig-pill.on{
+  border-color:var(--kc);background:var(--kcbg);color:var(--text-primary);
+  box-shadow:inset 0 0 0 1px var(--kcbd),var(--elev-1)}
+.kig-pill-dot{width:11px;height:11px;border-radius:50%;background:var(--kc);flex:none}
+.kig-pill-t{white-space:nowrap}
+.kig-pill-v{margin-left:auto;color:var(--text-muted);font-weight:700;font-size:12.5px;white-space:nowrap}
+.kig-pill.on .kig-pill-v{color:var(--kc)}
+/* Chevron drawn rather than marked up, so the control carries no stray glyph. */
+.kig-pill-c{
+  flex:none;width:0;height:0;border-left:5.5px solid currentColor;
+  border-top:4.5px solid transparent;border-bottom:4.5px solid transparent;
+  opacity:.55;transition:transform .18s ease;transform-origin:35% 50%}
+.kig-pill.on .kig-pill-c{transform:rotate(90deg);opacity:1;color:var(--kc)}
+
+.kig-hint{
+  padding:22px 18px;border:1px dashed var(--border);border-radius:12px;
+  background:var(--bg-surface);color:var(--text-muted);font-size:13.5px;text-align:center}
+
+/* The component table inside an open block, behind its own control. */
+.kig-comp{margin-top:15px;border-top:1px solid var(--border-subtle);padding-top:13px}
+.kig-comp-hd{
+  display:flex;align-items:center;gap:9px;width:100%;padding:10px 12px;
+  border:1px solid var(--border);border-radius:10px;background:var(--bg-page);
+  cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;
+  color:var(--text-secondary);text-align:left;transition:border-color .14s,color .14s,background .14s}
+.kig-comp-hd:hover{border-color:var(--primary);color:var(--primary)}
+.kig-comp-hd.on{border-color:var(--primary);background:var(--primary-subtle);color:var(--primary-hover)}
+.kig-comp-c{
+  flex:none;width:0;height:0;border-left:5.5px solid currentColor;
+  border-top:4.5px solid transparent;border-bottom:4.5px solid transparent;
+  transition:transform .18s ease;transform-origin:35% 50%}
+.kig-comp-hd.on .kig-comp-c{transform:rotate(90deg)}
+.kig-comp-n{
+  margin-left:auto;display:inline-grid;place-items:center;min-width:20px;height:20px;
+  padding:0 6px;border-radius:10px;background:var(--border);color:var(--text-secondary);
+  font-size:11px;font-weight:700}
+.kig-comp-hd.on .kig-comp-n{background:var(--primary);color:#fff}
+.kig-comp-body{margin-top:11px;animation:drop .22s ease}
+
 .kig-sec{margin:0 0 24px}
 .kig-band{display:flex;align-items:center;gap:14px;padding:14px 18px;border:1px solid var(--border);border-bottom:none;border-radius:12px 12px 0 0;background:var(--bg-surface)}
 .kig-badge{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:14px;letter-spacing:.02em;flex:none;box-shadow:0 2px 8px rgba(0,0,0,.13)}
@@ -1675,6 +1726,10 @@ const HEALTH_LEGEND='<span class="small muted">🟢 Healthy · 🟡 Moderate · 
 
 /* ---- state ---- */
 let state={view:'command', tr:{}, trSub:null, hsOpen:null, svOpen:null, filt:'All',
+  /* SAI KI 1 / KI 2 / Infra: one block open at a time, its component table
+     folded away until asked for. `kiOpen` holds the open block's tag, or null
+     when all three are shut. */
+  kiOpen:'KI 1', kiComp:false,
   /* KI Infra (States/UTs) starts UNTICKED: MDSD grants are released direct to States and
      Institutes and are not SAI's own expenditure, so the platform opens on the SAI-only
      picture. Ticking the chip folds them back in everywhere, as before. */
@@ -2402,9 +2457,40 @@ function kiGroupBlock(g){
         ${top&&top.exp>0?`<div class="kig-stat"><div class="kig-sk">Largest spender</div><div class="kig-sv">${esc(top.name)} <span class="mut">· ${crShort(top.exp)}</span></div></div>`:''}
         <div class="kig-stat"><div class="kig-sk">Zero-spend components</div><div class="kig-sv"><span style="color:${zero.length?'var(--critical)':'var(--good)'}">${zero.length}</span> <span class="mut">of ${funded.length} funded${zero.length?' · '+esc(zero[0].name)+(zero.length>1?' +'+(zero.length-1)+' more':''):''}</span></div></div>
       </div>
-      ${kiCompTable(g)}
+      ${kiCompGroup(g)}
     </div></div>`;
 }
+
+/* ---------------------------------------------------------------------------
+   The component table, folded away behind its own control
+   ---------------------------------------------------------------------------
+   A block's headline figures answer "how is this block doing"; the component
+   table answers "which component inside it". Those are two different questions
+   and the second is much the longer answer, so it opens on request rather than
+   pushing the next block off the screen by default.
+--------------------------------------------------------------------------- */
+function kiCompGroup(g){
+  const on=!!state.kiComp;
+  return `<div class="kig-comp">
+    <button class="kig-comp-hd${on?' on':''}" onclick="toggleKiComp()" aria-expanded="${on?'true':'false'}">
+      <span class="kig-comp-c"></span>
+      <span>Components of ${esc(g.tag)}</span>
+      <span class="kig-comp-n">${g.subs.length}</span>
+    </button>
+    ${on?`<div class="kig-comp-body">${kiCompTable(g)}</div>`:''}
+  </div>`;
+}
+/* Opening a block closes the other two — three blocks' worth of KPI cards and
+   tables at once is a page nobody reads. Tapping the open one shuts it, so the
+   comparison above can be read on its own. The component fold resets with each
+   change of block: carried over, it would spring open on a block the reader has
+   not asked to see inside yet. */
+function setKiOpen(tag){
+  state.kiOpen = state.kiOpen===tag ? null : tag;
+  state.kiComp = false;
+  render();
+}
+function toggleKiComp(){ state.kiComp=!state.kiComp; render(); }
 function viewKI(){
   const groups=kiGroupAgg(), orphans=kiUnassigned();
   const T={assign:sum(groups,g=>g.assign),exp:sum(groups,g=>g.exp),bal:sum(groups,g=>g.bal),
@@ -2436,7 +2522,27 @@ function viewKI(){
    + `<div class="card"><div class="card-hd"><h3>Block comparison</h3></div>
       <div class="qh">Share of the ${cr(T.assign)} assignment across the three blocks${state.filt==='All'?'':` · Classification: <b>${esc(state.filt)}</b>`}</div>
       <div class="kig-share">${share}</div>${cmp}</div>`
-   + groups.map(kiGroupBlock).join('');
+   + kiPills(groups)
+   + (groups.filter(function(g){ return g.tag===state.kiOpen; }).map(kiGroupBlock).join('')
+      || `<div class="kig-hint">Choose a block above to open its figures.</div>`);
+}
+
+/* One pill per block, carrying the block's colour and its assignment so the
+   three can be weighed against each other before any is opened. The pill is the
+   control and the label at once — there is no separate heading to keep in step
+   with it. */
+function kiPills(groups){
+  return `<div class="kig-pills" role="tablist">${groups.map(function(g){
+    const on=state.kiOpen===g.tag;
+    return `<button class="kig-pill${on?' on':''}" role="tab" aria-expanded="${on?'true':'false'}"
+      style="--kc:${g.col};--kcbg:${hexToRgba(g.col,.10)};--kcbd:${hexToRgba(g.col,.42)}"
+      onclick="setKiOpen(${jstr(g.tag)})" title="${esc(g.name)}">
+      <span class="kig-pill-dot"></span>
+      <span class="kig-pill-t">${esc(g.tag)}</span>
+      <span class="kig-pill-v tnum">${crShort(g.assign)}</span>
+      <span class="kig-pill-c"></span>
+    </button>`;
+  }).join('')}</div>`;
 }
 function viewRC(){
   const items=utilSorted(centreAgg().map(c=>({name:c.key,assign:c.lim,exp:c.act,bal:c.idle,up:c.up})),state.rcSort);
