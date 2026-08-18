@@ -1772,18 +1772,32 @@ const BUDGET_BE=924.35e7;
 function kpiScheme(budget){
   const ex=G.ex, inc=G.mdsdIncluded;
   const exUp=ex.assign?ex.exp/ex.assign:0;
-  /* Spend measured against the BE counts KI Infra (States/UTs) whether or not
-     its chip is ticked. The chip decides what the operating figures are scoped
-     to; the BE is a scheme-wide ceiling that covers KI Infra too, so leaving it
-     out would measure part of the spend against all of the budget.
-     `ex` is always the ex-MDSD rollup, so the KI Infra total is added rather
-     than read off G — that holds whichever way the chip is set. It still
-     answers to the classification filter, since KI Infra sits inside
-     Infrastructure and drops out with it. */
-  const mdsdExpAll=SECTIONS.indexOf('Infrastructure')>=0?MDSD.grand.exp:0;
-  const expBE=ex.exp+mdsdExpAll;
+  /* KI Infra (States/UTs) totals. Added to the ex-MDSD rollup rather than read
+     off G: `G.ex` is always ex-MDSD while `G` only carries KI Infra when the
+     chip is ticked, so adding holds whichever way the chip is set and cannot
+     double-count. Everything below that needs a scheme-wide figure — the card
+     captions and the spend measured against the BE — draws on these, so the two
+     can never drift apart.
+
+     They answer to the classification filter but not to the chip: KI Infra sits
+     inside Infrastructure and drops out with it, at which point the caption goes
+     quiet rather than repeating the headline. */
+  const infraIn=SECTIONS.indexOf('Infrastructure')>=0;
+  const mAssign=infraIn?MDSD.grand.assign:0;
+  const mExp=infraIn?MDSD.grand.exp:0;
+  const mBal=infraIn?MDSD.grand.bal:0;
+
+  /* The caption is shown whether or not the chip is on. The scheme-wide figure
+     is a fact about the scheme, not about which pills happen to be lit, and a
+     reader comparing panels should not have to remember what state they left
+     the chips in. */
+  const cap=(v)=>infraIn?`<div class="sub" style="margin-top:5px;padding-top:5px;border-top:1px dashed var(--border);color:var(--text-muted);font-size:11px">Incl. KI Infra <b class="tnum" style="color:var(--text-secondary)">${cr(v)}</b></div>`:'';
+
+  /* The BE is a scheme-wide ceiling that covers KI Infra, so the spend measured
+     against it counts KI Infra too — otherwise part of the outlay would be
+     compared with all of the budget. */
+  const expBE=ex.exp+mExp;
   const beUp=BUDGET_BE?expBE/BUDGET_BE:0;
-  const cap=(v)=>inc?`<div class="sub" style="margin-top:5px;padding-top:5px;border-top:1px dashed var(--border);color:var(--text-muted);font-size:11px">Incl. KI Infra <b class="tnum" style="color:var(--text-secondary)">${cr(v)}</b></div>`:'';
   /* Q2 inside the CURRENT scope, so the tile's "Previous" figure is always the
      headline minus the tranche under the very same chips and classification.
      Deriving it by subtraction rather than summing assignQ1 is deliberate: when a
@@ -1796,18 +1810,18 @@ function kpiScheme(budget){
   const tipExp=`<b>Expenditure to date</b><br>${cr(ex.exp)} (ex-MDSD)${inc?`<br>+ Infrastructure-MDSD ₹${(MDSD.grand.exp/1e7).toFixed(2)} Cr = ${cr(G.exp)}`:''}`;
   const tipBal=`<b>Balance</b><br>${cr(ex.bal)} (ex-MDSD)${inc?`<br>+ Infrastructure-MDSD ₹${(MDSD.grand.bal/1e7).toFixed(2)} Cr = ${cr(G.bal)}`:''}`;
   const tipIdle=`<b>Unspent by Centre</b><br>${cr(ex.idle)} (Regional Centres + DDO HQ)${inc?`<br>+ Infrastructure-MDSD unspent ₹${(G.mdsdIdle/1e7).toFixed(2)} Cr = ${cr(G.idle)}`:''}${idleTipRows(SV)}`;
-  const asgBE=ex.assign+(SECTIONS.indexOf('Infrastructure')>=0?MDSD.grand.assign:0);
+  const asgBE=ex.assign+mAssign;
   const tipBE=`<b>Budget Allotment (BE)</b><br>${cr(BUDGET_BE)} — the Budget Estimate for the scheme, FY 2026-27.`
     + `<br><br>Assignment released so far ${cr(asgBE)} (${pct(BUDGET_BE?asgBE/BUDGET_BE:0,1)} of BE)`
     + `<br>Spent ${cr(expBE)} (${pct(beUp,1)} of BE)`
-    + (mdsdExpAll?`<br><span style="color:var(--text-muted)">Both count KI Infra (States/UTs) — ${crShort(MDSD.grand.exp)} spent of ${crShort(MDSD.grand.assign)} — whether or not its chip is ticked, since the BE covers it.</span>`:'')
+    + (mExp?`<br><span style="color:var(--text-muted)">Both count KI Infra (States/UTs) — ${crShort(mExp)} spent of ${crShort(mAssign)} — whether or not its chip is ticked, since the BE covers it.</span>`:'')
     + `<br><span style="color:var(--text-muted)">A fixed scheme-level ceiling, not read from the expenditure sheet, so the chips and classification do not move it.</span>`;
   return `<div class="kpi-grid${budget?' k5':''}">${budget?`
-    <div class="kpi"${tattr(tipBE)}><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('bank')}</span><div class="kpi-txt"><div class="lbl">Budget Allotment</div><div class="val tnum">${cr(BUDGET_BE)}</div></div></div><div class="sub">BE</div></div>`:''}
-    <div class="kpi accent"${tattr(tipAssign)}><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">Total Assignment</div><div class="val tnum">${cr(ex.assign)}</div></div></div><div class="sub">Previous ${cr(ex.assign-q2In)} · <b>Q2 Limit: ${cr(q2In)}</b></div>${cap(G.assign)}</div>
-    <div class="kpi"${tattr(tipExp)}><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">Expenditure to date</div><div class="val tnum">${cr(ex.exp)}</div></div></div><div class="sub" style="color:var(--serious)">${budget?`${pct(beUp,1)} of Budget allotment <span style="color:var(--text-muted)">|</span> `:''}${pct(exUp,1)} of assignment</div>${cap(G.exp)}</div>
-    <div class="kpi"${tattr(tipBal)}><div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('scale')}</span><div class="kpi-txt"><div class="lbl">Balance</div><div class="val tnum">${cr(ex.bal)}</div></div></div><div class="sub">${pct(ex.assign?ex.bal/ex.assign:0,1)} unspent</div>${cap(G.bal)}</div>
-    <div class="kpi"${tattr(tipIdle)}><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('gauge')}</span><div class="kpi-txt"><div class="lbl">Unspent by Centre</div><div class="val tnum neg">${cr(ex.idle)}</div></div></div><div class="sub">limit assigned, not spent</div>${cap(G.idle)}</div>
+    <div class="kpi"${tattr(tipBE)}><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('bank')}</span><div class="kpi-txt"><div class="lbl">Budget Allotment</div><div class="val tnum">${cr(BUDGET_BE)}</div></div></div><div class="sub">Budget Estimates</div></div>`:''}
+    <div class="kpi accent"${tattr(tipAssign)}><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">Total Assignment</div><div class="val tnum">${cr(ex.assign)}</div></div></div><div class="sub">Previous ${cr(ex.assign-q2In)} · <b>Q2 Limit: ${cr(q2In)}</b></div>${cap(ex.assign+mAssign)}</div>
+    <div class="kpi"${tattr(tipExp)}><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">Expenditure to date</div><div class="val tnum">${cr(ex.exp)}</div></div></div><div class="sub" style="color:var(--serious)">${budget?`${pct(beUp,1)} of Budget allotment <span style="color:var(--text-muted)">|</span> `:''}${pct(exUp,1)} of assignment</div>${cap(ex.exp+mExp)}</div>
+    <div class="kpi"${tattr(tipBal)}><div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('scale')}</span><div class="kpi-txt"><div class="lbl">Balance</div><div class="val tnum">${cr(ex.bal)}</div></div></div><div class="sub">${pct(ex.assign?ex.bal/ex.assign:0,1)} unspent</div>${cap(ex.bal+mBal)}</div>
+    <div class="kpi"${tattr(tipIdle)}><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('gauge')}</span><div class="kpi-txt"><div class="lbl">Unspent by Centre</div><div class="val tnum neg">${cr(ex.idle)}</div></div></div><div class="sub">limit assigned, not spent</div>${cap(ex.idle+mBal)}</div>
   </div>`;
 }
 function donutChart(items){
