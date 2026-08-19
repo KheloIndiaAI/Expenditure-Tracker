@@ -103,12 +103,22 @@ sudo certbot --nginx -d your.domain     # provisions TLS; NODE_ENV=production ma
 
 ## Updating the dashboard
 
-The served dashboard is `packages/server/public/dashboard.html`. When the source
-`SAI_Financial_Intelligence.html` (repo root) changes, refresh the copy:
+The dashboard is a single file: **`platform/public/index.html`**. There is no
+copy step — this server reads it from where it lives, and the static (Vercel)
+deployment publishes the same folder. Edit it, commit, then on the box:
 
 ```bash
-cd /opt/efip/platform && npm run sync:dashboard && sudo systemctl restart efip
+cd /opt/efip && git pull && sudo systemctl restart efip
 ```
+
+The restart is what matters: the HTML is read into memory at boot (see *HTML
+cached at boot* below), so a pull alone changes nothing that is being served.
+
+It used to live in three places — the repo root, `index.html` for static
+hosting, and a copy under `packages/server/public` — kept byte-identical by
+hand. Any edit that missed one left the login-gated build and the public one
+quietly disagreeing, with nothing failing loudly. One file removes the class of
+error rather than automating around it.
 
 ## Managing logins
 
@@ -130,7 +140,7 @@ The server ships with the following controls (see `packages/server/src/main.ts`)
 - **`trustProxy` is enabled.** Behind the nginx reverse proxy (step 6), the rate limiter and audit log key on the real client IP from `X‑Forwarded‑For`. Make sure nginx sets that header (the sample config in step 6 does). Do **not** expose the Node port (4000) directly to the internet, or clients could spoof `X‑Forwarded‑For`.
 - **Audit logging.** Login success, login failure and logout are logged (actor id/role where known, plus client IP) via the Fastify logger — visible in `journalctl -u efip`. Ship these logs somewhere durable if you need a long‑term audit trail.
 - **Account enumeration & health.** Login timing is equalised between unknown‑email and wrong‑password paths, and `GET /api/health` returns only `{ ok: true }` (no user count or internal detail).
-- **HTML cached at boot.** The login and dashboard HTML are read into memory at startup, so a redeploy or `sync:dashboard` requires a service restart (`sudo systemctl restart efip`) — already the documented step for refreshing the dashboard.
+- **HTML cached at boot.** The login and dashboard HTML are read into memory at startup, so any change to `platform/public/index.html` requires a service restart (`sudo systemctl restart efip`) — already the documented step for refreshing the dashboard.
 
 ### Dependency vulnerabilities
 

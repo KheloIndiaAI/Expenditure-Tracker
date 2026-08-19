@@ -37,7 +37,14 @@ const MAX_AGE = 60 * 60 * 12; // 12h, in seconds
 const WEB_DIST = process.env.WEB_DIST || resolve(__dirname, '../../web/dist');
 const WEB_ASSETS = join(WEB_DIST, 'assets');
 const LOGIN_HTML = join(WEB_DIST, 'index.html');
-const DASHBOARD_HTML = process.env.DASHBOARD_HTML || resolve(__dirname, '../public/dashboard.html');
+/**
+ * The dashboard is a single file at platform/public/index.html, shared by this
+ * server and by the static (Vercel) deployment. It used to be copied into
+ * packages/server/public before every deploy; three copies of a 400 KB document
+ * that had to be kept byte-identical by hand is a drift waiting to happen, so
+ * there is now one, read from where it lives.
+ */
+const DASHBOARD_HTML = process.env.DASHBOARD_HTML || resolve(__dirname, '../../../public/index.html');
 
 function stripHash(u: User & { password_hash?: string }): User {
   const { password_hash, ...rest } = u;
@@ -179,7 +186,7 @@ async function start(): Promise<void> {
       return reply
         .code(500)
         .type('text/plain')
-        .send('Dashboard not found. Run: npm run sync:dashboard (from platform/).');
+        .send(`Dashboard not found at ${DASHBOARD_HTML}. Check the file exists, or set DASHBOARD_HTML.`);
     }
     return reply.type('text/html').send(dashboardHtml);
   });
