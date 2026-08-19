@@ -104,8 +104,8 @@ sudo certbot --nginx -d your.domain     # provisions TLS; NODE_ENV=production ma
 ## Updating the dashboard
 
 The dashboard is a single file: **`platform/public/index.html`**. There is no
-copy step — this server reads it from where it lives, and the static (Vercel)
-deployment publishes the same folder. Edit it, commit, then on the box:
+copy step — the server reads it from where it lives. Edit it, commit, then on
+the box:
 
 ```bash
 cd /opt/efip && git pull && sudo systemctl restart efip
@@ -130,6 +130,8 @@ error rather than automating around it.
 - **Auth‑only DB.** `packages/server/src/db/auth-schema.sql` defines a single `app_user` table. The richer star schema (`schema.sql`) is retained for a future full‑data build but is not loaded.
 - **Cookie security.** In `NODE_ENV=production` the session cookie is `Secure` + `httpOnly` + `SameSite=Lax`. Terminate TLS (step 6) so the cookie is sent.
 - **Dev mode.** `npm run dev` runs the login SPA on Vite (:5173, proxying `/api` to :4000) for UI iteration. The integrated login→dashboard flow is best exercised against the built server (`npm run build:deploy && npm start`).
+
+- **This server is the only publisher.** The dashboard was also served as a static site from Vercel for a period — the same expenditure figures, with no login in front of them, since a static host has no way to gate a page. That deployment and its `vercel.json` have been retired. **Do not add a static mirror back** (Vercel, Netlify, S3 website, GitHub Pages) without answering authentication first: publishing `platform/public/index.html` anywhere that cannot enforce a session makes the data public, and it will not look broken while it does so.
 
 ## Security hardening
 

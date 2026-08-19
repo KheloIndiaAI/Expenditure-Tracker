@@ -38,11 +38,16 @@ const WEB_DIST = process.env.WEB_DIST || resolve(__dirname, '../../web/dist');
 const WEB_ASSETS = join(WEB_DIST, 'assets');
 const LOGIN_HTML = join(WEB_DIST, 'index.html');
 /**
- * The dashboard is a single file at platform/public/index.html, shared by this
- * server and by the static (Vercel) deployment. It used to be copied into
- * packages/server/public before every deploy; three copies of a 400 KB document
- * that had to be kept byte-identical by hand is a drift waiting to happen, so
+ * The dashboard is a single file at platform/public/index.html. It used to be
+ * copied into packages/server/public before every deploy; three copies of a
+ * 400 KB document kept byte-identical by hand is a drift waiting to happen, so
  * there is now one, read from where it lives.
+ *
+ * This server is the only way it is published. A static copy was served
+ * unauthenticated from Vercel for a while — the same financial data with no
+ * login in front of it — and that deployment has been retired. If a static
+ * mirror is ever wanted again, it needs an answer for authentication first;
+ * `/` here is deliberately gated and a static host cannot reproduce that.
  */
 const DASHBOARD_HTML = process.env.DASHBOARD_HTML || resolve(__dirname, '../../../public/index.html');
 
