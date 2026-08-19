@@ -42,7 +42,7 @@ export function Login() {
                 <div className="text-caption text-ink-muted">Ministry of Youth Affairs &amp; Sports</div>
               </div>
             </div>
-            <h1 className="mt-6 text-h1 text-ink">Executive Financial Intelligence</h1>
+            <h1 className="mt-6 text-h1 text-ink">Khelo India Expenditure Tracker</h1>
             <p className="mt-2 text-body text-ink-secondary">
               Monitor, validate and trace Khelo India Scheme expenditure — from the executive summary down to an
               individual voucher.
