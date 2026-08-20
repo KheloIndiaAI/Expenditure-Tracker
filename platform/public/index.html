@@ -3940,7 +3940,7 @@ function gvizRows(o){
     return out;
   });
 }
-function jsonpTab(tab){
+function jsonpTabOnce(tab){
   return new Promise(function(res,rej){
     let done=false;
     const el=document.createElement('script');
@@ -3948,10 +3948,28 @@ function jsonpTab(tab){
     const tid=setTimeout(function(){ if(done) return; done=true; fin(); rej(new Error(tab+': timed out')); },25000);
     SYNC._cb=function(o){ if(done) return; done=true; fin();
       try{ res(gvizRows(o)); }catch(e){ rej(new Error(tab+': '+e.message)); } };
-    el.onerror=function(){ if(done) return; done=true; fin(); rej(new Error(tab+': could not reach the sheet')); };
+    el.onerror=function(){ if(done) return; done=true; fin();
+      /* Flagged so jsonpTab knows this one is safe to retry - see there. */
+      const e=new Error(tab+': could not reach the sheet'); e.transport=true; rej(e); };
     el.src='https://docs.google.com/spreadsheets/d/'+SYNC.id+'/gviz/tq?tqx=out:json&headers=0&sheet='+
            encodeURIComponent(tab)+'&_='+Date.now();
     document.head.appendChild(el);
+  });
+}
+/* A sync is 14 sequential requests, every 10 minutes. One blip on any of them used to fail
+   the whole run and drop the platform back to last-good data - a single dropped packet cost
+   a full 10-minute cycle. Each tab now gets a couple of extra attempts.
+
+   Only a hard transport failure (onerror) is retried. A timeout is deliberately NOT, because
+   the tabs share one global callback: a timed-out request whose response is still in flight
+   would land on whichever request is registered when it finally arrives, handing one tab's
+   rows to another. onerror means the request definitively failed, so no late response can
+   arrive and no such collision is possible. */
+function jsonpTab(tab,tries){
+  tries=(tries==null)?3:tries;
+  return jsonpTabOnce(tab).catch(function(err){
+    if(!err||!err.transport||tries<=1) throw err;
+    return new Promise(function(r){ setTimeout(r,1200); }).then(function(){ return jsonpTab(tab,tries-1); });
   });
 }
 /* the endpoint's default callback - route it into whichever jsonpTab is in flight */
