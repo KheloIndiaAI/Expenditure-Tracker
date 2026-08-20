@@ -1,15 +1,28 @@
-name: CI/CD
+name: CI/CD (dev)
 
-# CI runs on every push and PR. CD (deploy to the EC2 box) runs only after CI
-# passes on a push to `main`. Nothing deploys from a pull request or a branch.
+# CI runs on every push/PR to dev. CD (build image → push ECR → roll the ECS
+# Express service) runs only after CI passes on a push to `dev`.
+# Auth to AWS is via GitHub OIDC — no static access keys stored in GitHub.
 on:
   push:
+    branches: [dev]
   pull_request:
+    branches: [dev]
 
-# Cancel superseded runs on the same ref (save minutes on rapid pushes).
 concurrency:
-  group: ci-cd-${{ github.ref }}
+  group: cicd-dev-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write   # required for OIDC federation to AWS
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPO: 114171679953.dkr.ecr.ap-south-1.amazonaws.com/efip-dev
+  ECS_SERVICE_ARN: arn:aws:ecs:ap-south-1:114171679953:service/default/efip-dev
+  JWT_SECRET_ARN: arn:aws:secretsmanager:ap-south-1:114171679953:secret:efip-dev/JWT_SECRET-hQVgVX
+  DATABASE_URL_ARN: arn:aws:secretsmanager:ap-south-1:114171679953:secret:efip-dev/DATABASE_URL-Wt6ser
 
 jobs:
   # ── Continuous Integration ────────────────────────────────────────────────
@@ -21,54 +34,52 @@ jobs:
         working-directory: platform
     steps:
       - uses: actions/checkout@v4
-
-      - name: Use Node.js 22 (matches the EC2 runtime)
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: platform/package-lock.json
-
-      - name: Install (clean, from lockfile)
-        run: npm ci
-
-      - name: Build shared package (server/web resolve @efip/shared from dist)
+      - run: npm ci
+      - name: Build shared (server/web resolve @efip/shared from dist)
         run: npm run build -w @efip/shared
-
       - name: Typecheck all workspaces
         run: npm run typecheck
-
-      - name: Build the deploy artifact (shared + web + dashboard sync)
+      - name: Build the deploy artifact (shared + login SPA)
         run: npm run build:deploy
-
-      - name: Security audit — fail on High or Critical
+      - name: Security audit — fail on High/Critical
         run: npm audit --audit-level=high
 
-  # ── Continuous Deployment ─────────────────────────────────────────────────
+  # ── Continuous Deployment (dev only) ──────────────────────────────────────
   deploy:
-    name: Deploy to EC2
-    runs-on: ubuntu-latest
+    name: Deploy to ECS Express (efip-dev)
     needs: ci
-    # Only a successful CI on a direct push to main deploys.
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    # Optional: gate behind a GitHub Environment for manual approval / protection.
-    environment: production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    environment: dev
     steps:
-      - name: SSH in and redeploy
-        uses: appleboy/ssh-action@v1.2.0
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          # If SSH is not on 22, also set:  port: ${{ secrets.EC2_PORT }}
-          script: |
-            set -euo pipefail
-            cd /opt/efip
-            git fetch --all
-            git reset --hard origin/main        # match the repo exactly, no local drift
-            cd platform
-            npm ci                              # devDeps needed for the build (tsc/vite)
-            npm run build:deploy                # rebuild web + sync dashboard.html
-            sudo systemctl restart efip         # restart (HTML is cached at boot)
-            sleep 2
-            curl -fsS http://127.0.0.1:4000/api/health   # smoke test; fails the job if down
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push image (tagged with the git SHA)
+        run: |
+          set -euo pipefail
+          IMG="$ECR_REPO:${GITHUB_SHA::7}"
+          docker buildx build --platform linux/amd64 --provenance=false \
+            -f platform/Dockerfile -t "$IMG" --push .
+          echo "IMG=$IMG" >> "$GITHUB_ENV"
+
+      - name: Roll the ECS Express service to the new image
+        run: |
+          set -euo pipefail
+          aws ecs update-express-gateway-service \
+            --service-arn "$ECS_SERVICE_ARN" \
+            --primary-container "{\"image\":\"$IMG\",\"containerPort\":8080,\"environment\":[{\"name\":\"NODE_ENV\",\"value\":\"production\"},{\"name\":\"PORT\",\"value\":\"8080\"},{\"name\":\"PGSSL_STRICT\",\"value\":\"false\"}],\"secrets\":[{\"name\":\"JWT_SECRET\",\"valueFrom\":\"$JWT_SECRET_ARN\"},{\"name\":\"DATABASE_URL\",\"valueFrom\":\"$DATABASE_URL_ARN\"}]}" \
+            --monitor-resources
