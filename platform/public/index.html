@@ -660,6 +660,8 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 .sy-fig .k{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}
 .sy-fig .v{font-size:14px;font-weight:700;color:var(--text-primary);font-variant-numeric:tabular-nums;margin-top:1px}
 .sy-fig.used .v{color:var(--primary)}
+.sy-fig.wd .v{color:var(--serious)}
+.sy-tag{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;background:var(--bg-app);color:var(--serious);font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;vertical-align:middle}
 .sy-kv{display:flex;align-items:baseline;gap:12px;padding:3px 0}
 .sy-kv .k{color:var(--text-muted);flex:none}
 .sy-kv .v{margin-left:auto;text-align:right;color:var(--text-primary);font-weight:600;overflow-wrap:anywhere}
@@ -4134,6 +4136,7 @@ function txnBrief(t){
     rc: t.rc||'—',
     voucher: t.voucher||'—',
     sv: (t.sv||t.scat||'—'),
+    etype: t.etype||'',
     net: t.net, util: t.util
   };
 }
@@ -4477,11 +4480,15 @@ function renderSyncPill(){
 
         /* Latest movement - the most recent release the sheet holds. */
         const lt=SYNC.lastTxn;
+        /* A "Limit Withdraw" row is a recovery, not a release. Its figures are negative by
+           design, and "Released  -₹2.50 L" reads as a broken number rather than as money
+           coming back. Name it, and show the magnitude - the sign is carried by the label. */
+        const wd = lt && /withdraw/i.test(lt.etype||'');
         const last = lt
-          ? '<div class="sy-main">'+esc(lt.sv)+'</div>'
+          ? '<div class="sy-main">'+esc(lt.sv)+(wd?' <span class="sy-tag">Limit withdrawal</span>':'')+'</div>'
             + '<div class="sy-meta">'+esc(lt.when)+' &middot; '+esc(lt.rc)+' &middot; Voucher '+esc(lt.voucher)+'</div>'
             + '<div class="sy-figs">'
-              + '<div class="sy-fig"><div class="k">Released</div><div class="v">'+esc(crShort(lt.net))+'</div></div>'
+              + '<div class="sy-fig'+(wd?' wd':'')+'"><div class="k">'+(wd?'Withdrawn':'Released')+'</div><div class="v">'+esc(crShort(wd?Math.abs(lt.net):lt.net))+'</div></div>'
               + '<div class="sy-fig used"><div class="k">Utilised</div><div class="v">'+esc(crShort(lt.util))+'</div></div>'
             + '</div>'
           : '<div class="sy-meta">No releases in the current data</div>';
