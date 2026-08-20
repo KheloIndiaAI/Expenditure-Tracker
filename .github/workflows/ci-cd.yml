@@ -59,6 +59,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Show OIDC subject (debug)
+        run: |
+          TOKEN=$(curl -sH "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r .value)
+          echo "$TOKEN" | cut -d. -f2 | tr '_-' '/+' | { P=$(cat); L=$(( (4 - ${#P} % 4) % 4 )); printf '%s' "$P"; printf '=%.0s' $(seq 1 $L 2>/dev/null); } | base64 -d 2>/dev/null | jq '{sub, aud, repository, repository_owner, ref}'
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
