@@ -16,12 +16,12 @@ COPY platform/packages/server/package.json packages/server/
 COPY platform/packages/web/package.json packages/web/
 RUN npm ci
 
-# Sources + the dashboard HTML (sync:dashboard reads ../SAI_Financial_Intelligence.html).
+# Sources for the build (shared lib + login SPA). The dashboard is a separate
+# static file (platform/public/index.html) served by the server at runtime.
 COPY platform/tsconfig.base.json ./
 COPY platform/packages ./packages
-COPY SAI_Financial_Intelligence.html /src/SAI_Financial_Intelligence.html
 
-# Build @efip/shared, the login SPA, and copy the dashboard into the server.
+# Build @efip/shared and the login SPA (Vite).
 RUN npm run build:deploy
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
@@ -34,6 +34,8 @@ ENV HOST=0.0.0.0
 COPY --from=build /src/platform/node_modules ./node_modules
 COPY --from=build /src/platform/package.json ./package.json
 COPY --from=build /src/platform/packages ./packages
+# The single dashboard file the server serves at "/" (main.ts → ../../../public/index.html).
+COPY platform/public ./public
 
 EXPOSE 8080
 # No --experimental-sqlite: production uses Postgres via DATABASE_URL.
