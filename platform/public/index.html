@@ -3852,6 +3852,7 @@ function parseTxRows(rows,rcName){
     out.push({rc:rcName,sv:sv,head:head,date:iso,
       voucher:String(c[2]||'').trim(),sanction:String(c[3]||'').trim(),
       grantee:String(c[7]||'').trim(),nar:String(c[9]||'').trim(),
+      etype:String(c[8]||'').trim(),
       net:Math.round(nnum(c[10])),util:Math.round(nnum(c[14])),bal:Math.round(nnum(c[15]))});
   }
   return out;
@@ -3996,7 +3997,7 @@ function syncBuild(summaryRows,txRows){
     return {rc:t.rc,sv:t.sv,section:secOf[t.sv]||t.head,head:t.head,date:t.date,
       voucher:t.voucher,sanction:t.sanction,grantee:t.grantee,nar:t.nar,
       scat:known[t.rc+'|'+t.voucher+'|'+t.net]||syncScat(t.nar,t.sv),
-      net:t.net,util:t.util,bal:t.bal};
+      etype:t.etype,net:t.net,util:t.util,bal:t.bal};
   }).sort(function(a,b){ return (a.date||'').localeCompare(b.date||'')||a.rc.localeCompare(b.rc)||a.voucher.localeCompare(b.voucher); });
   const roll=function(rows){ const g={assign:0,exp:0,bal:0,limit:0,actual:0,ddoki:0};
     rows.forEach(function(x){ g.assign+=x.assign; g.exp+=x.exp; g.bal+=x.bal; g.limit+=x.totLim; g.actual+=x.totAct; g.ddoki+=x.ddoki; }); return g; };
@@ -4034,7 +4035,16 @@ function syncValidate(b){
   let sa=0,se=0; Object.keys(b.sectionTotals).forEach(function(k){ sa+=b.sectionTotals[k].assign; se+=b.sectionTotals[k].exp; });
   if(Math.abs(sa-g.assign)>1) e.push('section assignments do not sum to grand');
   if(Math.abs(se-g.exp)>1) e.push('section expenditure does not sum to grand');
-  b.txns.forEach(function(t){ if(t.net<0||t.util<0) e.push('release '+t.voucher+' has a negative amount'); });
+  /* A "Limit Withdraw" row records a limit being taken BACK, so its figures are negative by
+     design - e.g. TSA/481 (SLKIC/06), withdrawing PCA salary limit from LNCPE Trivandrum.
+     Only "Limit Assigned" rows are guaranteed non-negative; a negative one there is a keying
+     error and must still stop the publish. Reading the expenditure type keeps that typo
+     protection while letting a genuine recovery through - before this, one withdrawal row in
+     the workbook blocked every sync and the platform silently served stale figures. */
+  b.txns.forEach(function(t){
+    if(/withdraw/i.test(t.etype||'')) return;
+    if(t.net<0||t.util<0) e.push('release '+t.voucher+' has a negative amount');
+  });
   return {ok:e.length===0,errors:e.slice(0,6)};
 }
 function syncApply(b){
