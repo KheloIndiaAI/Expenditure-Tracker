@@ -42,7 +42,7 @@ sudo mkdir -p /var/lib/efip && sudo chown "$USER" /var/lib/efip            # mat
 ## 4. Build & seed
 
 ```bash
-npm run build:deploy          # builds @efip/shared + @efip/web, copies the dashboard into the server
+npm run build:deploy          # builds @efip/shared + @efip/web (dashboard is served directly from platform/public/index.html)
 npm run seed                  # creates the admin login from ADMIN_* in .env
 ```
 

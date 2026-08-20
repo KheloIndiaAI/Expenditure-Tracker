@@ -149,11 +149,61 @@ Point `efip.<yourdomain>` (or a dev subdomain) at the service's ALB: request an
 **Route 53 / DNS** record (CNAME to the ALB, or an alias if the zone is in Route
 53). This is also where the `cckin.in` nameserver delegation must be live first.
 
-## 9. CI/CD (GitHub Actions)
+## 9. CI/CD (GitHub Actions + OIDC)
 
-AWS provides an official **"Deploy Express Service"** GitHub Action. Replace the
-SSH deploy job with: build → push image to ECR → invoke the Express deploy action.
-Use per-account OIDC roles so dev and prod deploy into their own accounts.
+The pipeline lives at `.github/workflows/ci-cd.yml`. On push to the environment's
+branch it runs CI (build · typecheck · `npm audit`), then builds the image
+(tagged with the git SHA), pushes to ECR, and calls
+`aws ecs update-express-gateway-service`. It authenticates to AWS with **GitHub
+OIDC** — no static keys in GitHub. One-time setup **per account**:
+
+```bash
+# Run as ADMIN/ROOT (the deployer user cannot manage OIDC providers).
+ACCOUNT=<account-id>
+
+# a) GitHub OIDC provider (once per account)
+aws iam create-open-id-connect-provider \
+  --url https://token.actions.githubusercontent.com \
+  --client-id-list sts.amazonaws.com \
+  --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1 1c58a3a8518e8759bf075b76b750d4f2df264fcd
+
+# b) Deploy role trusting the repo (see the SUB gotcha below for the exact value)
+aws iam create-role --role-name efip-<env>-gha-deploy \
+  --assume-role-policy-document file:///tmp/trust.json \
+  --tags Key=Project,Value=SAI-Expense-Tracker Key=Environment,Value=<env>
+
+# c) Permissions: ECR push + ecs:* + PassRole on the two ECS roles
+aws iam put-role-policy --role-name efip-<env>-gha-deploy \
+  --policy-name efip-<env>-deploy --policy-document file:///tmp/perms.json
+```
+
+Then set the repo variable `AWS_DEPLOY_ROLE_ARN` (repo → Settings → Secrets and
+variables → Actions → Variables) and create the GitHub `Environment` the deploy
+job references.
+
+> **⚠ OIDC `sub` gotcha (bit us on dev).** If the GitHub org has **immutable-ID
+> subjects** enabled, the token `sub` is NOT
+> `repo:ORG/REPO:...` but
+> `repo:ORG@<org-id>/REPO@<repo-id>:environment:<env>` (with numeric IDs). A
+> plain `repo:ORG/REPO:*` trust condition will fail with *"Not authorized to
+> perform sts:AssumeRoleWithWebIdentity"*. **Print the real `sub` first**, then
+> set the trust to match it. Debug step to drop into the deploy job temporarily:
+>
+> ```yaml
+> - name: Show OIDC subject (debug)
+>   run: |
+>     TOKEN=$(curl -sH "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+>       "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r .value)
+>     echo "$TOKEN" | cut -d. -f2 | tr '_-' '/+' | { P=$(cat); L=$(( (4 - ${#P} % 4) % 4 )); printf '%s' "$P"; printf '=%.0s' $(seq 1 $L); } | base64 -d | jq '{sub,aud,repository_owner}'
+> ```
+>
+> Take the printed `sub`, keep everything up to the last `:` and replace the tail
+> with `*`, and use that in the trust `StringLike`. Example (dev):
+> `repo:KheloIndiaAI@318880338/Expenditure-Tracker@1340286019:*`
+
+Trust and permission policy templates (`/tmp/trust.json`, `/tmp/perms.json`) are
+in `DEPLOYMENT_AS_BUILT.md` §5. Use **per-account** providers/roles so dev and prod
+deploy only into their own accounts.
 
 ---
 
