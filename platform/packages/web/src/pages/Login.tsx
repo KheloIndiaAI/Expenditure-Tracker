@@ -47,7 +47,8 @@ export function Login() {
         {/* ── Left: Government of India masthead ───────────────────────────── */}
         <div className="border-b border-hairline px-[48px] py-[52px] md:border-b-0 md:border-r">
           <div className="flex items-start gap-[14px]">
-            <Emblem className="h-[56px] w-[42px] shrink-0 text-ink" />
+            {/* Height drives the size; width follows the emblem's own 0.691 ratio. */}
+            <Emblem className="h-[56px] w-auto shrink-0" />
             <div className="pt-[4px]">
               <div className="text-[15px] font-bold leading-[20px] text-ink">Government of India</div>
               <div className="mt-[3px] text-[13px] leading-[18px] text-ink-secondary">
