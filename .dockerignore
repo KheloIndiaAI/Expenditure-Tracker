@@ -1,0 +1,15 @@
+# Build context = repo root. Keep the image small and secrets out.
+**/node_modules
+**/dist
+**/build
+.git
+.github
+PRD
+*.xlsx
+platform/seed/*.csv
+!platform/seed/*.example.csv
+**/.env
+**/*.db
+**/*.db-wal
+**/*.db-shm
+index.html

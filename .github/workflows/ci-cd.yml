@@ -1,0 +1,74 @@
+name: CI/CD
+
+# CI runs on every push and PR. CD (deploy to the EC2 box) runs only after CI
+# passes on a push to `main`. Nothing deploys from a pull request or a branch.
+on:
+  push:
+  pull_request:
+
+# Cancel superseded runs on the same ref (save minutes on rapid pushes).
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Continuous Integration ────────────────────────────────────────────────
+  ci:
+    name: Build · typecheck · audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22 (matches the EC2 runtime)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: platform/package-lock.json
+
+      - name: Install (clean, from lockfile)
+        run: npm ci
+
+      - name: Build shared package (server/web resolve @efip/shared from dist)
+        run: npm run build -w @efip/shared
+
+      - name: Typecheck all workspaces
+        run: npm run typecheck
+
+      - name: Build the deploy artifact (shared + web + dashboard sync)
+        run: npm run build:deploy
+
+      - name: Security audit — fail on High or Critical
+        run: npm audit --audit-level=high
+
+  # ── Continuous Deployment ─────────────────────────────────────────────────
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: ci
+    # Only a successful CI on a direct push to main deploys.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Optional: gate behind a GitHub Environment for manual approval / protection.
+    environment: production
+    steps:
+      - name: SSH in and redeploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          # If SSH is not on 22, also set:  port: ${{ secrets.EC2_PORT }}
+          script: |
+            set -euo pipefail
+            cd /opt/efip
+            git fetch --all
+            git reset --hard origin/main        # match the repo exactly, no local drift
+            cd platform
+            npm ci                              # devDeps needed for the build (tsc/vite)
+            npm run build:deploy                # rebuild web + sync dashboard.html
+            sudo systemctl restart efip         # restart (HTML is cached at boot)
+            sleep 2
+            curl -fsS http://127.0.0.1:4000/api/health   # smoke test; fails the job if down

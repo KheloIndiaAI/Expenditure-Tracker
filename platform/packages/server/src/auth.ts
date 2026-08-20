@@ -49,12 +49,12 @@ const DUMMY_SALT = randomBytes(16);
 
 export interface TokenClaims {
   sub: string;
-  email: string;
+  username: string;
   role: Role;
 }
 
 export function signToken(u: User): string {
-  const claims: TokenClaims = { sub: u.id, email: u.email, role: u.role };
+  const claims: TokenClaims = { sub: u.id, username: u.username, role: u.role };
   return jwt.sign(claims, SECRET, { expiresIn: TTL as jwt.SignOptions['expiresIn'] });
 }
 

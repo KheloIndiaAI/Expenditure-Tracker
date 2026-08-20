@@ -28,9 +28,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const body: unknown = text ? safeParse(text) : null;
 
   if (!res.ok) {
-    const message =
-      (body && typeof body === 'object' && 'message' in body && String((body as { message: unknown }).message)) ||
-      `Request failed (${res.status})`;
+    let message = `Request failed (${res.status})`;
+    if (body && typeof body === 'object' && 'message' in body) {
+      message = String((body as { message: unknown }).message);
+    }
     throw new ApiError(res.status, message);
   }
   return body as T;
@@ -45,10 +46,10 @@ function safeParse(text: string): unknown {
 }
 
 export const api = {
-  login: (email: string, password: string) =>
+  login: (username: string, password: string) =>
     request<{ token: string; user: AuthedUser }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
     }),
   me: () => request<AuthedUser>('/auth/me'),
   logout: () => request<{ ok: true }>('/auth/logout', { method: 'POST' }),

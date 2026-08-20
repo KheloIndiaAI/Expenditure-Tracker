@@ -25,3 +25,7 @@ Thumbs.db
 
 # Vercel
 .vercel
+
+# RC user seed (plaintext creds — never commit)
+platform/seed/*.csv
+!platform/seed/*.example.csv

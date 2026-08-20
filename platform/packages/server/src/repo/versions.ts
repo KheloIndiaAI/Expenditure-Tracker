@@ -385,6 +385,12 @@ export interface PublishOptions {
    * wants the repository to refuse a self-approval outright as well.
    */
   enforceMakerChecker?: boolean;
+  /**
+   * Escape hatch for single-operator / seed scenarios where the same identity
+   * both uploads and publishes (e.g. loading the baseline). Off by default, so
+   * the maker-checker guard below refuses a self-approval unless explicitly set.
+   */
+  allowSelfApproval?: boolean;
 }
 
 /**

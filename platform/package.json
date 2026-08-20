@@ -17,6 +17,7 @@
     "build:deploy": "npm run build -w @efip/shared && npm run build -w @efip/web",
     "start": "npm run start -w @efip/server",
     "seed": "npm run seed -w @efip/server",
+    "seed:users": "npm run seed:users -w @efip/server",
     "test": "npm run test -w @efip/server",
     "typecheck": "npm run typecheck -w @efip/shared && npm run typecheck -w @efip/server && npm run typecheck -w @efip/web"
   },

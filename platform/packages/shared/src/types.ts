@@ -492,7 +492,8 @@ export function can(role: Role, capability: Capability): boolean {
 
 export interface User {
   id: string;
-  email: string;
+  /** Login identifier — a short username such as `RC_Kolkata` (not an email). */
+  username: string;
   name: string;
   role: Role;
   designation: string;

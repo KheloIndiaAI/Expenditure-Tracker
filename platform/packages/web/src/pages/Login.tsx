@@ -9,7 +9,7 @@ import { useAuth } from '../lib/auth.tsx';
 
 export function Login() {
   const { login } = useAuth();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -19,7 +19,7 @@ export function Login() {
     setError(null);
     setBusy(true);
     try {
-      await login(email, password);
+      await login(username, password);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-in failed.');
     } finally {
@@ -71,16 +71,20 @@ export function Login() {
 
           <form onSubmit={submit} className="mt-5 space-y-4">
             <div>
-              <label htmlFor="email" className="mb-1 block text-label text-ink-secondary">
-                Official email
+              <label htmlFor="username" className="mb-1 block text-label text-ink-secondary">
+                Username
               </label>
               <input
-                id="email"
-                type="email"
+                id="username"
+                type="text"
                 required
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 autoComplete="username"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                placeholder="e.g. RC_Kolkata"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="h-9 w-full rounded-sm border border-hairline bg-surface px-3 text-body text-ink outline-none focus:border-primary"
               />
             </div>

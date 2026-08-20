@@ -23,7 +23,7 @@ import fstatic from '@fastify/static';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import type { User } from '@efip/shared';
-import { findByEmail, countUsers } from './users.ts';
+import { findByUsername, countUsers } from './users.ts';
 import { dummyVerify, signToken, toAuthedUser, verifyPassword, verifyToken } from './auth.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -57,12 +57,12 @@ function stripHash(u: User & { password_hash?: string }): User {
 }
 
 /** Resolve the signed-in user from the request cookie, or null. */
-function currentUser(req: { cookies?: Record<string, string | undefined> }): User | null {
+async function currentUser(req: { cookies?: Record<string, string | undefined> }): Promise<User | null> {
   const token = req.cookies?.[COOKIE_NAME];
   if (!token) return null;
   const claims = verifyToken(token);
   if (!claims) return null;
-  const row = findByEmail(claims.email);
+  const row = await findByUsername(claims.username);
   return row ? stripHash(row) : null;
 }
 
@@ -80,20 +80,26 @@ async function start(): Promise<void> {
   await app.register(cookie);
 
   // Security headers (clickjacking, MIME sniffing, HSTS, referrer, etc.).
-  // The CSP is scoped to exactly what the two served documents need:
+  // The CSP is scoped to what the two served documents actually need:
   //   • login SPA  → same-origin JS/CSS from /assets
-  //   • dashboard  → inline scripts/styles + Google Fonts + live Google Sheets read
+  //   • dashboard  → a self-contained HTML doc that uses inline <script>/<style>,
+  //     inline event handlers (onclick/onchange), and loads live Google Sheets
+  //     data by INJECTING a <script> from docs.google.com (gviz JSONP), plus
+  //     Google Fonts. Those patterns force 'unsafe-inline' + the Google hosts in
+  //     script-src and script-src-attr. The dashboard is only served to
+  //     authenticated users and renders the org's own sheet, so this is an
+  //     acceptable trade-off vs. rewriting the dashboard to drop inline handlers.
+  const GOOGLE = ['https://docs.google.com', 'https://*.googleusercontent.com'];
   await app.register(helmet, {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        // The dashboard is a self-contained HTML doc with inline <script>/<style>.
-        scriptSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", ...GOOGLE],
+        scriptSrcAttr: ["'unsafe-inline'"], // inline onclick/onchange in the dashboard
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-        // Live data read from the Google Sheet (gviz) — no financial data on our server.
-        connectSrc: ["'self'", 'https://docs.google.com'],
-        imgSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'", ...GOOGLE],
+        imgSrc: ["'self'", 'data:', 'https:'],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
         frameAncestors: ["'none'"], // clickjacking protection for the gated dashboard
@@ -136,17 +142,17 @@ async function start(): Promise<void> {
       },
     },
     async (req, reply) => {
-      const { email, password } = (req.body ?? {}) as { email?: string; password?: string };
-      if (!email || !password) {
-        return reply.code(400).send({ message: 'Email and password are required.' });
+      const { username, password } = (req.body ?? {}) as { username?: string; password?: string };
+      if (!username || !password) {
+        return reply.code(400).send({ message: 'Username and password are required.' });
       }
-      const row = findByEmail(email);
-      // Equalise timing between "unknown email" and "wrong password": run a real
+      const row = await findByUsername(username);
+      // Equalise timing between "unknown user" and "wrong password": run a real
       // scrypt in both branches so response time doesn't reveal valid accounts.
       const ok = row ? verifyPassword(password, row.password_hash) : (dummyVerify(password), false);
       if (!row || !ok) {
-        req.log.warn({ event: 'auth.login.failure', email: String(email).toLowerCase(), ip: req.ip });
-        return reply.code(401).send({ message: 'Invalid email or password.' });
+        req.log.warn({ event: 'auth.login.failure', username: String(username).toLowerCase(), ip: req.ip });
+        return reply.code(401).send({ message: 'Invalid username or password.' });
       }
       const user = stripHash(row);
       reply.setCookie(COOKIE_NAME, signToken(user), {
@@ -162,13 +168,13 @@ async function start(): Promise<void> {
   );
 
   app.get('/api/auth/me', async (req, reply) => {
-    const user = currentUser(req);
+    const user = await currentUser(req);
     if (!user) return reply.code(401).send({ message: 'Not authenticated.' });
     return toAuthedUser(user);
   });
 
   app.post('/api/auth/logout', async (req, reply) => {
-    const user = currentUser(req);
+    const user = await currentUser(req);
     reply.clearCookie(COOKIE_NAME, { path: '/' });
     if (user) req.log.info({ event: 'auth.logout', userId: user.id, ip: req.ip });
     return { ok: true };
@@ -186,7 +192,7 @@ async function start(): Promise<void> {
   });
 
   app.get('/', async (req, reply) => {
-    if (!currentUser(req)) return reply.redirect('/login');
+    if (!(await currentUser(req))) return reply.redirect('/login');
     if (!dashboardHtml) {
       return reply
         .code(500)
@@ -203,7 +209,7 @@ async function start(): Promise<void> {
   });
 
   await app.listen({ port: PORT, host: HOST });
-  app.log.info(`EFIP server listening on http://${HOST}:${PORT} (users in DB: ${countUsers()})`);
+  app.log.info(`EFIP server listening on http://${HOST}:${PORT} (users in DB: ${await countUsers()})`);
 }
 
 start().catch((err) => {

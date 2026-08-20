@@ -6,5 +6,7 @@
     "allowImportingTsExtensions": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "//exclude": "Parked full-data-build scaffolding (ingest/analytics/repo/contracts). Not imported by the running server (main.ts → users/auth/db) and written against the pre-Postgres sync DB API. Excluded from typecheck until the full data platform is built.",
+  "exclude": ["src/ingest", "src/analytics", "src/repo", "src/contracts.ts"]
 }

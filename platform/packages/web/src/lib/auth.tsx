@@ -10,7 +10,7 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { api } from './api.ts';
 
 interface AuthValue {
-  login: (email: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
@@ -18,8 +18,8 @@ const AuthContext = createContext<AuthValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthValue>(
     () => ({
-      async login(email, password) {
-        await api.login(email, password);
+      async login(username, password) {
+        await api.login(username, password);
         // Cookie is now set; hand off to the server-gated dashboard.
         window.location.href = '/';
       },

@@ -1,106 +1,105 @@
 /**
- * Database connection & migration.
+ * Database access — one small async interface, two interchangeable drivers.
  *
- * Uses Node's built-in `node:sqlite` — zero native dependencies, which matters
- * for a government deployment that may not permit compiling native modules.
- * The SQL in `schema.sql` is plain and ports to PostgreSQL / Supabase without
- * application changes (02 §4 portability note).
+ *   • Postgres (Amazon RDS) when `DATABASE_URL` is set — the production store.
+ *     App Runner is stateless, so the auth table lives in managed Postgres.
+ *   • SQLite (node:sqlite) otherwise — zero-dependency local development, the
+ *     way the project ran before RDS. Same SQL, same code paths.
+ *
+ * All callers use the async `Db` interface below, so switching drivers is a
+ * config change (set DATABASE_URL), never a code change. SQL is written with `?`
+ * placeholders; the Postgres driver rewrites them to `$1,$2,…`.
  */
 
-import { DatabaseSync } from 'node:sqlite';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export type DB = DatabaseSync;
-
-let _db: DatabaseSync | null = null;
-
-export function dbPath(): string {
-  return process.env.EFIP_DB ?? resolve(__dirname, '../../data/efip.db');
+export interface Db {
+  all<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]>;
+  one<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T | undefined>;
+  run(sql: string, params?: unknown[]): Promise<void>;
+  exec(sql: string): Promise<void>;
 }
 
-export function getDb(): DatabaseSync {
-  if (_db) return _db;
-  const path = dbPath();
-  mkdirSync(dirname(path), { recursive: true });
-  const db = new DatabaseSync(path);
-  // Auth-only store: financial data is read live from the Google Sheet by the
-  // dashboard, so only the custom-login identity table is created here.
-  db.exec(readFileSync(resolve(__dirname, 'auth-schema.sql'), 'utf8'));
-  _db = db;
+const SCHEMA = () => readFileSync(resolve(__dirname, 'auth-schema.sql'), 'utf8');
+
+/** `?` → `$1,$2,…` for node-postgres, which uses numbered placeholders. */
+function toPgPlaceholders(sql: string): string {
+  let n = 0;
+  return sql.replace(/\?/g, () => `$${++n}`);
+}
+
+let _db: Promise<Db> | null = null;
+
+/** Memoised: the first call creates and migrates the store. */
+export function getDb(): Promise<Db> {
+  if (!_db) _db = process.env.DATABASE_URL ? initPostgres() : initSqlite();
+  return _db;
+}
+
+export async function closeDb(): Promise<void> {
+  _db = null;
+}
+
+// ── Postgres (RDS) ───────────────────────────────────────────────────────────
+async function initPostgres(): Promise<Db> {
+  const { default: pg } = await import('pg');
+  const pool = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+    // RDS requires TLS; verify-full needs the RDS CA bundle mounted, so default
+    // to TLS-on with relaxed verification unless PGSSL_STRICT is set.
+    ssl:
+      process.env.PGSSL === 'disable'
+        ? undefined
+        : { rejectUnauthorized: process.env.PGSSL_STRICT === 'true' },
+    max: Number(process.env.PG_POOL_MAX || 10),
+  });
+  const db: Db = {
+    async all<T>(sql: string, params: unknown[] = []) {
+      const r = await pool.query(toPgPlaceholders(sql), params as never[]);
+      return r.rows as T[];
+    },
+    async one<T>(sql: string, params: unknown[] = []) {
+      const r = await pool.query(toPgPlaceholders(sql), params as never[]);
+      return (r.rows[0] as T) ?? undefined;
+    },
+    async run(sql: string, params: unknown[] = []) {
+      await pool.query(toPgPlaceholders(sql), params as never[]);
+    },
+    async exec(sql: string) {
+      await pool.query(sql);
+    },
+  };
+  await db.exec(SCHEMA());
   return db;
 }
 
-export function closeDb(): void {
-  if (_db) {
-    _db.close();
-    _db = null;
-  }
-}
-
-/** Reset to a clean database — used by the seed script and tests. */
-export function resetDb(): DatabaseSync {
-  closeDb();
-  const path = dbPath();
+// ── SQLite (local dev) ───────────────────────────────────────────────────────
+async function initSqlite(): Promise<Db> {
+  const { mkdirSync } = await import('node:fs');
+  // node:sqlite is behind an experimental flag; only imported on this path.
+  const { DatabaseSync } = await import('node:sqlite');
+  const path = process.env.EFIP_DB ?? resolve(__dirname, '../../data/efip.db');
   mkdirSync(dirname(path), { recursive: true });
-  try {
-    const fs = require('node:fs') as typeof import('node:fs');
-    for (const suffix of ['', '-wal', '-shm']) {
-      try {
-        fs.unlinkSync(path + suffix);
-      } catch {
-        /* not present */
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return getDb();
-}
-
-/**
- * Run `fn` inside a transaction. Staging is transactional so a pipeline failure
- * mid-way leaves no partial state (07 §9).
- */
-export function transact<T>(db: DatabaseSync, fn: () => T): T {
-  db.exec('BEGIN');
-  try {
-    const out = fn();
-    db.exec('COMMIT');
-    return out;
-  } catch (err) {
-    try {
-      db.exec('ROLLBACK');
-    } catch {
-      /* already rolled back */
-    }
-    throw err;
-  }
-}
-
-/** Typed query helper — node:sqlite returns null-prototype objects. */
-export function all<T = Record<string, unknown>>(
-  db: DatabaseSync,
-  sql: string,
-  params: unknown[] = [],
-): T[] {
-  const stmt = db.prepare(sql);
-  return stmt.all(...(params as never[])) as T[];
-}
-
-export function one<T = Record<string, unknown>>(
-  db: DatabaseSync,
-  sql: string,
-  params: unknown[] = [],
-): T | undefined {
-  const stmt = db.prepare(sql);
-  return stmt.get(...(params as never[])) as T | undefined;
-}
-
-export function run(db: DatabaseSync, sql: string, params: unknown[] = []): void {
-  const stmt = db.prepare(sql);
-  stmt.run(...(params as never[]));
+  const sq = new DatabaseSync(path);
+  sq.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
+  sq.exec(SCHEMA());
+  const db: Db = {
+    async all<T>(sql: string, params: unknown[] = []) {
+      return sq.prepare(sql).all(...(params as never[])) as T[];
+    },
+    async one<T>(sql: string, params: unknown[] = []) {
+      return sq.prepare(sql).get(...(params as never[])) as T | undefined;
+    },
+    async run(sql: string, params: unknown[] = []) {
+      sq.prepare(sql).run(...(params as never[]));
+    },
+    async exec(sql: string) {
+      sq.exec(sql);
+    },
+  };
+  return db;
 }

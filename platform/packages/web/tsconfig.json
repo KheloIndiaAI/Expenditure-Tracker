@@ -12,5 +12,11 @@
     "allowImportingTsExtensions": true,
     "types": ["vite/client"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "//exclude": "Parked Phase-3 dashboard-SPA scaffolding: these components target an API/auth surface (search, encodeFilters, AuthValue.user/can) that does not exist in the current auth-only build. They are not imported by App.tsx and are excluded until the full SPA is built.",
+  "exclude": [
+    "src/components/AppShell.tsx",
+    "src/components/CommandPalette.tsx",
+    "src/lib/useFilters.ts"
+  ]
 }
