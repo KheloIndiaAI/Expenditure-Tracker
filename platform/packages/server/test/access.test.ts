@@ -1,0 +1,135 @@
+/**
+ * Tests for the rules that decide who can do what.
+ *
+ * These cover the guarantees that are easy to break silently later: that an
+ * untouched user keeps full access, that a Super Admin cannot be locked out of
+ * their own platform, and that a password verifies only against itself.
+ *
+ * Runs against a throwaway SQLite file so it needs no server and no Postgres.
+ * EFIP_DB is set before importing anything that touches the database — the
+ * connection is memoised on first use, so the order matters.
+ */
+
+import { after, before, describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const dir = mkdtempSync(join(tmpdir(), 'efip-test-'));
+process.env.EFIP_DB = join(dir, 'test.db');
+delete process.env.DATABASE_URL; // never let a stray env point these at RDS
+process.env.JWT_SECRET ??= 'test-secret-not-used-in-production';
+
+const { hashPassword, verifyPassword, isSuperAdmin } = await import('../src/auth.ts');
+const { upsertUser, getModuleAccess, setModuleAccess, findByUsername, updateUser } = await import('../src/users.ts');
+
+after(() => {
+  /* Best-effort: node:sqlite keeps the WAL files open for the life of the
+     process, and Windows refuses to unlink an open file. The directory is under
+     the OS temp root, so leaving it is harmless — failing the suite over
+     housekeeping would not be. */
+  try {
+    rmSync(dir, { recursive: true, force: true });
+  } catch {
+    /* ignore */
+  }
+});
+
+describe('passwords', () => {
+  it('verifies against its own hash and nothing else', () => {
+    const stored = hashPassword('correct horse battery');
+    assert.equal(verifyPassword('correct horse battery', stored), true);
+    assert.equal(verifyPassword('correct horse batter', stored), false);
+    assert.equal(verifyPassword('', stored), false);
+  });
+
+  it('salts, so the same password hashes differently every time', () => {
+    assert.notEqual(hashPassword('same'), hashPassword('same'));
+  });
+
+  it('never stores the plaintext', () => {
+    assert.equal(hashPassword('plaintext-should-not-appear').includes('plaintext-should-not-appear'), false);
+  });
+});
+
+describe('isSuperAdmin', () => {
+  it('recognises only the super_admin role', () => {
+    assert.equal(isSuperAdmin({ role: 'super_admin' }), true);
+    assert.equal(isSuperAdmin({ role: 'admin' }), false);
+    assert.equal(isSuperAdmin({ role: 'analyst' }), false);
+    assert.equal(isSuperAdmin(null), false);
+    assert.equal(isSuperAdmin(undefined), false);
+  });
+});
+
+describe('module access', () => {
+  let plainId = '';
+  let superId = '';
+
+  before(async () => {
+    plainId = (await upsertUser({ username: 'test_plain', password: 'password123', name: 'Plain', role: 'analyst' })).id;
+    superId = (await upsertUser({ username: 'test_super', password: 'password123', name: 'Super', role: 'super_admin' })).id;
+  });
+
+  it('grants everything to a user with no stored decision', async () => {
+    const access = await getModuleAccess(plainId, 'analyst');
+    assert.deepEqual(Object.values(access).every(Boolean), true);
+  });
+
+  it('honours a stored decision', async () => {
+    await setModuleAccess(plainId, { command: true, tracker: true, kigroups: false, mdsd: true, rc: true, exceptions: false });
+    const access = await getModuleAccess(plainId, 'analyst');
+    assert.equal(access.kigroups, false);
+    assert.equal(access.exceptions, false);
+    assert.equal(access.command, true);
+    assert.equal(access.rc, true);
+  });
+
+  it('cannot lock a Super Admin out, even when everything is stored as off', async () => {
+    await setModuleAccess(superId, {
+      command: false, tracker: false, kigroups: false, mdsd: false, rc: false, exceptions: false,
+    });
+    const access = await getModuleAccess(superId, 'super_admin');
+    assert.deepEqual(Object.values(access).every(Boolean), true, 'a Super Admin must keep every module');
+  });
+
+  it('replaces the whole set rather than merging, so the UI and store agree', async () => {
+    await setModuleAccess(plainId, { command: false });
+    const access = await getModuleAccess(plainId, 'analyst');
+    assert.equal(access.command, false);
+    // Keys omitted by the caller default to allowed, not to their previous value.
+    assert.equal(access.kigroups, true);
+  });
+});
+
+describe('user records', () => {
+  it('stores contact details and defaults to active', async () => {
+    await upsertUser({
+      username: 'test_contact',
+      password: 'password123',
+      name: 'Contact',
+      role: 'director',
+      email: 'contact@example.gov.in',
+      phone: '+91 90000 00000',
+    });
+    const row = await findByUsername('test_contact');
+    assert.equal(row?.email, 'contact@example.gov.in');
+    assert.equal(row?.phone, '+91 90000 00000');
+    assert.equal(row?.is_active, true, 'a new user is active unless stated otherwise');
+  });
+
+  it('lowercases the username so sign-in is case-insensitive', async () => {
+    await upsertUser({ username: 'Test_MixedCase', password: 'password123', name: 'Mixed', role: 'analyst' });
+    assert.ok(await findByUsername('test_mixedcase'));
+    assert.ok(await findByUsername('TEST_MIXEDCASE'));
+  });
+
+  it('does not revive a deactivated account on re-seed', async () => {
+    const user = await upsertUser({ username: 'test_off', password: 'password123', name: 'Off', role: 'analyst' });
+    await updateUser(user.id, { is_active: false });
+    // A re-seed states no is_active, so the administrator's decision must stand.
+    await upsertUser({ username: 'test_off', password: 'password123', name: 'Off', role: 'analyst' });
+    assert.equal((await findByUsername('test_off'))?.is_active, false);
+  });
+});

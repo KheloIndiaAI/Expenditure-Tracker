@@ -1317,7 +1317,8 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
       <div><div class="bt">Expenditure Tracker</div><div class="bs">Sports Authority of India</div></div>
     </div>
     <nav id="nav"></nav>
-    <button class="navitem navlogout" onclick="logout()" title="Sign out of the platform">
+    <div id="acctLinks"></div>
+  <button class="navitem navlogout" onclick="logout()" title="Sign out of the platform">
       <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
       Sign out
     </button>
@@ -1891,7 +1892,7 @@ const NAV=[{g:'ANALYSIS'},
 function svgIcon(i){ return `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[i]}"/>${i==='rc'?'<circle cx="12" cy="10" r="2.4"/>':''}</svg>`; }
 function renderNav(){
   const n=attentionCount();
-  const items=NAV.filter(it=>it.g||!viewHidden(it.v))
+  const items=NAV.filter(it=>it.g||(!viewHidden(it.v)&&moduleAllowed(it.v)))
     .filter((it,i,a)=>!it.g || a.slice(i+1).some(x=>!x.g));   // no empty group headers
   document.getElementById('nav').innerHTML=items.map(it=>{
     if(it.g) return `<div class="navgroup">${it.g}</div>`;
@@ -1901,7 +1902,7 @@ function renderNav(){
     return `<button class="navitem${active}" onclick="go('${it.v}')">${svgIcon(it.i)}${it.t}${badge}</button>`;
   }).join('');
 }
-function go(v){ if(viewHidden(v)) return; state.view=v; render(); window.scrollTo(0,0); if(innerWidth<=980) closeSidebar(); }
+function go(v){ if(viewHidden(v)||!moduleAllowed(v)) return; state.view=v; render(); window.scrollTo(0,0); if(innerWidth<=980) closeSidebar(); }
 function toggleSidebar(){ const sb=document.getElementById('sidebar'),open=sb.classList.toggle('open'); document.getElementById('sbBackdrop').classList.toggle('show',open); }
 function closeSidebar(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sbBackdrop').classList.remove('show'); }
 /* Sign out: clear the server session cookie, then return to the login page.
@@ -3541,7 +3542,7 @@ const TABS=[
 function renderTabbar(){
   const el=document.getElementById('tabbar'); if(!el) return;
   const n=attentionCount();
-  const tabs=TABS.filter(function(t){ return !viewHidden(t.v); }).map(function(t){
+  const tabs=TABS.filter(function(t){ return !viewHidden(t.v)&&moduleAllowed(t.v); }).map(function(t){
     const on=state.view===t.v;
     return `<button class="tab${on?' on':''}" onclick="go('${t.v}')"${on?' aria-current="page"':''}>
       <span class="tab-ic">
@@ -3551,7 +3552,7 @@ function renderTabbar(){
   }).join('');
   /* "More" reflects the drawer's state rather than a panel, so it is marked
      current whenever the open panel isn't one of the four above. */
-  const other=!TABS.some(function(t){ return t.v===state.view && !viewHidden(t.v); });
+  const other=!TABS.some(function(t){ return t.v===state.view && !viewHidden(t.v) && moduleAllowed(t.v); });
   el.innerHTML=tabs+`<button class="tab${other?' on':''}" onclick="toggleSidebar()" aria-label="More panels">
       <span class="tab-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></span>
       <span class="tab-t">More</span></button>`;
@@ -4671,7 +4672,7 @@ const GS_W=GS_KIND.reduce(function(m,k){ m[k[0]]=k[1]; return m; },{});
 
 function gsBuild(){
   const ix=[], txns=DATA.txns||[];
-  NAV.forEach(function(x){ if(x.v&&!viewHidden(x.v)) ix.push({k:'Panel',t:x.t,s:'Open panel',go:{v:x.v}}); });
+  NAV.forEach(function(x){ if(x.v&&!viewHidden(x.v)&&moduleAllowed(x.v)) ix.push({k:'Panel',t:x.t,s:'Open panel',go:{v:x.v}}); });
   (DATA.sections||[]).forEach(function(n){
     const g=(DATA.sectionTotals||{})[n]||{};
     ix.push({k:'Section',t:n,s:'Financial classification',a:g.assign,u:g.exp,go:{v:'command',hs:'sectbl:'+n}});
@@ -4866,7 +4867,90 @@ function gsInit(){
   });
 }
 
-renderNav(); refreshSyncFacts(); render(); syncStart(); gsInit();
+/* ============================================================================
+   PER-USER MODULE ACCESS
+   ============================================================================
+   The signed-in user's allowed panels come from GET /api/auth/me, which resolves
+   them from the database on every request. The Super Admin's toggles are the
+   source of truth; this file only obeys them.
+
+   Honest scope: this hides panels. It is not a data boundary, and the
+   architecture cannot make it one — the dashboard is a single document that
+   loads the whole dataset into the browser and reads the sheet client-side, so
+   anyone with developer tools can still reach figures for a panel they are not
+   shown. Enforcing that properly would mean serving each panel's data from the
+   server per request, which is a different platform. What IS enforced
+   server-side is everything that mutates: /api/admin/* refuses non-Super-Admins
+   outright, and a deactivated account is refused at login and on every request.
+
+   Until /me answers, nothing is hidden: a network hiccup must not blank the menu
+   for a user who is entitled to it. Denial only ever comes from a real answer. */
+var ME = null;
+
+function moduleAllowed(v) {
+  if (!v || !ME || !ME.modules) return true;
+  return ME.modules[v] !== false;
+}
+
+function isSuperAdmin() {
+  return !!(ME && ME.role === 'super_admin');
+}
+
+/* Landing on a panel that is no longer permitted moves to the first that is,
+   rather than showing an empty frame. */
+function firstAllowedView() {
+  for (var i = 0; i < NAV.length; i++) {
+    var it = NAV[i];
+    if (it.v && !viewHidden(it.v) && moduleAllowed(it.v)) return it.v;
+  }
+  return null;
+}
+
+function applyAccess() {
+  if (!ME || !ME.modules) return;
+  if (!moduleAllowed(state.view)) {
+    var next = firstAllowedView();
+    if (next) state.view = next;
+  }
+  renderAccountLinks();
+  render();
+}
+
+function renderAccountLinks() {
+  var slot = document.getElementById('acctLinks');
+  if (!slot) return;
+  var html = '';
+  if (isSuperAdmin()) {
+    html +=
+      '<a class="navitem" href="/admin/users" title="Manage users and access">' +
+      '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>' +
+      'Administration</a>';
+  }
+  html +=
+    '<a class="navitem" href="/profile" title="Your name, contact details and password">' +
+    '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
+    'Profile</a>';
+  slot.innerHTML = html;
+}
+
+function loadMe() {
+  return fetch('/api/auth/me', { credentials: 'include' })
+    .then(function (r) {
+      return r.ok ? r.json() : null;
+    })
+    .then(function (u) {
+      if (!u) return;
+      ME = u;
+      applyAccess();
+    })
+    .catch(function () {
+      /* Offline or a blip: leave the menu exactly as it is. */
+    });
+}
+
+renderNav(); refreshSyncFacts(); renderAccountLinks(); render(); syncStart(); gsInit(); loadMe();
 </script>
 </body>
 </html>

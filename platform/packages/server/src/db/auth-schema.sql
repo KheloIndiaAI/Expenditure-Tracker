@@ -20,3 +20,21 @@ CREATE TABLE IF NOT EXISTS app_user (
 );
 
 CREATE INDEX IF NOT EXISTS ix_app_user_username ON app_user(username);
+
+-- ============================================================================
+--  Per-user module access. A user with NO rows here can see every module —
+--  that keeps every pre-existing login working exactly as before this table
+--  arrived, so adding it is not a silent lockout. A row is written only when a
+--  Super Admin actually decides something, and `allowed = 0` is that decision.
+--
+--  `module` is the dashboard's own view name (command, tracker, kigroups, mdsd,
+--  rc, exceptions) so a grant maps 1:1 onto what the UI renders.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS user_module_access (
+  user_id  TEXT NOT NULL,
+  module   TEXT NOT NULL,
+  allowed  INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (user_id, module)
+);
+
+CREATE INDEX IF NOT EXISTS ix_user_module_access_user ON user_module_access(user_id);

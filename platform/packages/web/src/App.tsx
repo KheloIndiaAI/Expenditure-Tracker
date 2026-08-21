@@ -1,13 +1,67 @@
 /**
  * App root.
  *
- * This build is intentionally the login surface only. The dashboard is the
- * self-contained, Google-Sheets-synced HTML served by the server at "/" once a
- * session cookie exists, so the SPA's whole job is to authenticate and hand off.
+ * One bundle serves three surfaces: the sign-in page, the Super Admin area and
+ * the user's own profile. The dashboard is still the self-contained,
+ * Google-Sheets-synced HTML that the server hands out at "/" once a session
+ * cookie exists, so this SPA never renders financial data.
+ *
+ * The route guards below decide what to *render*. They are not the security
+ * boundary — every admin endpoint re-checks the caller's role server-side, so a
+ * user who edits their client state gets a 403, not data.
  */
 
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Login } from './pages/Login.tsx';
+import { AdminUsers } from './pages/AdminUsers.tsx';
+import { AdminAccess } from './pages/AdminAccess.tsx';
+import { Profile } from './pages/Profile.tsx';
+import { useAuth } from './lib/auth.tsx';
+
+/** Blocks the first paint until `me` has resolved, so guards never flash. */
+function Gate({ children, superOnly }: { children: React.ReactNode; superOnly?: boolean }) {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="grid min-h-full place-items-center bg-page text-body text-ink-muted">Loading…</div>;
+  if (!user) {
+    window.location.href = '/login';
+    return null;
+  }
+  if (superOnly && user.role !== 'super_admin') return <Navigate to="/profile" replace />;
+  return <>{children}</>;
+}
 
 export function App() {
-  return <Login />;
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/admin" element={<Navigate to="/admin/users" replace />} />
+        <Route
+          path="/admin/users"
+          element={
+            <Gate superOnly>
+              <AdminUsers />
+            </Gate>
+          }
+        />
+        <Route
+          path="/admin/access"
+          element={
+            <Gate superOnly>
+              <AdminAccess />
+            </Gate>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <Gate>
+              <Profile />
+            </Gate>
+          }
+        />
+        <Route path="*" element={<Login />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }

@@ -22,15 +22,15 @@ import cookie from '@fastify/cookie';
 import fstatic from '@fastify/static';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
-import type { User } from '@efip/shared';
-import { findByUsername, countUsers } from './users.ts';
-import { dummyVerify, signToken, toAuthedUser, verifyPassword, verifyToken } from './auth.ts';
+import { findByUsername, countUsers, getModuleAccess } from './users.ts';
+import { dummyVerify, signToken, toAuthedUser, verifyPassword } from './auth.ts';
+import { COOKIE_NAME, currentUser, stripHash } from './session.ts';
+import { registerAdminRoutes } from './routes/admin.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const PORT = Number(process.env.PORT || 4000);
 const HOST = process.env.HOST || '0.0.0.0';
-const COOKIE_NAME = process.env.COOKIE_NAME || 'efip_session';
 const IS_PROD = process.env.NODE_ENV === 'production';
 const MAX_AGE = 60 * 60 * 12; // 12h, in seconds
 
@@ -50,21 +50,6 @@ const LOGIN_HTML = join(WEB_DIST, 'index.html');
  * `/` here is deliberately gated and a static host cannot reproduce that.
  */
 const DASHBOARD_HTML = process.env.DASHBOARD_HTML || resolve(__dirname, '../../../public/index.html');
-
-function stripHash(u: User & { password_hash?: string }): User {
-  const { password_hash, ...rest } = u;
-  return rest;
-}
-
-/** Resolve the signed-in user from the request cookie, or null. */
-async function currentUser(req: { cookies?: Record<string, string | undefined> }): Promise<User | null> {
-  const token = req.cookies?.[COOKIE_NAME];
-  if (!token) return null;
-  const claims = verifyToken(token);
-  if (!claims) return null;
-  const row = await findByUsername(claims.username);
-  return row ? stripHash(row) : null;
-}
 
 /**
  * Read a file once at boot and keep it in memory. The login and dashboard HTML
@@ -155,6 +140,13 @@ async function start(): Promise<void> {
         return reply.code(401).send({ message: 'Invalid username or password.' });
       }
       const user = stripHash(row);
+      /* Deactivation is a login-time refusal, not merely a hidden menu. The same
+         check runs on every request in session.ts, so an already-signed-in user
+         loses access immediately rather than at token expiry. */
+      if (!user.is_active) {
+        req.log.warn({ event: 'auth.login.deactivated', userId: user.id, ip: req.ip });
+        return reply.code(403).send({ message: 'This account has been deactivated. Contact the administrator.' });
+      }
       reply.setCookie(COOKIE_NAME, signToken(user), {
         httpOnly: true,
         sameSite: 'lax',
@@ -163,14 +155,14 @@ async function start(): Promise<void> {
         maxAge: MAX_AGE,
       });
       req.log.info({ event: 'auth.login.success', userId: user.id, role: user.role, ip: req.ip });
-      return { token: 'cookie', user: toAuthedUser(user) };
+      return { token: 'cookie', user: toAuthedUser(user, await getModuleAccess(user.id, user.role)) };
     },
   );
 
   app.get('/api/auth/me', async (req, reply) => {
     const user = await currentUser(req);
     if (!user) return reply.code(401).send({ message: 'Not authenticated.' });
-    return toAuthedUser(user);
+    return toAuthedUser(user, await getModuleAccess(user.id, user.role));
   });
 
   app.post('/api/auth/logout', async (req, reply) => {
@@ -179,6 +171,10 @@ async function start(): Promise<void> {
     if (user) req.log.info({ event: 'auth.logout', userId: user.id, ip: req.ip });
     return { ok: true };
   });
+
+  // Super Admin (/api/admin/*) and self-service (/api/me*) routes. Every one of
+  // them re-checks the caller against the database — see routes/admin.ts.
+  registerAdminRoutes(app);
 
   // Public liveness probe — no user count or other internal detail is exposed.
   app.get('/api/health', async () => ({ ok: true }));
@@ -190,6 +186,20 @@ async function start(): Promise<void> {
     }
     return reply.type('text/html').send(loginHtml);
   });
+
+  /* The login bundle is also the Administration and Profile SPA, so these paths
+     serve the same document and let the client router take over. They are still
+     gated: an unauthenticated visitor is sent to /login, and every action the SPA
+     can take is authorised server-side regardless of what it chooses to render. */
+  for (const path of ['/admin', '/admin/*', '/profile']) {
+    app.get(path, async (req, reply) => {
+      if (!(await currentUser(req))) return reply.redirect('/login');
+      if (!loginHtml) {
+        return reply.code(500).type('text/plain').send('UI not built. Run: npm run build -w @efip/web');
+      }
+      return reply.type('text/html').send(loginHtml);
+    });
+  }
 
   app.get('/', async (req, reply) => {
     if (!(await currentUser(req))) return reply.redirect('/login');

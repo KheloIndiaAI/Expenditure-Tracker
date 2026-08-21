@@ -26,6 +26,37 @@ export interface Db {
 
 const SCHEMA = () => readFileSync(resolve(__dirname, 'auth-schema.sql'), 'utf8');
 
+/**
+ * Columns added to `app_user` after the table already existed in production.
+ *
+ * `CREATE TABLE IF NOT EXISTS` cannot add a column to a table that is already
+ * there, and the two engines disagree on the alternative: Postgres has
+ * `ADD COLUMN IF NOT EXISTS`, SQLite does not. Rather than branch on the driver,
+ * each ALTER is attempted and a "duplicate column" failure is treated as
+ * success — the only outcome that matters is that the column exists afterwards.
+ * Any other error is re-thrown, so a genuine problem still fails loudly at boot.
+ *
+ * Defaults are constants, which SQLite requires for ADD COLUMN, and they encode
+ * the pre-existing behaviour: no contact details, and active.
+ */
+const ADD_COLUMNS = [
+  "ALTER TABLE app_user ADD COLUMN email TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE app_user ADD COLUMN phone TEXT NOT NULL DEFAULT ''",
+  'ALTER TABLE app_user ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1',
+];
+
+async function applyMigrations(db: Db): Promise<void> {
+  for (const sql of ADD_COLUMNS) {
+    try {
+      await db.exec(sql);
+    } catch (err) {
+      const msg = String((err as Error)?.message ?? err).toLowerCase();
+      const alreadyThere = msg.includes('duplicate column') || msg.includes('already exists');
+      if (!alreadyThere) throw err;
+    }
+  }
+}
+
 /** `?` → `$1,$2,…` for node-postgres, which uses numbered placeholders. */
 function toPgPlaceholders(sql: string): string {
   let n = 0;
@@ -74,6 +105,7 @@ async function initPostgres(): Promise<Db> {
     },
   };
   await db.exec(SCHEMA());
+  await applyMigrations(db);
   return db;
 }
 
@@ -101,5 +133,6 @@ async function initSqlite(): Promise<Db> {
       sq.exec(sql);
     },
   };
+  await applyMigrations(db);
   return db;
 }

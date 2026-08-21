@@ -424,10 +424,13 @@ export const ROLES = [
   'analyst',
   'auditor',
   'admin',
+  /** Platform owner: the only role that may reach /api/admin/*. */
+  'super_admin',
 ] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABELS: Record<Role, string> = {
+  super_admin: 'Super Administrator',
   minister: 'Minister',
   secretary: 'Secretary',
   joint_secretary: 'Joint Secretary',
@@ -484,7 +487,31 @@ export const ROLE_MATRIX: Record<Role, Capability[]> = {
   analyst: ['view_dashboards', 'search_explore', 'export', 'view_audit'],
   auditor: ['view_dashboards', 'search_explore', 'export', 'view_audit', 'view_full_audit'],
   admin: [...CAPABILITIES],
+  super_admin: [...CAPABILITIES],
 };
+
+// ─── Dashboard modules · the unit of per-user access ─────────────────────────
+
+/**
+ * The panels a user can be granted or denied, keyed by the dashboard's own view
+ * name so a grant maps 1:1 onto what the UI renders. Hidden views (`sv`,
+ * `trend`, `detail`, `saifmt`) are deliberately absent: they are unreachable, so
+ * granting them would be a permission that means nothing.
+ */
+export const MODULES = [
+  { key: 'command', label: 'Financial Overview' },
+  { key: 'tracker', label: 'Component Tracker' },
+  { key: 'kigroups', label: 'SAI KI 1, KI 2 & Infra' },
+  { key: 'mdsd', label: 'KI Infra (States/UTs)' },
+  { key: 'rc', label: 'Regional Centres' },
+  { key: 'exceptions', label: 'Attention Centre' },
+] as const;
+
+export type ModuleKey = (typeof MODULES)[number]['key'];
+export const MODULE_KEYS: readonly ModuleKey[] = MODULES.map((m) => m.key);
+
+/** A user with no rows in `user_module_access` gets everything — see users.ts. */
+export type ModuleAccess = Record<ModuleKey, boolean>;
 
 export function can(role: Role, capability: Capability): boolean {
   return ROLE_MATRIX[role].includes(capability);
@@ -497,10 +524,17 @@ export interface User {
   name: string;
   role: Role;
   designation: string;
+  /** Contact detail only. Login is still by username, never by email. */
+  email: string;
+  phone: string;
+  /** A deactivated user keeps their record but is refused at login. */
+  is_active: boolean;
 }
 
 export interface AuthedUser extends User {
   capabilities: Capability[];
+  /** Which dashboard panels this user may open, resolved server-side. */
+  modules: ModuleAccess;
 }
 
 // ─── 07 §7 · Audit ───────────────────────────────────────────────────────────
