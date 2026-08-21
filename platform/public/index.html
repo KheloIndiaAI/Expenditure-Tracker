@@ -1216,6 +1216,7 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
     display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;
     border-radius:9px;background:var(--primary);color:#fff;font-size:10.5px;font-weight:700}
   .filtbtn-n.rc{background:var(--good)}
+  .filtbtn-n.off{display:none}
   .sheet-backdrop.show{display:block}
 
   /* The chip row becomes the sheet body. */
@@ -1693,7 +1694,7 @@ function rcTipRows(metric,label){
    + (infraOn?'<tr class="infra"><td>INFRA-SAI</td><td>'+crShort(val(infra))+'</td></tr>':'')
    + (hqOn?'<tr class="hq"><td>DDO HQ</td><td>'+crShort(val(hq))+'</td></tr>':'')
    + '<tr class="tot"><td>Total</td><td>'+crShort(tot)+'</td></tr>'
-   + (off.length?'<tr class="nil"><td colspan="2">'+off.join(' and ')+' excluded by filter</td></tr>':'')
+   + (off.length?'<tr class="nil"><td colspan="2">'+off.join(' and ')+' not counted in this panel</td></tr>':'')
    + '</table>';
 }
 function idleTipRows(list,posOnly){
@@ -1720,7 +1721,7 @@ function idleTipRows(list,posOnly){
    + (infraOn?`<tr class="infra"><td>INFRA-SAI <span class="nb">· SAI infrastructure wing</span></td><td>${crShort(infra.idle)}</td></tr>`:'')
    + (hqOn?`<tr class="hq"><td>DDO HQ <span class="nb">· HQ, not an RC</span></td><td>${crShort(hq.idle)}</td></tr>`:'')
    + `<tr class="tot"><td>Total unspent</td><td>${crShort(tot)}</td></tr>`
-   + (off.length?`<tr class="nil"><td colspan="2">${off.join(' and ')} excluded by filter</td></tr>`:'')
+   + (off.length?`<tr class="nil"><td colspan="2">${off.join(' and ')} not counted in this panel</td></tr>`:'')
    + `</table>`;
 }
 function vAgg(node){ if(node.leaf) return node.leaf; const a=sum(node.subs,s=>s.assign),e=sum(node.subs,s=>s.exp),b=sum(node.subs,s=>s.bal),idle=sum(node.subs,idleOf); return {assign:a,exp:e,bal:b,up:(a?e/a:0),idle}; }
@@ -2332,7 +2333,7 @@ function printSAIFmt(){
 function saifRCDetail(row){
   if(row.mdsd){
     const items=SV.filter(s=>s.mdsd);
-    if(!items.length) return `<div class="saif-note">KI Infra (States/UTs) is excluded by the current filter.</div>`;
+    if(!items.length) return `<div class="saif-note">KI Infra (States/UTs) is not counted in this panel.</div>`;
     const T={a:sum(items,s=>s.assign),e:sum(items,s=>s.exp)};
     return `<div class="ih">State / Institute detail · released direct, outside every Regional Centre limit</div>
       <div class="saif-note" style="margin-bottom:9px">MDSD grants carry <b>no Regional Centre limit</b> — they are sanctioned straight to States and Institutes, so the equivalent detail is shown below.</div>
@@ -3399,12 +3400,10 @@ function entityUtilTable(items,cfg){
 }
 const MDSD_CFG={ns:'mdsdtbl',sortField:'mdsdSort',nameLabel:'State / Institute',sancLabel:'Sanctioned',usedLabel:'Used',balLabel:'Balance',icon:x=>mdsdIcon(x.type),detail:x=>mdsdDetail(x)};
 function viewMDSD(){
-  if(!state.inclMdsd){
-    return pageHead('KI Infra (States/UTs)','')
-     + `<div class="card"><div class="dt-empty"><div class="e-ic">🚫</div><div class="e-t">KI Infra (States/UTs) is currently excluded</div>
-        <div class="e-s">The <b>KI Infra (States/UTs)</b> filter chip is unticked, so State / Institute grants are excluded from the active dataset platform-wide.
-        <span style="text-decoration:underline;cursor:pointer;color:var(--primary)" onclick="toggleMdsd()">Include it again</span> to view this page.</div></div></div>`;
-  }
+  /* The "KI Infra is excluded" empty state that stood here is gone. This panel's
+     preset forces inclMdsd:true on every render, so the branch was unreachable -
+     and it both named the filter chip and offered a link to re-enable it, which is
+     precisely the control this panel is meant to have no visible trace of. */
   const items=utilSorted(MDSD.items,state.mdsdSort), Gm=MDSD.grand;
   const kpis=`<div class="kpi-grid">
     <div class="kpi accent"><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">KI Infra Assignment</div><div class="val tnum">${cr(Gm.assign)}</div></div></div><div class="sub">${items.length} States / Institutes funded</div></div>
@@ -3442,11 +3441,12 @@ function renderTopFilters(){
         <option value="Infrastructure"${f==='Infrastructure'?' selected':''}>Infrastructure</option>
       </select>
     </div>
-    <button class="fchip fchip-rc${rcOnlyOn()?' on':''}" onclick="toggleRcOnly()" title="Show only the 12 Regional Centres. Excludes DDO KI Direct expenditure, DDO HQ, INFRA-SAI and KI Infra (States/UTs), each of which carries its own separate data. Component assignment is a scheme-level budget and is not centre-attributable, so it is unchanged - limit released, expenditure and balance become Regional-Centre only."><span class="fchip-main">Regional Centres</span><span class="fchip-sub">only</span></button>
-    <button class="fchip fchip-2l${state.inclDdoki?' on':''}${rcOnlyOn()?' lk':''}" onclick="toggleDdoki()" title="Include or exclude DDO KI Direct expenditure from every KPI, chart, table, drill-down and insight on the platform"><span class="fchip-main">DDO KI</span><span class="fchip-sub">(Direct expenditure)</span></button>
-    <button class="fchip${state.inclMdsd?' on':''}${rcOnlyOn()?' lk':''}" onclick="toggleMdsd()" title="Include or exclude KI Infra (States/UTs) grants from every KPI, chart, table, drill-down and insight on the platform">KI Infra (States/UTs)</button>
-    <button class="fchip${state.inclHQ!==false?' on':''}${rcOnlyOn()?' lk':''}" onclick="toggleHQ()" title="Include or exclude the DDO HQ centre - headquarters, not a Regional Centre. Unticking withdraws its limit and its actual expenditure from every figure on the platform and removes it from every table, dropdown and tooltip.">DDO HQ</button>
-    <button class="fchip${state.inclInfraSai!==false?' on':''}${rcOnlyOn()?' lk':''}" onclick="toggleInfraSai()" title="Include or exclude the INFRA-SAI centre - SAI's own infrastructure wing. Unticking withdraws its limit and its actual expenditure from every figure on the platform and removes it from every table, dropdown and tooltip.">Infra-SAI</button>
+    <!-- The five stream chips (Regional Centres only / DDO KI / KI Infra / DDO HQ /
+         Infra-SAI) used to sit here. They are deliberately NOT rendered: each panel
+         now carries a fixed preset, re-asserted on every render by
+         applyViewFilterDefaults(), so the streams are a property of the panel rather
+         than something a viewer sets. The toggle functions are kept so the presets
+         and rcOnly logic still read clearly, but nothing in the UI calls them. -->
   `;
   syncFilterBadge();
 }
@@ -3460,10 +3460,13 @@ function renderTopFilters(){
 --------------------------------------------------------------------------- */
 function syncFilterBadge(){
   const n=document.getElementById('filtBtnN'); if(!n) return;
-  const on=[state.inclDdoki,state.inclMdsd,state.inclHQ!==false,state.inclInfraSai!==false]
-    .filter(Boolean).length;
-  n.textContent=rcOnlyOn()?'RC':String(on);
-  n.className='filtbtn-n'+(rcOnlyOn()?' rc':'');
+  /* This used to count the stream chips. They are no longer shown, so counting them
+     would advertise hidden state and mean nothing to whoever is reading it. The
+     sheet now holds exactly one control - Classification - so the badge marks only
+     whether that has been narrowed away from All, and is otherwise absent. */
+  const narrowed = state.filt && state.filt!=='All';
+  n.textContent = narrowed ? '1' : '';
+  n.className = 'filtbtn-n' + (narrowed ? '' : ' off');
 }
 function openFilterSheet(){
   document.body.classList.add('filters-open');
@@ -3578,6 +3581,11 @@ const VIEW_FILTER_PRESETS = {
   kigroups: EXEC_FILTER_PRESET,
   saifmt:   ALL_FILTER_PRESET,
   mdsd:     MDSD_FILTER_PRESET,
+  /* Attention Centre had no entry, so it inherited whatever the previous panel
+     left behind - arriving from Regional Centres carried the RC streams in.
+     That was survivable while the chips were on screen to correct it; with them
+     hidden it would be an invisible inconsistency, so it is pinned explicitly. */
+  exceptions: EXEC_FILTER_PRESET,
 };
 /* Regional-Centre mode is expressed through the four existing stream flags rather
    than a parallel calculation, so every KPI, chart, table, drill-down and export
@@ -3598,11 +3606,17 @@ function toggleRcOnly(){
   render();
 }
 function applyViewFilterDefaults(){
-  if(rcOnlyOn()){ applyRcOnly(); state._filtView=state.view; return; }
-  if(state._filtView === state.view) return;        // same panel -> respect manual toggles
+  /* The stream chips are no longer rendered, so a panel's preset is now the ONLY
+     thing that sets these flags - and it is re-asserted on every render, not just
+     when the panel changes. The old "same panel -> respect manual toggles" early
+     return existed to preserve a viewer's clicks; with no control left to click it
+     would instead let a stray flag persist invisibly, with nothing on screen able
+     to correct it. Re-asserting makes each panel's streams a property of the panel.
+     rcOnly is pinned off because its chip is gone and the mode is now unreachable. */
+  state.rcOnly=false;
   const preset = VIEW_FILTER_PRESETS[state.view];
-  if(preset) Object.assign(state, preset);          // listed panel -> apply its default
-  state._filtView = state.view;                      // others -> leave filters untouched
+  if(preset) Object.assign(state, preset);
+  state._filtView = state.view;
 }
 
 function render(){ applyViewFilterDefaults(); applyFilter(); renderNav(); renderTopFilters(); renderSyncPill(); const v=state.view;
