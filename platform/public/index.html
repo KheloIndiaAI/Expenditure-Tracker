@@ -75,6 +75,50 @@ button{font-family:inherit}
 /* four filter chips plus the Classification select need the room on laptop widths, so the
    data-as-of chip (duplicated in every page sub-heading) yields first. */
 @media(max-width:1320px){.verchip{display:none}}
+/* ---- Global search ---------------------------------------------------------
+   A finder, not a filter. It searches the whole dataset regardless of which
+   classification chips are on, so nothing is ever invisible merely because a
+   chip is unticked - a search that silently hides what you asked for is worse
+   than no search. Picking a result navigates to the panel that owns it AND
+   opens that row (state.hsOpen), which is what makes it a drill rather than a
+   jump to a page you then have to scan by hand. */
+/* Flexible, not fixed: the chip row already fills the bar at laptop widths, so a
+   fixed box pushed the filters onto a second row and made the sticky header 111px
+   tall. Basis 140 keeps it on the line, it grows into whatever the chips leave, and
+   caps at 216 so it never sprawls on a wide monitor. */
+.gs{position:relative;flex:1 1 140px;min-width:118px;max-width:216px}
+.gs-f{display:flex;align-items:center;gap:7px;height:34px;padding:0 9px 0 11px;background:var(--bg-surface);border:1px solid var(--border);border-radius:20px;transition:border-color .12s,box-shadow .12s}
+.gs-f:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-subtle)}
+.gs-i{flex:1;min-width:0;border:0;outline:0;background:none;font-family:inherit;font-size:12.5px;font-weight:500;color:var(--text-primary);padding:0}
+.gs-i::placeholder{color:var(--text-muted);font-weight:500}
+.gs-ic{width:14px;height:14px;flex:none;color:var(--text-muted)}
+.gs-f:focus-within .gs-ic{color:var(--primary)}
+.gs-k{flex:none;font:700 10px/1 inherit;color:var(--text-muted);background:var(--bg-app);border:1px solid var(--border);border-radius:4px;padding:3px 5px}
+.gs-x{flex:none;border:0;background:none;padding:0;margin:0;cursor:pointer;color:var(--text-muted);display:none;line-height:0}
+.gs-x:hover{color:var(--text-primary)}
+.gs.has .gs-k{display:none}
+.gs.has .gs-x{display:block}
+.gs-p{position:absolute;top:calc(100% + 9px);left:0;width:min(580px,84vw);max-height:min(64vh,510px);overflow:auto;overscroll-behavior:contain;background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 18px 48px rgba(11,11,11,.16),0 2px 8px rgba(11,11,11,.06);padding:6px;display:none;z-index:70}
+.gs.on .gs-p{display:block}
+.gs-g{padding:9px 10px 4px;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)}
+.gs-r{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer}
+.gs-r:hover{background:var(--bg-app)}
+.gs-r.sel{background:var(--primary-subtle)}
+.gs-b{flex:1;min-width:0}
+.gs-t{font-size:13px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gs-s{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.gs-n{font-size:11px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.gs-v{flex:none;text-align:right;padding-left:4px}
+.gs-v .a{font-size:12.5px;font-weight:700;color:var(--text-primary);font-variant-numeric:tabular-nums}
+.gs-v .u{font-size:10.5px;color:var(--good);font-variant-numeric:tabular-nums;margin-top:1px}
+.gs-mk{background:rgba(250,178,25,.32);color:inherit;border-radius:2px;padding:0 1px}
+.gs-e{padding:20px 14px;text-align:center;color:var(--text-muted);font-size:12.5px;line-height:1.6}
+.gs-more{padding:2px 10px 8px;font-size:11px;color:var(--text-muted)}
+.gs-ft{display:flex;gap:13px;justify-content:flex-end;padding:7px 10px 3px;border-top:1px solid var(--border-subtle);margin-top:4px;font-size:10.5px;color:var(--text-muted)}
+.gs-ft b{font-weight:700;color:var(--text-secondary)}
+@media(max-width:1320px){.gs{flex-basis:132px;max-width:172px}}
+@media(max-width:980px){.gs{flex:1 1 130px;max-width:none}.gs-k{display:none}.gs-p{width:min(560px,92vw)}}
+@media(max-width:520px){.gs-p{position:fixed;left:8px;right:8px;width:auto;top:auto;margin-top:9px}.gs-v{display:none}}
 /* live-sync status pill */
 .syncp{display:inline-flex;align-items:center;gap:7px;cursor:pointer;user-select:none}
 .syncp .dot{width:7px;height:7px;border-radius:50%;flex:none}
@@ -1285,6 +1329,17 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M7 12h10M10 19h4"/></svg>
         <span>Filters</span><span class="filtbtn-n" id="filtBtnN"></span>
       </button>
+      <div class="gs" id="gs">
+        <div class="gs-f">
+          <svg class="gs-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input id="gsI" class="gs-i" type="text" placeholder="Search anything…" autocomplete="off" spellcheck="false"
+                 role="combobox" aria-expanded="false" aria-controls="gsP" aria-autocomplete="list" aria-label="Search the platform"
+                 oninput="gsType(this.value)" onkeydown="gsKey(event)" onfocus="gsShow()">
+          <kbd class="gs-k" title="Press / to search">/</kbd>
+          <button class="gs-x" type="button" onclick="gsClear()" aria-label="Clear search"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+        </div>
+        <div class="gs-p" id="gsP" role="listbox" aria-label="Search results"></div>
+      </div>
       <div class="topfilters" id="topFilters"></div>
       <div class="verchip" id="syncPill"></div>
     </div>
@@ -4568,7 +4623,236 @@ function syncStart(){
 }
 
 if(viewHidden(state.view)){ var f=NAV.filter(function(x){return x.v&&!viewHidden(x.v);})[0]; if(f) state.view=f.v; }
-renderNav(); refreshSyncFacts(); render(); syncStart();
+/* ============================================================================
+   GLOBAL SEARCH
+   ============================================================================
+   One box that reaches everything the platform holds: panels, sections, scheme
+   components, Regional Centres, KI Infra States/UTs, spend categories, grantees,
+   and every individual release down to its voucher, sanction number and the
+   free text of its narration.
+
+   Two decisions worth knowing:
+
+   1. It searches the FULL dataset, not the filtered one. The classification
+      chips change what the figures mean, not what exists; a global search that
+      could not find a release because a chip was unticked would be a bug
+      wearing a feature's clothes. The figures on each row are that record's
+      own, so they never contradict whatever the chips are doing to page totals.
+
+   2. Picking a result opens the row, not just the page. Centres, sections and
+      KI Infra states all render through entityUtilTable, which expands whichever
+      row matches state.hsOpen — so setting that before navigating lands the user
+      on the actual thing, expanded and scrolled into view. A release resolves to
+      its Regional Centre, because the Transaction Record panel is in
+      HIDDEN_VIEWS and a result must never navigate somewhere unreachable.
+      Categories and grantees own no panel, so they re-query in place instead,
+      turning one result into its constituent releases.
+   ---------------------------------------------------------------------------*/
+const GS={open:false,sel:0,rows:[],terms:[],_src:null,_idx:null};
+/* Kinds in the order they should read, each with a weight so a query like
+   "kolkata" surfaces the centre above the 40 releases that merely mention it. */
+const GS_KIND=[['Panel',60],['Section',52],['Centre',50],['Component',48],
+               ['KI Infra',44],['Category',30],['Grantee',26],['Release',0]];
+const GS_W=GS_KIND.reduce(function(m,k){ m[k[0]]=k[1]; return m; },{});
+
+function gsBuild(){
+  const ix=[], txns=DATA.txns||[];
+  NAV.forEach(function(x){ if(x.v&&!viewHidden(x.v)) ix.push({k:'Panel',t:x.t,s:'Open panel',go:{v:x.v}}); });
+  (DATA.sections||[]).forEach(function(n){
+    const g=(DATA.sectionTotals||{})[n]||{};
+    ix.push({k:'Section',t:n,s:'Financial classification',a:g.assign,u:g.exp,go:{v:'command',hs:'sectbl:'+n}});
+  });
+  (DATA.subverticals||[]).forEach(function(x){
+    ix.push({k:'Component',t:x.name,s:(x.short?x.short+' · ':'')+(x.section||''),
+      a:x.assign,u:x.exp,x:[x.short,x.parent,x.section,x.code],go:{v:'tracker'}});
+  });
+  (DATA.centres||[]).forEach(function(c){
+    const r=txns.filter(function(t){ return t.rc===c; });
+    ix.push({k:'Centre',t:c,s:'Regional Centre · '+r.length+' release'+(r.length===1?'':'s'),
+      a:r.reduce(function(m,t){return m+t.net;},0),u:r.reduce(function(m,t){return m+t.util;},0),
+      go:{v:'rc',hs:'rctbl:'+c}});
+  });
+  if(typeof MDSD!=='undefined'&&MDSD.items) MDSD.items.forEach(function(m){
+    ix.push({k:'KI Infra',t:m.name,s:'KI Infra · '+(m.type==='institute'?'Institute':'State / UT'),
+      a:m.assign,u:m.exp,x:[m.type,'states','uts','mdsd'],go:{v:'mdsd',hs:'mdsdtbl:'+m.name}});
+  });
+  const agg=function(f,kind){
+    const m={};
+    txns.forEach(function(t){ const v=t[f]; if(!v) return;
+      if(!m[v]) m[v]={n:0,a:0,u:0}; m[v].n++; m[v].a+=t.net; m[v].u+=t.util; });
+    Object.keys(m).forEach(function(v){
+      ix.push({k:kind,t:v,s:m[v].n+' release'+(m[v].n===1?'':'s'),a:m[v].a,u:m[v].u,go:{q:v}}); });
+  };
+  agg('scat','Category'); agg('grantee','Grantee');
+  txns.forEach(function(t){
+    ix.push({k:'Release',t:t.voucher||'Release',
+      s:[t.date?fmtD(t.date):'',t.rc,t.sv].filter(Boolean).join(' · '),
+      n:t.nar,a:t.net,u:t.util,
+      x:[t.sanction,t.grantee,t.scat,t.head,t.section,t.etype,t.date,t.nar],
+      go:{v:'rc',hs:'rctbl:'+t.rc}});
+  });
+  ix.forEach(function(o){
+    o._t=String(o.t||'').toLowerCase();
+    o._h=(o._t+' '+(o.s||'')+' '+(o.n||'')+' '+(o.x||[]).join(' ')+' '+o.k).toLowerCase();
+  });
+  return ix;
+}
+/* syncApply replaces DATA.txns wholesale, so identity is a reliable staleness
+   check — the index rebuilds itself on the first search after any sync. */
+function gsIndex(){
+  if(!GS._idx||GS._src!==DATA.txns){ GS._idx=gsBuild(); GS._src=DATA.txns; }
+  return GS._idx;
+}
+function gsRx(t){ return t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+
+function gsFind(q){
+  const terms=String(q||'').toLowerCase().split(/\s+/).filter(Boolean);
+  GS.terms=terms;
+  if(!terms.length) return [];
+  const hits=[];
+  gsIndex().forEach(function(o){
+    let sc=0;
+    for(let i=0;i<terms.length;i++){
+      const tm=terms[i], inT=o._t.indexOf(tm);
+      if(o._h.indexOf(tm)<0) return;                     // every term must appear
+      if(o._t===tm) sc+=180; else if(inT===0) sc+=90; else if(inT>0) sc+=45; else sc+=14;
+      if(new RegExp('\\b'+gsRx(tm)).test(o._h)) sc+=10;  // word-start beats mid-word
+    }
+    hits.push({o:o,sc:sc+(GS_W[o.k]||0)});
+  });
+  hits.sort(function(x,y){ return y.sc-x.sc||(y.o.a||0)-(x.o.a||0)||x.o._t.localeCompare(y.o._t); });
+  return hits.map(function(h){ return h.o; });
+}
+/* Escape and highlight in one pass over the RAW string: escaping first and
+   highlighting after would let a query like "amp" match inside &amp;. */
+function gsHl(str,terms){
+  const v=String(str==null?'':str);
+  if(!terms.length) return esc(v);
+  const re=new RegExp('('+terms.map(gsRx).join('|')+')','ig');
+  return v.split(re).map(function(piece,i){
+    return i%2 ? '<mark class="gs-mk">'+esc(piece)+'</mark>' : esc(piece);
+  }).join('');
+}
+
+const GS_CAP={Release:8,Category:5,Grantee:5};   // per-group cap; the rest are counted
+function gsRender(q){
+  const box=document.getElementById('gsP'); if(!box) return;
+  const found=gsFind(q), tms=GS.terms;
+  GS.rows=[];
+  if(!tms.length){
+    box.innerHTML='<div class="gs-e">Search panels, components, centres, KI Infra states,<br>categories, grantees, vouchers, sanctions and narrations.</div>';
+    gsAria(); return;
+  }
+  if(!found.length){
+    box.innerHTML='<div class="gs-e">Nothing matches <b>'+esc(q)+'</b>.<br>Try a voucher, a centre, or a word from a narration.</div>';
+    gsAria(); return;
+  }
+  let html='';
+  GS_KIND.forEach(function(pair){
+    const kind=pair[0], all=found.filter(function(o){ return o.k===kind; });
+    if(!all.length) return;
+    const cap=GS_CAP[kind]||6, show=all.slice(0,cap);
+    html+='<div class="gs-g">'+esc(kind)+(all.length>show.length?' · '+all.length:'')+'</div>';
+    show.forEach(function(o){
+      const i=GS.rows.length; GS.rows.push(o);
+      html+='<div class="gs-r'+(i===GS.sel?' sel':'')+'" id="gsr'+i+'" role="option" aria-selected="'+(i===GS.sel)+'"'
+          + ' onmousedown="event.preventDefault()" onclick="gsPick('+i+')" onmouseenter="gsHover('+i+')">'
+          + '<div class="gs-b"><div class="gs-t">'+gsHl(o.t,tms)+'</div>'
+          + '<div class="gs-s">'+gsHl(o.s||'',tms)+'</div>'
+          + (o.n?'<div class="gs-n">'+gsHl(o.n,tms)+'</div>':'')
+          + '</div>'
+          + (o.a==null?'':'<div class="gs-v"><div class="a">'+esc(crShort(o.a))+'</div>'
+             + (o.u?'<div class="u">'+esc(crShort(o.u))+' used</div>':'')+'</div>')
+          + '</div>';
+    });
+    if(all.length>show.length)
+      html+='<div class="gs-more">+'+(all.length-show.length)+' more '+esc(kind.toLowerCase())+' matches — keep typing to narrow</div>';
+  });
+  html+='<div class="gs-ft"><span><b>↑↓</b> move</span><span><b>↵</b> open</span><span><b>esc</b> close</span></div>';
+  box.innerHTML=html;
+  gsAria();
+}
+function gsAria(){
+  const i=document.getElementById('gsI'); if(!i) return;
+  i.setAttribute('aria-expanded',GS.open?'true':'false');
+  if(GS.rows.length&&document.getElementById('gsr'+GS.sel)) i.setAttribute('aria-activedescendant','gsr'+GS.sel);
+  else i.removeAttribute('aria-activedescendant');
+}
+function gsShow(){
+  GS.open=true;
+  document.getElementById('gs').classList.add('on');
+  gsRender(document.getElementById('gsI').value);
+}
+function gsHide(){
+  GS.open=false;
+  const g=document.getElementById('gs'); if(g) g.classList.remove('on');
+  gsAria();
+}
+function gsType(v){
+  GS.sel=0;
+  const g=document.getElementById('gs');
+  g.classList.toggle('has',!!v);
+  g.classList.add('on'); GS.open=true;
+  gsRender(v);
+}
+function gsClear(){ const i=document.getElementById('gsI'); i.value=''; gsType(''); i.focus(); }
+function gsHover(i){ if(i===GS.sel) return; GS.sel=i; gsPaint(); }
+function gsPaint(){
+  GS.rows.forEach(function(_,i){
+    const el=document.getElementById('gsr'+i); if(!el) return;
+    el.classList.toggle('sel',i===GS.sel);
+    el.setAttribute('aria-selected',i===GS.sel);
+  });
+  const a=document.getElementById('gsr'+GS.sel);
+  if(a&&a.scrollIntoView) a.scrollIntoView({block:'nearest'});
+  gsAria();
+}
+function gsKey(e){
+  if(e.key==='Escape'){
+    const i=document.getElementById('gsI');
+    if(i.value){ gsClear(); } else { gsHide(); i.blur(); }
+    e.stopPropagation(); return;
+  }
+  if(!GS.open||!GS.rows.length){ if(e.key==='ArrowDown') gsShow(); return; }
+  if(e.key==='ArrowDown'){ e.preventDefault(); GS.sel=(GS.sel+1)%GS.rows.length; gsPaint(); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); GS.sel=(GS.sel-1+GS.rows.length)%GS.rows.length; gsPaint(); }
+  else if(e.key==='Enter'){ e.preventDefault(); gsPick(GS.sel); }
+}
+function gsPick(i){
+  const o=GS.rows[i]; if(!o) return;
+  const g=o.go||{};
+  if(g.q!=null){                                  // category / grantee: drill in place
+    const el=document.getElementById('gsI');
+    el.value=g.q; gsType(g.q); el.focus(); return;
+  }
+  if(g.hs) state.hsOpen=g.hs;                     // expand the row we are landing on
+  gsHide();
+  document.getElementById('gsI').blur();
+  if(g.v) go(g.v);
+  if(g.hs) setTimeout(function(){
+    const r=document.querySelector('.mdsd-row.open');
+    if(r&&r.scrollIntoView) r.scrollIntoView({block:'center',behavior:'smooth'});
+  },60);
+}
+function gsInit(){
+  document.addEventListener('click',function(e){
+    const g=document.getElementById('gs');
+    if(g&&GS.open&&!g.contains(e.target)) gsHide();
+  });
+  /* "/" and Ctrl/Cmd-K focus the box, but never while the user is typing
+     somewhere else — including the platform's own selects. */
+  document.addEventListener('keydown',function(e){
+    const t=e.target, tag=t&&t.tagName;
+    const typing = tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(t&&t.isContentEditable);
+    const combo=(e.key==='k'||e.key==='K')&&(e.metaKey||e.ctrlKey);
+    if(combo||(e.key==='/'&&!typing&&!e.metaKey&&!e.ctrlKey&&!e.altKey)){
+      const i=document.getElementById('gsI'); if(!i) return;
+      e.preventDefault(); i.focus(); i.select(); gsShow();
+    }
+  });
+}
+
+renderNav(); refreshSyncFacts(); render(); syncStart(); gsInit();
 </script>
 </body>
 </html>
