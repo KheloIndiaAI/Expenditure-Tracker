@@ -80,10 +80,12 @@ export function AdminShell({ title, subtitle, actions, children }: {
           <div className="px-3 pb-1.5 pt-4 text-caption font-semibold uppercase tracking-wide text-ink-muted">
             Account
           </div>
-          <NavLink to="/profile" className={linkClass}>
+          {/* My Profile is a panel of the dashboard, not a screen of this SPA, so
+              this is a real navigation rather than a client-side route. */}
+          <a href="/?panel=profile" className={linkClass({ isActive: false })}>
             <Icons.UserRound className="h-4 w-4" strokeWidth={1.6} />
             My Profile
-          </NavLink>
+          </a>
         </nav>
 
         <main className="min-w-0 flex-1">
@@ -106,9 +108,9 @@ export function AdminShell({ title, subtitle, actions, children }: {
                 </NavLink>
               </>
             )}
-            <NavLink to="/profile" className={linkClass}>
+            <a href="/?panel=profile" className={linkClass({ isActive: false })}>
               Profile
-            </NavLink>
+            </a>
           </div>
           <div key={pathname}>{children}</div>
         </main>

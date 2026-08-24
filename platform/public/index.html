@@ -190,6 +190,28 @@ button{font-family:inherit}
 .card h3{margin:0;font-size:15px;font-weight:600}
 .card .qh{font-size:12.5px;color:var(--text-muted);margin:2px 0 12px}
 .card-hd{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+/* ---- My Profile panel: the platform's only form surface --------------------
+   The dashboard had no input styling because it never took input. These follow
+   the sign-in page so the two form surfaces agree: 8px radius, hairline border,
+   primary ring on focus. */
+.pf-grid{display:grid;gap:16px;grid-template-columns:minmax(0,1fr) 340px;align-items:start}
+@media(max-width:1100px){.pf-grid{grid-template-columns:1fr}}
+.pf-f{display:grid;gap:13px;grid-template-columns:1fr 1fr}
+@media(max-width:620px){.pf-f{grid-template-columns:1fr}}
+.pf-stack{display:grid;gap:13px}
+.pf-lb{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:5px}
+.pf-in{width:100%;height:38px;border:1px solid var(--border);border-radius:8px;background:var(--bg-surface);padding:0 11px;font-family:inherit;font-size:13.5px;color:var(--text-primary);outline:0;transition:border-color .12s,box-shadow .12s}
+.pf-in:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-subtle)}
+.pf-in:disabled{background:var(--bg-app);color:var(--text-muted);cursor:not-allowed}
+.pf-hint{font-size:11px;color:var(--text-muted);margin-top:4px;line-height:1.4}
+.pf-act{display:flex;justify-content:flex-end;margin-top:15px}
+.pf-btn{border:1px solid var(--primary);background:var(--primary);color:#fff;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .12s,border-color .12s}
+.pf-btn:hover{background:var(--primary-hover);border-color:var(--primary-hover)}
+.pf-btn[disabled]{opacity:.6;cursor:default}
+.pf-btn.wide{width:100%}
+.pf-msg{border-radius:8px;padding:9px 12px;font-size:12.5px;margin:10px 0 2px;line-height:1.45}
+.pf-msg.ok{background:rgba(27,158,99,.09);color:var(--good);border:1px solid rgba(27,158,99,.28)}
+.pf-msg.err{background:rgba(198,45,45,.07);color:var(--critical);border:1px solid rgba(198,45,45,.26)}
 .card-hd .link{font-size:12.5px;font-weight:600;cursor:pointer}
 
 .barrow{display:grid;grid-template-columns:170px 1fr 96px;gap:10px;align-items:center;padding:5px 0;cursor:pointer}
@@ -1859,7 +1881,8 @@ const ICON={
  detail:'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
  mdsd:'M3 22h18M5 22V10M19 22V10M3 10l9-6 9 6M8 22v-6h2v6M14 22v-6h2v6',
  kig:'M3 4h7v7H3zM14 4h7v4h-7zM14 12h7v8h-7zM3 15h7v5H3z',
- saif:'M5 3h11l3 3v15H5zM16 3v4h3M8 11h8M8 15h8M8 19h5'
+ saif:'M5 3h11l3 3v15H5zM16 3v4h3M8 11h8M8 15h8M8 19h5',
+ user:'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8'
 };
 /* ---- Navigation ---------------------------------------------------------
    One group. The former INTELLIGENCE section is gone and Attention Centre now
@@ -1888,7 +1911,10 @@ const NAV=[{g:'ANALYSIS'},
   {v:'sv',        t:'Sub-Vertical Analysis',   i:'sv'},
   {v:'exceptions',t:'Attention Centre',        i:'exceptions', badge:1},
   {v:'trend',     t:'Trend Analytics',         i:'trend'},
-  {v:'detail',    t:'Transaction Record',      i:'detail'}];
+  {v:'detail',    t:'Transaction Record',      i:'detail'},
+  /* Own group: this is about the person signed in, not the scheme. */
+  {g:'ACCOUNT'},
+  {v:'profile',   t:'My Profile',              i:'user'}];
 function svgIcon(i){ return `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[i]}"/>${i==='rc'?'<circle cx="12" cy="10" r="2.4"/>':''}</svg>`; }
 function renderNav(){
   const n=attentionCount();
@@ -3430,6 +3456,9 @@ function viewMDSD(){
 
 /* ---- render ---- */
 function renderTopFilters(){
+  /* Classification filters the scheme's figures; My Profile has none, so the
+     control is withdrawn rather than left sitting there doing nothing. */
+  if(state.view==='profile'){ document.getElementById('topFilters').innerHTML=''; syncFilterBadge(); return; }
   const f=state.filt;
   document.getElementById('topFilters').innerHTML = `
     <div class="sheet-hd"><span>Filters</span><button class="sheet-done" onclick="closeFilterSheet()">Done</button></div>
@@ -3621,7 +3650,7 @@ function applyViewFilterDefaults(){
 }
 
 function render(){ applyViewFilterDefaults(); applyFilter(); renderNav(); renderTopFilters(); renderSyncPill(); const v=state.view;
-  const html = v==='command'?viewCommand():v==='rc'?viewRC():v==='sv'?viewSV():v==='mdsd'?viewMDSD():v==='kigroups'?viewKI():v==='saifmt'?viewSAIFmt():v==='trend'?viewTrend():v==='exceptions'?viewExc():v==='detail'?viewDetail():viewTracker();
+  const html = v==='command'?viewCommand():v==='rc'?viewRC():v==='sv'?viewSV():v==='mdsd'?viewMDSD():v==='kigroups'?viewKI():v==='saifmt'?viewSAIFmt():v==='trend'?viewTrend():v==='exceptions'?viewExc():v==='detail'?viewDetail():v==='profile'?viewProfile():viewTracker();
   document.getElementById('content').innerHTML=html;
   labelTableCells();
   groupTreeSections();
@@ -4868,6 +4897,172 @@ function gsInit(){
 }
 
 /* ============================================================================
+   MY PROFILE — a panel, not a separate application
+   ============================================================================
+   This lives in the dashboard shell alongside Financial Overview and the rest,
+   so it inherits the sidebar, the header and the page furniture rather than
+   reproducing them. It used to be a React screen at /profile with its own frame;
+   two frames for one platform is how designs drift apart, and a user should not
+   feel they have left the product to change their phone number.
+
+   Only the rendering is here. Everything it shows comes from GET /api/auth/me
+   and everything it changes goes through PATCH /api/me and POST /api/me/password
+   — the server decides what a user may alter about themselves, and it accepts
+   exactly four fields, so no crafted request turns a profile edit into a
+   privilege change.
+
+   Deliberately absent: the "Your access" list. Which modules a user holds is an
+   administrator's decision, and showing users a read-only inventory of their own
+   permissions invites a conversation the panel cannot resolve. The Super Admin's
+   Manage Access screen is where that belongs.
+   ---------------------------------------------------------------------------*/
+
+/* Mirrors ROLE_LABELS in @efip/shared. The dashboard is a standalone document
+   and imports nothing, so the labels are restated; anything unrecognised falls
+   back to a readable form of the raw value rather than showing a blank. */
+const PF_ROLE = {
+  super_admin: 'Super Administrator',
+  admin: 'Administrator',
+  minister: 'Minister',
+  secretary: 'Secretary',
+  joint_secretary: 'Joint Secretary',
+  director: 'Director',
+  finance_officer: 'Finance Officer (maker)',
+  senior_finance: 'Senior Finance (checker)',
+  analyst: 'Analyst',
+  auditor: 'Auditor',
+};
+function pfRoleLabel(r) {
+  if (PF_ROLE[r]) return PF_ROLE[r];
+  return String(r || '—')
+    .split('_')
+    .map(function (w) { return w ? w.charAt(0).toUpperCase() + w.slice(1) : w; })
+    .join(' ');
+}
+
+function pfField(label, id, value, opts) {
+  opts = opts || {};
+  return (
+    '<div>' +
+    '<label class="pf-lb" for="' + id + '">' + esc(label) + '</label>' +
+    '<input class="pf-in" id="' + id + '" type="' + (opts.type || 'text') + '"' +
+    ' value="' + esc(value == null ? '' : value) + '"' +
+    (opts.disabled ? ' disabled' : '') +
+    (opts.required ? ' required' : '') +
+    (opts.autocomplete ? ' autocomplete="' + opts.autocomplete + '"' : '') +
+    (opts.placeholder ? ' placeholder="' + esc(opts.placeholder) + '"' : '') +
+    '>' +
+    (opts.hint ? '<div class="pf-hint">' + esc(opts.hint) + '</div>' : '') +
+    '</div>'
+  );
+}
+
+function viewProfile() {
+  const u = ME || {};
+  return (
+    pageHead('My Profile', 'Your contact details. Role and access are set by an administrator.') +
+    '<div class="pf-grid">' +
+      '<div class="card">' +
+        '<div class="card-hd"><h3>Your details</h3></div>' +
+        '<div id="pfMsg"></div>' +
+        '<form id="pfForm" onsubmit="return pfSave(event)" novalidate>' +
+          '<div class="pf-f">' +
+            pfField('Name', 'pfName', u.name, { required: true, autocomplete: 'name' }) +
+            pfField('Designation', 'pfDesig', u.designation, { placeholder: 'e.g. Officer on Special Duty' }) +
+            pfField('Email ID', 'pfEmail', u.email, { type: 'email', autocomplete: 'email' }) +
+            pfField('Phone Number', 'pfPhone', u.phone, { autocomplete: 'tel', placeholder: 'e.g. +91 98765 43210' }) +
+            pfField('Username', 'pfUser', u.username, { disabled: true, hint: 'Your login identifier. Only an administrator can change this.' }) +
+            pfField('Role', 'pfRole', pfRoleLabel(u.role), { disabled: true, hint: 'Set by an administrator.' }) +
+          '</div>' +
+          '<div class="pf-act"><button class="pf-btn" type="submit" id="pfSaveBtn">Save changes</button></div>' +
+        '</form>' +
+      '</div>' +
+      '<div class="card">' +
+        '<div class="card-hd"><h3>Change password</h3></div>' +
+        '<div id="pfPwMsg"></div>' +
+        '<form id="pfPwForm" onsubmit="return pfPassword(event)" novalidate>' +
+          '<div class="pf-stack">' +
+            pfField('Current password', 'pfCur', '', { type: 'password', required: true, autocomplete: 'current-password' }) +
+            pfField('New password', 'pfNew', '', { type: 'password', required: true, autocomplete: 'new-password', hint: 'At least 8 characters.' }) +
+            pfField('Confirm new password', 'pfConf', '', { type: 'password', required: true, autocomplete: 'new-password' }) +
+          '</div>' +
+          '<div class="pf-act"><button class="pf-btn wide" type="submit" id="pfPwBtn">Change password</button></div>' +
+        '</form>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+function pfVal(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+function pfNote(slot, kind, text) {
+  const el = document.getElementById(slot);
+  if (el) el.innerHTML = text ? '<div class="pf-msg ' + kind + '">' + esc(text) + '</div>' : '';
+}
+/** Read the server's message when it sends one; fall back otherwise. */
+function pfSend(url, method, body) {
+  return fetch(url, {
+    method: method,
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(function (r) {
+    return r.text().then(function (t) {
+      let parsed = null;
+      try { parsed = t ? JSON.parse(t) : null; } catch (e) { parsed = null; }
+      if (!r.ok) throw new Error((parsed && parsed.message) || 'Request failed (' + r.status + ').');
+      return parsed;
+    });
+  });
+}
+
+function pfSave(e) {
+  e.preventDefault();
+  const btn = document.getElementById('pfSaveBtn');
+  if (!pfVal('pfName')) { pfNote('pfMsg', 'err', 'Name cannot be empty.'); return false; }
+  btn.disabled = true; btn.textContent = 'Saving…';
+  pfNote('pfMsg', '', '');
+  pfSend('/api/me', 'PATCH', {
+    name: pfVal('pfName'),
+    designation: pfVal('pfDesig'),
+    email: pfVal('pfEmail'),
+    phone: pfVal('pfPhone'),
+  })
+    .then(function (me) {
+      /* Adopt the server's copy rather than the form's: it is the record that
+         was actually stored, trimmed and validated. No re-render — that would
+         discard the confirmation the user is reading. */
+      if (me) ME = me;
+      pfNote('pfMsg', 'ok', 'Profile updated.');
+    })
+    .catch(function (err) { pfNote('pfMsg', 'err', err.message); })
+    .then(function () { btn.disabled = false; btn.textContent = 'Save changes'; });
+  return false;
+}
+
+function pfPassword(e) {
+  e.preventDefault();
+  const cur = pfVal('pfCur'), next = pfVal('pfNew'), confirm = pfVal('pfConf');
+  if (!cur || !next || !confirm) { pfNote('pfPwMsg', 'err', 'Fill in all three fields.'); return false; }
+  /* Caught here purely to save a round trip; the server still validates length
+     and that the current password is right. */
+  if (next !== confirm) { pfNote('pfPwMsg', 'err', 'The two new passwords do not match.'); return false; }
+  if (next.length < 8) { pfNote('pfPwMsg', 'err', 'The new password must be at least 8 characters.'); return false; }
+  const btn = document.getElementById('pfPwBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  pfNote('pfPwMsg', '', '');
+  pfSend('/api/me/password', 'POST', { current: cur, next: next })
+    .then(function () {
+      ['pfCur', 'pfNew', 'pfConf'].forEach(function (id) {
+        const el = document.getElementById(id); if (el) el.value = '';
+      });
+      pfNote('pfPwMsg', 'ok', 'Password changed.');
+    })
+    .catch(function (err) { pfNote('pfPwMsg', 'err', err.message); })
+    .then(function () { btn.disabled = false; btn.textContent = 'Change password'; });
+  return false;
+}
+
+/* ============================================================================
    PER-USER MODULE ACCESS
    ============================================================================
    The signed-in user's allowed panels come from GET /api/auth/me, which resolves
@@ -4888,6 +5083,9 @@ function gsInit(){
 var ME = null;
 
 function moduleAllowed(v) {
+  /* Everyone has a profile. It is not a module a Super Admin grants, so it is
+     never in ME.modules and must not be caught by the lookup below. */
+  if (v === 'profile') return true;
   if (!v || !ME || !ME.modules) return true;
   return ME.modules[v] !== false;
 }
@@ -4927,11 +5125,9 @@ function renderAccountLinks() {
       '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>' +
       'Administration</a>';
   }
-  html +=
-    '<a class="navitem" href="/profile" title="Your name, contact details and password">' +
-    '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-    '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
-    'Profile</a>';
+  /* No Profile link here any more: it is a panel in the sidebar above, reached
+     like every other panel. Administration stays a link because it is a separate
+     application surface, not a panel of this dashboard. */
   slot.innerHTML = html;
 }
 
@@ -4950,6 +5146,15 @@ function loadMe() {
     });
 }
 
+/* Deep link: /profile now redirects here as /?panel=profile, so an old
+   bookmark still lands on the panel rather than the default view. Only names a
+   view that exists and is visible, so a hand-typed value cannot open a hidden
+   panel or leave the app on a blank frame. */
+(function(){
+  var m = /[?&]panel=([A-Za-z]+)/.exec(location.search);
+  var v = m && m[1];
+  if (v && NAV.some(function(it){ return it.v === v; }) && !viewHidden(v)) state.view = v;
+})();
 renderNav(); refreshSyncFacts(); renderAccountLinks(); render(); syncStart(); gsInit(); loadMe();
 </script>
 </body>

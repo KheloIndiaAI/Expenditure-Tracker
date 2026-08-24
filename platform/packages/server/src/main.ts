@@ -191,7 +191,11 @@ async function start(): Promise<void> {
      serve the same document and let the client router take over. They are still
      gated: an unauthenticated visitor is sent to /login, and every action the SPA
      can take is authorised server-side regardless of what it chooses to render. */
-  for (const path of ['/admin', '/admin/*', '/profile']) {
+  /* My Profile is a panel of the dashboard now, not a screen of this SPA. The
+     path is kept and redirected so existing links and bookmarks still work. */
+  app.get('/profile', async (_req, reply) => reply.redirect('/?panel=profile'));
+
+  for (const path of ['/admin', '/admin/*']) {
     app.get(path, async (req, reply) => {
       if (!(await currentUser(req))) return reply.redirect('/login');
       if (!loginHtml) {

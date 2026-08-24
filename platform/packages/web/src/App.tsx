@@ -1,8 +1,10 @@
 /**
  * App root.
  *
- * One bundle serves three surfaces: the sign-in page, the Super Admin area and
- * the user's own profile. The dashboard is still the self-contained,
+ * One bundle serves two surfaces: the sign-in page and the Super Admin area.
+ * My Profile used to be a third; it is a panel of the dashboard now, so a user
+ * changing their phone number never leaves the product they were using.
+ * The dashboard is still the self-contained,
  * Google-Sheets-synced HTML that the server hands out at "/" once a session
  * cookie exists, so this SPA never renders financial data.
  *
@@ -15,7 +17,6 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Login } from './pages/Login.tsx';
 import { AdminUsers } from './pages/AdminUsers.tsx';
 import { AdminAccess } from './pages/AdminAccess.tsx';
-import { Profile } from './pages/Profile.tsx';
 import { useAuth } from './lib/auth.tsx';
 
 /** Blocks the first paint until `me` has resolved, so guards never flash. */
@@ -26,7 +27,12 @@ function Gate({ children, superOnly }: { children: React.ReactNode; superOnly?: 
     window.location.href = '/login';
     return null;
   }
-  if (superOnly && user.role !== 'super_admin') return <Navigate to="/profile" replace />;
+  if (superOnly && user.role !== 'super_admin') {
+    /* Nothing in this bundle is theirs to see. My Profile is a dashboard panel
+       now, so the only sensible destination is the dashboard itself. */
+    window.location.href = '/?panel=profile';
+    return null;
+  }
   return <>{children}</>;
 }
 
@@ -49,14 +55,6 @@ export function App() {
           element={
             <Gate superOnly>
               <AdminAccess />
-            </Gate>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <Gate>
-              <Profile />
             </Gate>
           }
         />

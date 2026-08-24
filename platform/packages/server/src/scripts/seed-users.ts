@@ -16,7 +16,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Role } from '@efip/shared';
 import { ROLES } from '@efip/shared';
-import { countUsers, upsertUser } from '../users.ts';
+import { countUsers, findByUsername, upsertUser } from '../users.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Default resolves to platform/seed/rc_users.csv regardless of the cwd npm uses.
@@ -43,11 +43,26 @@ for (const r of records) {
     console.error(`✗ Row "${username}" has unknown role "${role}". Valid: ${ROLES.join(', ')}`);
     process.exit(1);
   }
+  /* Never demote the Super Administrator by re-running a seed.
+     The CSV is a roster of ordinary logins and usually lists this account at
+     whatever rank it held before promotion, so a routine re-seed would quietly
+     strip the only role that can reach /api/admin/* - and nobody would be left
+     able to put it back. The rest of the row (name, contact, password) is still
+     applied; only the demotion is refused, loudly. */
+  const existing = await findByUsername(username);
+  let effectiveRole = role;
+  if (existing?.role === 'super_admin' && role !== 'super_admin') {
+    console.warn(
+      `!  "${username}" is the Super Administrator; keeping that role rather than ` +
+        `demoting to "${role}". Set the CSV row to super_admin to silence this.`,
+    );
+    effectiveRole = 'super_admin';
+  }
   await upsertUser({
     username,
     password,
     name: (r.name || username).trim(),
-    role,
+    role: effectiveRole,
     designation: (r.designation || '').trim(),
   });
   n++;
