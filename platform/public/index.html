@@ -1473,15 +1473,102 @@ const SVCOL={}; SV.forEach(s=>SVCOL[s.name]=SERIES[s.idx%SERIES.length]);
 const SECTCOL={'Recurring':'#2a78d6','Infrastructure':'#eb6834','Non-Recurring':'#1baf7a'};
 
 /* ---- Infrastructure MDSD (State/Institute grants) ---- */
-const MDSD=(function(){
-  const m=DATA.mdsd||{items:[],grand:{assign:0,exp:0}};
-  m.items.forEach((x,i)=>{ x.bal=x.assign-x.exp; x.up=x.assign?x.exp/x.assign:0; x.idx=SV.length+i; x.mdsd=true; SVCOL[x.name]=SERIES[x.idx%SERIES.length]; });
-  m.grand.bal=m.grand.assign-m.grand.exp;
-  m.grand.up=m.grand.assign?m.grand.exp/m.grand.assign:0;
-  m.zeroCount=m.items.filter(x=>x.exp===0).length;
-  m.topUtil=m.items.slice().sort((a,b)=>b.up-a.up)[0];
+/* ---- KI Infra (States/UTs) from the sheet ----------------------------------
+   The block sits at the foot of the summary tab the sync already fetches, so it
+   costs no extra request. It is located by its "KI Infra (States/UTs)" label
+   rather than a fixed row number: rows get inserted above it, and a hard-coded
+   offset would silently read the wrong cells the first time that happened.
+
+   Columns are read positionally, which is what the rest of this file does:
+     A serial no. · B name · C Limit Assigned · D Expenditure · E Limit Unspent
+   A data row is one that carries a serial number in column A; the run ends at
+   the "Total" row, whose figures are kept to check the rows against.
+
+   MONEY IS NEVER ROUNDED INTO SHAPE HERE. Every figure is read as whole rupees
+   straight from the cell — no percentage is turned back into an amount, and no
+   total is derived from a rounded part. The grand total the platform shows is
+   the sum of the rows, so it cannot drift from them; the sheet's own printed
+   total is then checked against that sum by syncValidate. Rounding appears only
+   at display time, where crShort renders crore to two decimals. */
+function mdsdKey(s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+function mdsdTitle(s) {
+  return String(s || '').toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); });
+}
+
+function parseMdsdRows(rows) {
+  let start = -1;
+  for (let i = 0; i < rows.length; i++) {
+    if (/KI\s*INFRA/i.test(String((rows[i] || [])[1] || ''))) { start = i; break; }
+  }
+  if (start < 0) return null;
+
+  const items = [];
+  let stated = null;
+  for (let r = start + 1; r < rows.length; r++) {
+    const c = rows[r] || [];
+    const name = String(c[1] || '').trim();
+    if (/^total$/i.test(name)) {
+      stated = { assign: Math.round(nnum(c[2])), exp: Math.round(nnum(c[3])), bal: Math.round(nnum(c[4])) };
+      break;
+    }
+    const serial = /^\d+(\.0+)?$/.test(String(c[0] || '').trim());
+    if (!name || !serial) {
+      if (items.length) break;   // ran past the block
+      continue;                  // header/spacer before it
+    }
+    items.push({
+      name: name,
+      assign: Math.round(nnum(c[2])),
+      exp: Math.round(nnum(c[3])),
+      bal: Math.round(nnum(c[4])),
+    });
+  }
+  if (!items.length || !stated) return null;
+
+  /* The sheet carries neither a display name nor the state/institute
+     distinction — names arrive shouted ("UTTAR PRADESH") and typeless. Both are
+     carried across from the embedded baseline where a row matches, so the panel
+     keeps reading "Uttar Pradesh" and IISER keeps its institute icon. Anything
+     the baseline does not know is title-cased and typed by its name. */
+  const base = (DATA.mdsd && DATA.mdsd.items) || [];
+  items.forEach(function (it, i) {
+    const k = mdsdKey(it.name);
+    let match = null;
+    for (let j = 0; j < base.length; j++) {
+      const bk = mdsdKey(base[j].name);
+      if (bk === k || k.indexOf(bk) === 0 || bk.indexOf(k) === 0) { match = base[j]; break; }
+    }
+    it.no = i + 1;
+    it.name = match ? match.name : mdsdTitle(it.name);
+    it.type = match
+      ? match.type
+      : (/IIT|IISER|NIT|INSTITUTE|UNIVERSITY|COLLEGE|ACADEMY/.test(k) ? 'institute' : 'state');
+  });
+  return { items: items, stated: stated };
+}
+
+/* Derived fields for the KI Infra set. Extracted from the boot-time IIFE so the
+   very same derivation runs again after a sync — two copies would be a way for
+   the synced figures and the seeded ones to disagree. */
+function mdsdDerive(m) {
+  m.items.forEach(function (x, i) {
+    x.bal = x.assign - x.exp;
+    x.up = x.assign ? x.exp / x.assign : 0;
+    x.idx = SV.length + i;
+    x.mdsd = true;
+    SVCOL[x.name] = SERIES[x.idx % SERIES.length];
+  });
+  m.grand.bal = m.grand.assign - m.grand.exp;
+  m.grand.up = m.grand.assign ? m.grand.exp / m.grand.assign : 0;
+  m.zeroCount = m.items.filter(function (x) { return x.exp === 0; }).length;
+  m.topUtil = m.items.slice().sort(function (a, b) { return b.up - a.up; })[0];
   return m;
-})();
+}
+
+/* Seeded at boot from the embedded block, then replaced by the sheet on the
+   first successful sync. MDSD IS DATA.mdsd — the same object — so refreshing one
+   refreshes the other and nothing can hold a stale copy. */
+const MDSD=mdsdDerive(DATA.mdsd||{items:[],grand:{assign:0,exp:0}});
 
 /* ---- centralized filtered-dataset architecture ----
    Every KPI / chart / table / insight / search result / analysis page reads its figures
@@ -4007,7 +4094,9 @@ function syncScat(nar,sv){
    What the sheet supplies : DDO-KI direct, per-centre limit/actual, every release row.
    What it does NOT supply : the Ministry assignment column is blank in this workbook, so
                              assignments are carried forward from the embedded baseline.
-                             Same for the KI Infra (States/UTs) block, which lives elsewhere.
+   KI Infra (States/UTs)   : now supplied too - the block at the foot of the summary
+                             tab, parsed by parseMdsdRows and reconciled against its
+                             own printed total before it is allowed in.
    ========================================================================================== */
 const SYNC={
   id:'1crNcEBnf_h6n_ZhT-WfODXNoT0zD1tX-aNvnie3Bb7Q',
@@ -4122,7 +4211,11 @@ function syncBuild(summaryRows,txRows){
     rows.forEach(function(x){ g.assign+=x.assign; g.exp+=x.exp; g.bal+=x.bal; g.limit+=x.totLim; g.actual+=x.totAct; g.ddoki+=x.ddoki; }); return g; };
   const sect={}; DATA.sections.forEach(function(sec){ sect[sec]=roll(subs.filter(function(x){return x.section===sec;})); });
   const dts=tx.map(function(t){return t.date;}).filter(Boolean).sort();
-  return {asOf:asOf,subverticals:subs,byName:byName,txns:tx,sectionTotals:sect,grand:roll(subs),
+  /* KI Infra rides on the summary tab, so it is parsed from rows already in
+     hand. Null means the sheet does not carry the block — the platform then
+     keeps whatever it had rather than blanking the panel. */
+  const mdsd=parseMdsdRows(summaryRows);
+  return {asOf:asOf,subverticals:subs,byName:byName,txns:tx,sectionTotals:sect,grand:roll(subs),mdsd:mdsd,
     releasesMeta:{count:tx.length,net:tx.reduce(function(a,t){return a+t.net;},0),
       util:tx.reduce(function(a,t){return a+t.util;},0),bal:tx.reduce(function(a,t){return a+t.bal;},0),
       asOfMin:dts[0]||null,asOfMax:dts[dts.length-1]||null},
@@ -4160,6 +4253,26 @@ function syncValidate(b){
      error and must still stop the publish. Reading the expenditure type keeps that typo
      protection while letting a genuine recovery through - before this, one withdrawal row in
      the workbook blocked every sync and the platform silently served stale figures. */
+  /* KI Infra (States/UTs). The sheet prints its own totals, so they are checked
+     against the sum of the rows rather than taken on trust, and every row must
+     satisfy assigned - expenditure = unspent. These are whole rupees; the 1-rupee
+     tolerance is the same one the checks above use for a formatting artifact,
+     not a licence to drift. A mismatch rejects the whole candidate, so a
+     half-edited block never reaches the panel. */
+  if(b.mdsd){
+    const mi=b.mdsd.items, ms=b.mdsd.stated;
+    if(mi.length<5) e.push('KI Infra: only '+mi.length+' States/UTs parsed');
+    let sa=0, se=0;
+    mi.forEach(function(x){
+      sa+=x.assign; se+=x.exp;
+      if(x.assign<0||x.exp<0) e.push('KI Infra '+x.name+': negative figure');
+      if(Math.abs((x.assign-x.exp)-x.bal)>1) e.push('KI Infra '+x.name+': assigned less expenditure does not equal unspent');
+      if(x.exp>x.assign+1) e.push('KI Infra '+x.name+': expenditure exceeds the limit assigned');
+    });
+    if(Math.abs(sa-ms.assign)>1) e.push('KI Infra: rows do not sum to the assigned total the sheet states');
+    if(Math.abs(se-ms.exp)>1) e.push('KI Infra: rows do not sum to the expenditure total the sheet states');
+    if(Math.abs((ms.assign-ms.exp)-ms.bal)>1) e.push('KI Infra: the stated total does not reconcile');
+  }
   b.txns.forEach(function(t){
     if(/withdraw/i.test(t.etype||'')) return;
     if(t.net<0||t.util<0) e.push('release '+t.voucher+' has a negative amount');
@@ -4190,6 +4303,17 @@ function syncApply(b){
     if(v.subs) v.subs=v.subs.map(function(o){ return b.byName[o.name]||o; });
     else if(v.leaf) v.leaf=b.byName[v.leaf.name]||v.leaf;
   });
+  /* KI Infra: the grand total is the SUM OF THE ROWS, never the sheet's printed
+     figure, so the panel can never show a total its own rows do not add up to.
+     syncValidate has already confirmed the two agree. */
+  if(b.mdsd){
+    MDSD.items=b.mdsd.items;
+    MDSD.grand={assign:b.mdsd.items.reduce(function(a,x){return a+x.assign;},0),
+                exp:b.mdsd.items.reduce(function(a,x){return a+x.exp;},0)};
+    MDSD.asOf=b.asOf;
+    MDSD.source='SAI Expenditure SYNC · KI Infra block on the summary tab';
+    mdsdDerive(MDSD);
+  }
   DATA.txns=b.txns;
   TXN.length=0; Array.prototype.push.apply(TXN,b.txns);
   Object.keys(b.releasesMeta).forEach(function(k){ RMETA[k]=b.releasesMeta[k]; });
