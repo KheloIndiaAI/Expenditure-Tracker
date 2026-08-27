@@ -670,6 +670,37 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
    alert, and the sync time in the footer. Nothing else earns a line; a tooltip
    that has to be read twice is not doing its job. #tip drops its own padding
    for this one so the card can run its sections full-bleed. */
+/* ---- Yesterday's movement panel ------------------------------------------
+   A summary strip that opens onto a centre table. The strip carries the two
+   figures at KPI weight because they are the panel's whole answer; the table
+   below reuses the .usage / .txmini idiom the component drop-downs already
+   use, so a row that expands looks the same here as everywhere else. */
+.yd-sum{display:flex;align-items:center;gap:18px;padding:13px 18px 15px;cursor:pointer;
+  border-top:1px solid var(--border-subtle);transition:background .12s}
+.yd-sum:hover{background:var(--bg-app)}
+.yd-sum.open{background:var(--bg-app);border-bottom:1px solid var(--border-subtle)}
+.yd-sum>.chev{flex:none}
+.yd-fig{min-width:0}
+.yd-fig .k{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}
+.yd-fig .v{font-size:21px;font-weight:700;letter-spacing:-.01em;color:var(--text-primary);
+  font-variant-numeric:tabular-nums;margin-top:2px}
+.yd-fig.used .v{color:var(--good)}
+.yd-hint{margin-left:auto;font-size:11.5px;color:var(--text-muted);text-align:right}
+.yd-empty{padding:16px 18px 20px;font-size:12.5px;color:var(--text-muted)}
+.yd-note{padding:9px 4px 2px;color:var(--text-muted);line-height:1.45}
+/* Group band - separates Regional Centres from States/UTs when both moved. */
+.usage tr.yd-band>td{background:rgba(37,106,191,.06);font-weight:700;color:var(--primary-hover);
+  font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;
+  border-bottom:1px solid var(--border)}
+/* Which column an edit landed in. Money moved reads green-neutral; a label
+   change reads as the quieter thing it is. */
+.yd-tag{display:inline-block;padding:1px 7px;border-radius:999px;background:#e9f6ef;color:#1b7a4b;
+  font-size:10.5px;font-weight:700;white-space:nowrap}
+.yd-tag.asg{background:var(--primary-subtle);color:var(--primary-hover)}
+@media(max-width:720px){
+  .yd-sum{flex-wrap:wrap;gap:12px 16px}
+  .yd-hint{margin-left:0;flex-basis:100%;text-align:left}
+}
 /* ---- Trend Analytics ---- */
 .ta-top{align-items:center;gap:8px;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:9px 12px;box-shadow:var(--elev-1);margin-bottom:14px}
 .ta-cap{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-right:2px}
@@ -1954,6 +1985,9 @@ let state={view:'command', tr:{}, trSub:null, hsOpen:null, svOpen:null, filt:'Al
   mdsdSort:{key:'bal',dir:-1}, rcSort:{key:'bal',dir:-1}, sectSort:{key:'assign',dir:-1}, svSort:{key:'assign',dir:-1},
   dsort:{key:'act',dir:-1}, dfilt:{sv:'',rc:'',scat:'',q:''}, dmode:'alloc', cdOpen:null, sfOpen:null, tg:{}, _filtView:null, txRange:'all', txType:'',
   rcOnly:false,
+  /* Yesterday's movement panel: the strip starts shut so the Overview opens on
+     the same five KPIs it always has, and one centre expands at a time. */
+  ydOpen:false, ydCentre:null,
   taMetric:'all', taCum:false, taBucket:{m1:'W',m2:'W',m3:'W'}, taRc:'', taComp:'', taSub:''};
 
 /* ---- geometry / tooltip ---- */
@@ -2046,6 +2080,8 @@ function trToggle(k){ state.tr[k]=!state.tr[k]; render(); }
 function trSubToggle(k){ tipHide(); state.trSub = state.trSub===k?null:k; render(); }
 function hsToggle(k){ tipHide(); state.hsOpen = state.hsOpen===k?null:k; render(); }
 function svToggle(k){ state.svOpen = state.svOpen===k?null:k; render(); }
+function ydToggle(){ tipHide(); state.ydOpen=!state.ydOpen; if(!state.ydOpen) state.ydCentre=null; render(); }
+function ydCentreToggle(k){ tipHide(); state.ydCentre = state.ydCentre===k?null:k; render(); }
 function sortDetail(k){ const s=state.dsort; if(s.key===k)s.dir*=-1; else state.dsort={key:k,dir:-1}; render(); }
 function setUtilSort(field,key,dir){ state[field]={key,dir}; render(); }
 function utilSorted(items,sortObj){
@@ -2265,7 +2301,186 @@ function viewCommand(){
      the section table beside it. */
   return pageHead('Financial Overview','')
    + kpiScheme()
+   + ydayPanel()
    + `<div class="card" style="padding:0;overflow:hidden"><div class="card-hd" style="padding:16px 18px 0"><h3>Expenditure vs balance by section</h3></div>${sectionUtilTable()}</div>`;
+}
+
+/* ============================================================================
+   YESTERDAY'S EXPENDITURE AND ASSIGNMENTS
+   ============================================================================
+   What moved in the workbook yesterday, read from its own EditHistory log
+   rather than inferred from the figures.
+
+   Why the log and not the figures. A voucher's row carries a running balance,
+   not a diary: "Utilization by RC = 18,35,993" says what the total is now and
+   nothing about when any of it was booked. The Payment Date column dates the
+   VOUCHER, not the data entry - a voucher paid in June can be keyed in
+   yesterday. Only the edit log knows when a figure actually changed, so only
+   the edit log can answer this panel's question.
+
+   What a day's movement is. The INCREMENT, New - Old, never the new balance.
+   GANDHINAGAR TSA/185 went 8,36,000 -> 18,35,993 yesterday; 9,99,993 was booked
+   yesterday and the 8,36,000 beneath it was booked on some earlier day. Summing
+   balances would have counted that older money again and put a figure in a
+   panel labelled "Yesterday" that reconciles against nothing else on screen.
+
+   Double counting, the other way. One cell edited three times in a day writes
+   three log rows - (empty)->5L, 5L->7L, 7L->7.5L - and adding those deltas is
+   right while adding those balances is not. Edits are therefore collapsed per
+   cell first: earliest Old, latest New, one movement. The collapse key carries
+   the sheet name because a voucher number is only unique WITHIN a centre's tab
+   - TSA/388 exists in both IMPHAL and GUWAHATI as two unrelated transactions,
+   and keying on the voucher alone would silently merge them.
+
+   Where the detail comes from. The log names a centre and a voucher and stops
+   there; the component, sanction, grantee and narration live in the main
+   workbook. (rc, voucher) is unique within a centre tab - checked against every
+   tab - so the join is 1:1 and needs no disambiguation. The log's own Sub
+   Vertical column wins when the tracker starts filling it. */
+const YD_GROUP={centre:'SAI Regional Centres', infra:'KI Infra (States/UTs)', other:'Other'};
+/* The log's "Sheet Name (State)" is a tab name. A centre tab is one thing, a
+   State/UT grant is another, and anything we cannot place is shown as itself
+   rather than quietly dropped or filed under a centre it is not. */
+function ydayBucket(rc){
+  if((DATA.centres||[]).indexOf(rc)>=0) return 'centre';
+  const n=String(rc||'').trim().toLowerCase();
+  for(let i=0;i<(MDSD.items||[]).length;i++){
+    if(String(MDSD.items[i].name).trim().toLowerCase()===n) return 'infra';
+  }
+  return 'other';
+}
+function ydayMovement(){
+  const day=istDateStr(1), win=istDayWindow(1);
+  const out={day:day, label:sheetDMY(day), places:[], assigned:0, spent:0, n:0,
+             ready:!!SYNC.editLog};
+  if(!SYNC.editLog) return out;
+  /* One movement per cell: earliest Old, latest New, however many edits landed. */
+  const cell={}, order=[];
+  SYNC.editLog.forEach(function(e){
+    if(!e||!e.kind||!isFinite(e.ts)||e.ts<win.start||e.ts>win.end) return;
+    const k=e.rc+'|'+e.voucher+'|'+e.col;
+    let p=cell[k];
+    if(!p){ p=cell[k]={rc:e.rc, voucher:e.voucher, col:e.col, kind:e.kind, sv:e.sv||'',
+                       firstTs:e.ts, lastTs:e.ts, open:e.oldV, close:e.newV, edits:0};
+            order.push(p); }
+    p.edits++;
+    if(e.ts<p.firstTs){ p.firstTs=e.ts; p.open=e.oldV; }
+    if(e.ts>=p.lastTs){ p.lastTs=e.ts; p.close=e.newV; }
+    if(!p.sv&&e.sv) p.sv=e.sv;
+  });
+  const byPlace={};
+  order.forEach(function(p){
+    /* A label column has no arithmetic. It is a real edit and is listed as one,
+       but it moves no money and must not be summed into a rupee total. */
+    p.delta=(p.open==null||p.close==null)?null:(p.close-p.open);
+    let tx=null; const tl=DATA.txns||[];
+    for(let i=0;i<tl.length;i++){
+      if(tl[i]&&tl[i].rc===p.rc&&tl[i].voucher===p.voucher){ tx=tl[i]; break; }
+    }
+    p.sv=p.sv||(tx?tx.sv:'');
+    p.scat=tx?tx.scat:''; p.nar=tx?tx.nar:''; p.sanction=tx?tx.sanction:'';
+    p.date=tx?tx.date:null; p.matched=!!tx;
+    const b=byPlace[p.rc]||(byPlace[p.rc]={name:p.rc, group:ydayBucket(p.rc), rel:0, util:0, n:0, rows:[]});
+    b.rows.push(p); b.n++; out.n++;
+    if(p.delta!=null){ b[p.kind]+=p.delta; out[p.kind==='rel'?'assigned':'spent']+=p.delta; }
+  });
+  const GRANK={centre:0, infra:1, other:2};
+  out.places=Object.keys(byPlace).map(function(k){ return byPlace[k]; })
+    .sort(function(a,b){
+      return (GRANK[a.group]-GRANK[b.group])
+          || ((b.util+b.rel)-(a.util+a.rel))
+          || a.name.localeCompare(b.name);
+    });
+  out.places.forEach(function(b){
+    b.rows.sort(function(x,y){ return (y.delta||0)-(x.delta||0) || String(x.voucher).localeCompare(String(y.voucher)); });
+  });
+  return out;
+}
+/** Voucher-level detail for one centre - what changed, and on which component. */
+function ydayTxns(b){
+  const body=b.rows.map(function(p){
+    const asg=p.kind==='rel';
+    const head='<b>'+esc(p.voucher||'—')+'</b>'
+      + (p.sanction?' <span class="muted">· '+esc(p.sanction)+'</span>':'')
+      + (p.date?' <span class="muted">· '+esc(fmtD(p.date))+'</span>':'')
+      + (p.edits>1?' <span class="muted">· '+p.edits+' edits merged</span>':'')
+      + (p.nar?'<div class="txnar">'+esc(p.nar)+'</div>':'');
+    const comp=p.sv
+      ? esc(p.sv)+(p.scat?'<div class="muted" style="font-size:10.5px">'+esc(p.scat)+'</div>':'')
+      : '<span class="muted">Not found in the main sheet</span>';
+    /* crShort rounds to two decimals of a lakh, so 9,99,993 prints as ₹10.00 L.
+       That is the platform's convention and stays, but this table is where the
+       exact movement is checked, so every figure carries its rupees on hover. */
+    const amt=function(v){
+      return v==null ? '<span class="muted">—</span>'
+        : '<span title="₹'+esc(grpIN(v))+'">'+esc(crShort(v))+'</span>';
+    };
+    return '<tr'+(p.nar?' title="'+esc(p.nar)+'"':'')+'>'
+      + '<td>'+head+'</td>'
+      + '<td>'+comp+'</td>'
+      + '<td><span class="yd-tag'+(asg?' asg':'')+'">'+(asg?'Assignment':'Expenditure')+'</span></td>'
+      + '<td class="num tnum">'+amt(p.open)+'</td>'
+      + '<td class="num tnum">'+amt(p.close)+'</td>'
+      + '<td class="num tnum" style="color:'+(p.delta>0?'var(--good)':p.delta<0?'var(--serious)':'var(--text-muted)')+'">'
+        + (p.delta==null?'<span class="muted">label only</span>':amt(p.delta))+'</td></tr>';
+  }).join('');
+  return '<table class="txmini"><thead><tr><th>Voucher · Sanction · Payment date</th>'
+    + '<th>Component</th><th>Field</th><th class="num">Previous</th><th class="num">Updated</th>'
+    + '<th class="num">Booked yesterday</th></tr></thead><tbody>'+body+'</tbody></table>';
+}
+function ydayPanel(){
+  const y=ydayMovement();
+  const on=!!state.ydOpen, has=y.n>0;
+  const hint = !y.ready ? 'Reading the sheet…'
+    : has ? y.n+' entr'+(y.n===1?'y':'ies')+' · '+y.places.length+' location'+(y.places.length===1?'':'s')
+    : 'Nothing recorded';
+  const fig=function(k,v,cls){
+    return '<div class="yd-fig'+(cls?' '+cls:'')+'" title="₹'+esc(grpIN(v))+'"><div class="k">'+k+'</div>'
+         + '<div class="v">'+esc(crShort(v))+'</div></div>';
+  };
+  let drop='';
+  if(on){
+    if(!y.ready){
+      drop='<div class="yd-empty">The sheet\'s edit log has not been read yet. It is pulled on every sync.</div>';
+    } else if(!has){
+      drop='<div class="yd-empty">No entries were recorded in the sheet on '+esc(y.label)+'.</div>';
+    } else {
+      let band=null, trs='';
+      y.places.forEach(function(b){
+        if(b.group!==band){
+          band=b.group;
+          trs+='<tr class="yd-band"><td colspan="4">'+esc(YD_GROUP[b.group]||'Other')+'</td></tr>';
+        }
+        const k='Y|'+b.name, o=state.ydCentre===k;
+        trs+='<tr class="click" style="cursor:pointer'+(o?';background:rgba(37,106,191,.10)':'')+'"'
+           + ' onclick="event.stopPropagation();ydCentreToggle('+jstr(k)+')">'
+          + '<td class="subc"><span class="chev'+(o?' open':'')+'" style="margin-right:6px">'+(o?'▾':'▸')+'</span>'
+            + '<b>'+esc(b.name)+'</b> <span class="muted" style="font-weight:400;font-size:10.5px">· '
+            + b.n+' entr'+(b.n===1?'y':'ies')+'</span></td>'
+          + '<td class="num tnum">'+(b.rel?'<span title="₹'+esc(grpIN(b.rel))+'">'+esc(crShort(b.rel))+'</span>':'<span class="muted">—</span>')+'</td>'
+          + '<td class="num tnum" style="color:'+(b.util>0?'var(--good)':'var(--text-muted)')+'"'
+            + ' title="₹'+esc(grpIN(b.util))+'">'+esc(crShort(b.util))+'</td>'
+          + '<td class="num tnum">'+b.n+'</td></tr>';
+        if(o) trs+='<tr class="txrow"><td colspan="4" onclick="event.stopPropagation()">'+ydayTxns(b)+'</td></tr>';
+      });
+      drop='<div class="usage"><table><thead><tr><th>Centre / State</th>'
+         + '<th class="num">Assigned</th><th class="num">Expenditure</th><th class="num">Entries</th>'
+         + '</tr></thead><tbody>'+trs+'</tbody></table>'
+         + '<div class="small yd-note">Each figure is the movement booked on '+esc(y.label)
+         + ' - the change to the cell, not the balance standing in it. Repeat edits to one cell are counted once.</div></div>';
+    }
+  }
+  return '<div class="card" style="padding:0;overflow:hidden">'
+    + '<div class="card-hd" style="padding:16px 18px 0"><h3>Yesterday\'s Expenditure and Assignments</h3>'
+      + '<span class="small muted">'+esc(y.label)+'</span></div>'
+    + '<div class="yd-sum'+(on?' open':'')+'" onclick="ydToggle()" role="button" tabindex="0"'
+      + ' aria-expanded="'+(on?'true':'false')+'">'
+      + '<span class="chev'+(on?' open':'')+'">'+(on?'▾':'▸')+'</span>'
+      + fig('Total Assigned', y.assigned)
+      + fig('Total Expenditure', y.spent, 'used')
+      + '<span class="yd-hint">'+esc(hint)+'</span></div>'
+    + drop
+    + '</div>';
 }
 function svMiniTable(rows){ return `<div class="tscroll"><table class="dt"><thead><tr><th>Sub-Vertical</th><th class="num">Assignment</th><th class="num">Expenditure</th><th class="num">Balance</th><th class="num">Used</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.key)}</td><td class="num tnum">${crShort(r.net)}</td><td class="num tnum">${crShort(r.util)}</td><td class="num tnum">${crShort(r.bal)}</td><td class="num tnum">${pct(r.up,0)}</td></tr>`).join('')}</tbody></table></div>`; }
 /* ---- section-level utilisation (Recurring / Infrastructure / Non-Recurring) - same shared
@@ -4399,11 +4614,19 @@ function txnBrief(t){
    different question, and the wrong one for a live-sync card. So the card reads
    the log when it is there, and falls back to latestTxn() when it is not.
 
-   Two of the sheet's columns carry money. They are named for the sheet's own
-   headers, not the platform's, so they are mapped once, here:
-       Utilization by RC    ->  Expenditure done / Utilised
-       Type of Expenditure  ->  Limit assigned / Released
-   Every other column is an edit the card does not price, and is ignored.
+   The sheet's columns are named for its own headers, not the platform's, so
+   they are mapped once, here:
+       Utilization by RC    ->  Expenditure done / Utilised   (column O)
+       NET AMOUNT           ->  Limit assigned / Released     (column K)
+       Type of Expenditure  ->  Limit assigned / Released     (column I)
+   Every other column is an edit we do not price, and is ignored.
+
+   NET AMOUNT and Type of Expenditure share a bucket but are not alike: the
+   first holds the assigned rupees, the second holds the WORD for what kind of
+   release it is ("Limit Assigned", "Limit Withdraw"). Editing the label changes
+   no money, so ehNum returns null for it, it sums as nothing, and it surfaces
+   only as a listed change. Bucketing them together means an assignment reads as
+   an assignment however the sheet's tracker happens to name the column.
 
    `(empty)` is how the log writes a cell that held nothing. It means zero, not
    "unknown" - a first utilisation against a voucher reads `(empty) -> 22,00,000`
@@ -4421,6 +4644,7 @@ function ehNum(s){
 function ehKind(col){
   const s=String(col||'');
   if(/utili[sz]ation/i.test(s)) return 'util';
+  if(/net\s*amount/i.test(s)) return 'rel';
   if(/type\s*of\s*expenditure/i.test(s)) return 'rel';
   return null;
 }
@@ -4429,11 +4653,18 @@ function ehKind(col){
    with that - the lowercase meridiem alone defeats some engines, and a bare
    dd/mm/yyyy is read as US month-first - so it is parsed by hand. The raw gviz
    Date(y,m,d,...) form is accepted too, for the case where the cell carries no
-   format. Returns ms, or NaN when there is no date in the cell. */
+   format. Returns ms, or NaN when there is no date in the cell.
+
+   The wall clock in that string is IST - the workbook's own timezone, which is
+   what its tracker script stamps - so it is converted from IST rather than from
+   whatever zone the viewer's machine is set to. Reading it as local time would
+   put an 11pm edit in Delhi on the wrong calendar day for a viewer abroad, and
+   "yesterday" is a day boundary this platform reports against. */
 function ehTime(s){
   const t=String(s==null?'':s).trim(); if(!t) return NaN;
+  const ist=function(y,mo,d,hh,mi,ss){ return Date.UTC(y,mo,d,hh,mi,ss)-IST_MIN*60000; };
   let m=/^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)$/.exec(t);
-  if(m) return new Date(+m[1],+m[2],+m[3],+(m[4]||0),+(m[5]||0),+(m[6]||0)).getTime();
+  if(m) return ist(+m[1],+m[2],+m[3],+(m[4]||0),+(m[5]||0),+(m[6]||0));
   m=/^(\d{4})-(\d{1,2})-(\d{1,2})|^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/.exec(t);
   if(!m) return NaN;
   let y,mo,d;
@@ -4446,8 +4677,13 @@ function ehTime(s){
     if(ap==='pm'&&hh<12) hh+=12;
     if(ap==='am'&&hh===12) hh=0;      // 12:29 am is 00:29
   }
-  const dt=new Date(y,mo,d,hh,mi,ss);
-  return isNaN(dt.getTime())?NaN:dt.getTime();
+  const ms=ist(y,mo,d,hh,mi,ss);
+  return isNaN(ms)?NaN:ms;
+}
+/** Epoch -> the IST calendar date it falls on, as 'YYYY-MM-DD' (the sheet's form). */
+function istISO(ms){
+  const d=new Date(ms+IST_MIN*60000), p=function(n){ return String(n).padStart(2,'0'); };
+  return d.getUTCFullYear()+'-'+p(d.getUTCMonth()+1)+'-'+p(d.getUTCDate());
 }
 /* Rows out of the EditHistory tab, or null if this is not that tab.
 
@@ -4480,6 +4716,10 @@ function parseEditHistory(rows){
   let   cO =col('old value','old'),
         cN =col('new value','new'),
         cT =col('timestamp','time','date');
+  /* Optional, and blank on every row the log holds today - the component is
+     read from the main sheet instead. Honoured when the tracker starts filling
+     it, because then it is the log's own answer and beats a lookup. */
+  const cSv=col('sub vertical','subvertical','component');
   if(cRc<0||cV<0||cC<0) return null;
   if(cN<0&&cO>=0) cN=cO+1;            // New Value sits after Old Value
   if(cT<0&&cRc>0)  cT=cRc-1;          // Timestamp sits before the state name
@@ -4492,6 +4732,7 @@ function parseEditHistory(rows){
     if(!rc&&!vch) continue;           // trailing blank rows the sheet pads with
     out.push({ts:cT>=0?ehTime(c[cT]):NaN, rc:rc, voucher:vch,
       kind:ehKind(c[cC]), col:String(c[cC]==null?'':c[cC]).trim(),
+      sv:cSv>=0?String(c[cSv]==null?'':c[cSv]).trim():'',
       oldV:ehNum(cO>=0?c[cO]:null), newV:ehNum(c[cN])});
   }
   return out;
@@ -4542,9 +4783,8 @@ function editBrief(){
   for(let i=0;i<tl.length;i++){
     if(tl[i]&&tl[i].rc===best.rc&&tl[i].voucher===best.voucher){ tx=tl[i]; break; }
   }
-  const d=new Date(best.ts), p2=function(n){ return ('0'+n).slice(-2); };
   return {
-    when: fmtD(d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())),
+    when: fmtD(istISO(best.ts)),
     rc: best.rc||'—',
     voucher: best.voucher||'—',
     rel:  pick.rel  ? pick.rel.newV  : (tx?tx.net :null),
