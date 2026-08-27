@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { MODULE_KEYS, ROLES, isAdminRole, type ModuleAccess } from '@efip/shared';
 import { isSuperAdmin, toAuthedUser, verifyPassword } from '../auth.ts';
 import { currentUser } from '../session.ts';
+import { LOGIN_OUTCOMES, listLogins, loginSummary } from '../logins.ts';
 import {
   findById,
   findByUsername,
@@ -186,6 +187,36 @@ export function registerAdminRoutes(app: FastifyInstance): void {
        what getModuleAccess will hand back on their next request. */
     return isSuperAdmin(target) ? getModuleAccess(target.id, target.role) : saved;
   });
+
+  // ── Sign-in history ────────────────────────────────────────────────────────
+  /* Administrator-only, like everything else under /api/admin/*. The log names
+     who reached the platform and from which address, which is exactly the kind
+     of thing that must not be readable by the people it records. */
+  app.get<{ Querystring: { limit?: string; user?: string; outcome?: string; days?: string } }>(
+    '/api/admin/logins',
+    async (req, reply) => {
+      const admin = await requireSuperAdmin(req as never, reply as never);
+      if (!admin) return;
+      const q = req.query ?? {};
+      const outcome = LOGIN_OUTCOMES.includes(q.outcome as never)
+        ? (q.outcome as (typeof LOGIN_OUTCOMES)[number])
+        : undefined;
+      /* `days` is a window back from now, not a calendar range - the log is read
+         to answer "recently", and a bad value simply means no window. */
+      const days = Number(q.days);
+      const since =
+        Number.isFinite(days) && days > 0
+          ? new Date(Date.now() - days * 86400000).toISOString()
+          : undefined;
+      const events = await listLogins({
+        limit: Number(q.limit) || undefined,
+        userId: q.user || undefined,
+        outcome,
+        since,
+      });
+      return { events, ...(await loginSummary()) };
+    },
+  );
 
   // ── Self-service ───────────────────────────────────────────────────────────
   app.patch('/api/me', async (req, reply) => {

@@ -38,3 +38,36 @@ CREATE TABLE IF NOT EXISTS user_module_access (
 );
 
 CREATE INDEX IF NOT EXISTS ix_user_module_access_user ON user_module_access(user_id);
+
+-- ============================================================================
+--  Sign-in history — who reached the platform, when, and from where.
+--
+--  Refusals are recorded as well as successes. A log of successes alone answers
+--  "who was here"; only the refusals answer "who tried and could not", which is
+--  the question that matters when an account is being probed or a colleague
+--  cannot get in. `outcome` is one of:
+--    success  — signed in
+--    failed   — wrong username or password
+--    blocked  — correct password, but the account is deactivated
+--    logout   — signed out
+--
+--  `username` is stored as typed, in lower case, and is the only identifier for
+--  a `failed` attempt against a username that does not exist — hence NOT NULL
+--  here while `user_id` may be empty. Names and roles are NOT copied in: they
+--  are joined from app_user when the log is read, so the list shows people as
+--  they are currently known rather than under a name since changed.
+--
+--  Append-only by intent. Nothing in the application updates or deletes a row.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS login_event (
+  id       TEXT PRIMARY KEY,
+  user_id  TEXT NOT NULL DEFAULT '',
+  username TEXT NOT NULL,
+  outcome  TEXT NOT NULL,
+  ip       TEXT NOT NULL DEFAULT '',
+  at       TEXT NOT NULL
+);
+
+-- The log is read newest-first and filtered by person; both are indexed.
+CREATE INDEX IF NOT EXISTS ix_login_event_at ON login_event(at);
+CREATE INDEX IF NOT EXISTS ix_login_event_user ON login_event(user_id);

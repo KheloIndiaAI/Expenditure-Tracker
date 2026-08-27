@@ -25,6 +25,7 @@ import rateLimit from '@fastify/rate-limit';
 import { findByUsername, countUsers, getModuleAccess } from './users.ts';
 import { dummyVerify, signToken, toAuthedUser, verifyPassword } from './auth.ts';
 import { COOKIE_NAME, currentUser, stripHash } from './session.ts';
+import { recordLogin } from './logins.ts';
 import { registerAdminRoutes } from './routes/admin.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -137,6 +138,13 @@ async function start(): Promise<void> {
       const ok = row ? verifyPassword(password, row.password_hash) : (dummyVerify(password), false);
       if (!row || !ok) {
         req.log.warn({ event: 'auth.login.failure', username: String(username).toLowerCase(), ip: req.ip });
+        /* Recorded against the username as typed. When it matches no account
+           there is no id to attach, and that attempt is precisely the one an
+           administrator needs to see. */
+        await recordLogin(
+          { userId: row?.id, username: String(username), outcome: 'failed', ip: req.ip },
+          (err) => req.log.error({ event: 'auth.log.write_failed', err }),
+        );
         return reply.code(401).send({ message: 'Invalid username or password.' });
       }
       const user = stripHash(row);
@@ -145,6 +153,10 @@ async function start(): Promise<void> {
          loses access immediately rather than at token expiry. */
       if (!user.is_active) {
         req.log.warn({ event: 'auth.login.deactivated', userId: user.id, ip: req.ip });
+        await recordLogin(
+          { userId: user.id, username: user.username, outcome: 'blocked', ip: req.ip },
+          (err) => req.log.error({ event: 'auth.log.write_failed', err }),
+        );
         return reply.code(403).send({ message: 'This account has been deactivated. Contact the administrator.' });
       }
       reply.setCookie(COOKIE_NAME, signToken(user), {
@@ -155,6 +167,10 @@ async function start(): Promise<void> {
         maxAge: MAX_AGE,
       });
       req.log.info({ event: 'auth.login.success', userId: user.id, role: user.role, ip: req.ip });
+      await recordLogin(
+        { userId: user.id, username: user.username, outcome: 'success', ip: req.ip },
+        (err) => req.log.error({ event: 'auth.log.write_failed', err }),
+      );
       return { token: 'cookie', user: toAuthedUser(user, await getModuleAccess(user.id, user.role)) };
     },
   );
@@ -168,7 +184,13 @@ async function start(): Promise<void> {
   app.post('/api/auth/logout', async (req, reply) => {
     const user = await currentUser(req);
     reply.clearCookie(COOKIE_NAME, { path: '/' });
-    if (user) req.log.info({ event: 'auth.logout', userId: user.id, ip: req.ip });
+    if (user) {
+      req.log.info({ event: 'auth.logout', userId: user.id, ip: req.ip });
+      await recordLogin(
+        { userId: user.id, username: user.username, outcome: 'logout', ip: req.ip },
+        (err) => req.log.error({ event: 'auth.log.write_failed', err }),
+      );
+    }
     return { ok: true };
   });
 
@@ -187,23 +209,31 @@ async function start(): Promise<void> {
     return reply.type('text/html').send(loginHtml);
   });
 
-  /* The login bundle is also the Administration and Profile SPA, so these paths
-     serve the same document and let the client router take over. They are still
-     gated: an unauthenticated visitor is sent to /login, and every action the SPA
-     can take is authorised server-side regardless of what it chooses to render. */
-  /* My Profile is a panel of the dashboard now, not a screen of this SPA. The
-     path is kept and redirected so existing links and bookmarks still work. */
-  app.get('/profile', async (_req, reply) => reply.redirect('/?panel=profile'));
+  /* The SPA bundle is the sign-in page and nothing else now.
 
-  for (const path of ['/admin', '/admin/*']) {
-    app.get(path, async (req, reply) => {
-      if (!(await currentUser(req))) return reply.redirect('/login');
-      if (!loginHtml) {
-        return reply.code(500).type('text/plain').send('UI not built. Run: npm run build -w @efip/web');
-      }
-      return reply.type('text/html').send(loginHtml);
-    });
+     My Profile became a dashboard panel first; Administration has followed it,
+     for the same reason. Sending an administrator out of the dashboard into a
+     separate application to add a user meant leaving the product they were
+     working in, losing the sidebar, the search and the sync status, and coming
+     back through a fresh page load. The old paths are kept and redirected so
+     existing links and bookmarks still land somewhere sensible — and each one
+     lands on the panel that replaced it, not merely on the dashboard.
+
+     No auth check here: "/" already sends an unauthenticated visitor to /login,
+     so a redirect through it is gated exactly as before. */
+  const PANEL_FOR: Record<string, string> = {
+    '/profile': 'profile',
+    '/admin': 'admin',
+    '/admin/users': 'admin',
+    '/admin/access': 'access',
+    '/admin/logs': 'logs',
+  };
+  for (const path of Object.keys(PANEL_FOR)) {
+    app.get(path, async (_req, reply) => reply.redirect(`/?panel=${PANEL_FOR[path]}`));
   }
+  /* Any other /admin/* path is a link to a screen that no longer exists; the
+     Administration panel is the honest destination for it. */
+  app.get('/admin/*', async (_req, reply) => reply.redirect('/?panel=admin'));
 
   app.get('/', async (req, reply) => {
     if (!(await currentUser(req))) return reply.redirect('/login');

@@ -214,6 +214,82 @@ button{font-family:inherit}
 .pf-msg.err{background:rgba(198,45,45,.07);color:var(--critical);border:1px solid rgba(198,45,45,.26)}
 .card-hd .link{font-size:12.5px;font-weight:600;cursor:pointer}
 
+/* ---- Administration panels -------------------------------------------------
+   User Management, Roles & Access and User Logs. These extend the .pf-* form
+   language above rather than starting a second one, and the row that opens to
+   reveal an editor is the same expand-in-place gesture the scheme panels use -
+   so administration reads as part of this dashboard, not a visitor in it. */
+.pf-sel{width:100%;height:38px;border:1px solid var(--border);border-radius:8px;background:var(--bg-surface);
+  padding:0 32px 0 11px;font-family:inherit;font-size:13.5px;color:var(--text-primary);outline:0;cursor:pointer;
+  appearance:none;-webkit-appearance:none;transition:border-color .12s,box-shadow .12s;
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;background-size:14px}
+.pf-sel:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-subtle)}
+.pf-sel:disabled{background-color:var(--bg-app);color:var(--text-muted);cursor:not-allowed}
+/* Toolbar above a table: search on the left, actions pushed right. */
+.ad-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.ad-search{position:relative;flex:1;min-width:210px;max-width:420px}
+.ad-search .pf-in{padding-left:34px}
+.ad-search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;
+  color:var(--text-muted);pointer-events:none}
+.ad-count{font-size:12px;color:var(--text-muted);margin-left:auto;white-space:nowrap}
+/* A row that opens. Mirrors tr.click elsewhere; the chevron is the same glyph. */
+.ad-tbl tbody tr.ad-row{cursor:pointer}
+.ad-tbl tbody tr.ad-row:hover>td{background:var(--bg-raised)}
+.ad-tbl tbody tr.ad-row.open>td{background:var(--primary-subtle)}
+.ad-tbl tbody tr.ad-row.open .ad-nm b{color:var(--primary-hover)}
+.ad-nm{display:flex;align-items:center;gap:8px;min-width:0}
+.ad-nm .un{font-size:11px;color:var(--text-muted);font-weight:500}
+.ad-you{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;background:var(--primary-subtle);
+  color:var(--primary-hover);font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+/* The editor that unfolds beneath a row. Tinted like .grp-drop so it reads as
+   belonging to the row above rather than as a new card. */
+.ad-drop>td{padding:0!important;background:linear-gradient(180deg,rgba(37,106,191,.05),rgba(37,106,191,.01))!important;
+  border-bottom:1px solid var(--border)!important}
+.ad-edit{padding:15px 16px 17px}
+.ad-edit .ad-sec{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--text-muted);margin:0 0 9px}
+.ad-edit .ad-sec.mt{margin-top:18px;padding-top:15px;border-top:1px dashed var(--border)}
+.ad-two{display:grid;gap:16px;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);align-items:start}
+@media(max-width:900px){.ad-two{grid-template-columns:1fr}}
+/* Status dot, reused by the user table and the log. */
+.ad-pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.ad-pill i{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.ad-pill.on{color:var(--good)}
+.ad-pill.off{color:var(--text-muted)}
+/* Module access toggles. */
+.ad-mods{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(215px,1fr))}
+.ad-mod{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:9px;
+  background:var(--bg-surface);padding:9px 11px;cursor:pointer;transition:border-color .12s,background .12s}
+.ad-mod:hover{border-color:var(--primary)}
+.ad-mod.on{border-color:rgba(37,106,191,.35);background:var(--primary-subtle)}
+.ad-mod.lock{cursor:not-allowed;opacity:.72}
+.ad-mod .nm{font-size:12.5px;font-weight:600;color:var(--text-primary);min-width:0;overflow-wrap:anywhere}
+.ad-sw{width:34px;height:19px;border-radius:999px;background:var(--border);position:relative;flex:none;
+  transition:background .14s}
+.ad-sw::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 3px rgba(16,24,40,.28);transition:transform .14s}
+.ad-mod.on .ad-sw{background:var(--primary)}
+.ad-mod.on .ad-sw::after{transform:translateX(15px)}
+/* Sign-in log: one glyph per outcome, so the column scans without reading. */
+.lg-ev{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;white-space:nowrap}
+.lg-ev i{width:20px;height:20px;border-radius:6px;display:grid;place-items:center;flex:none;
+  font-size:11px;font-weight:800;font-style:normal}
+.lg-ev.success{color:var(--good)}       .lg-ev.success i{background:rgba(27,158,99,.13)}
+.lg-ev.failed{color:var(--critical)}    .lg-ev.failed i{background:rgba(198,45,45,.10)}
+.lg-ev.blocked{color:var(--serious)}    .lg-ev.blocked i{background:rgba(217,119,6,.13)}
+.lg-ev.logout{color:var(--text-muted)}  .lg-ev.logout i{background:var(--bg-app)}
+.lg-ip{font-variant-numeric:tabular-nums;font-size:11.5px;color:var(--text-muted)}
+.lg-when b{font-variant-numeric:tabular-nums}
+.lg-when .ago{display:block;font-size:10.5px;color:var(--text-muted);font-weight:500}
+/* Log summary strip - four counts, same shape as the yesterday tile's figures. */
+.lg-sum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+@media(max-width:720px){.lg-sum{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.lg-card{border:1px solid var(--border);border-radius:10px;background:var(--bg-surface);padding:11px 13px;
+  box-shadow:var(--elev-1)}
+.lg-card .k{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}
+.lg-card .v{font-size:20px;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+
 .barrow{display:grid;grid-template-columns:170px 1fr 96px;gap:10px;align-items:center;padding:5px 0;cursor:pointer}
 .barrow:hover .lab{color:var(--primary)}
 .barrow .lab{font-size:13px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1996,6 +2072,10 @@ let state={view:'command', tr:{}, trSub:null, hsOpen:null, svOpen:null, filt:'Al
   /* Yesterday's movement panel: the strip starts shut so the Overview opens on
      the same five KPIs it always has, and one centre expands at a time. */
   ydOpen:false, ydCentre:null,
+  /* Administration. One user's editor open at a time in each of the two lists;
+     the sign-in log opens on the last 7 days, which is the window an
+     administrator is nearly always asking about. */
+  admOpen:null, admNew:false, admQ:'', accOpen:null, logOutcome:'', logDays:'7',
   taMetric:'all', taCum:false, taBucket:{m1:'W',m2:'W',m3:'W'}, taRc:'', taComp:'', taSub:''};
 
 /* ---- geometry / tooltip ---- */
@@ -2026,7 +2106,10 @@ const ICON={
  mdsd:'M3 22h18M5 22V10M19 22V10M3 10l9-6 9 6M8 22v-6h2v6M14 22v-6h2v6',
  kig:'M3 4h7v7H3zM14 4h7v4h-7zM14 12h7v8h-7zM3 15h7v5H3z',
  saif:'M5 3h11l3 3v15H5zM16 3v4h3M8 11h8M8 15h8M8 19h5',
- user:'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8'
+ user:'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8',
+ users:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+ shield:'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4',
+ clock:'M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20zM12 6v6l4 2'
 };
 /* ---- Navigation ---------------------------------------------------------
    One group. The former INTELLIGENCE section is gone and Attention Centre now
@@ -2056,14 +2139,30 @@ const NAV=[{g:'ANALYSIS'},
   {v:'exceptions',t:'Attention Centre',        i:'exceptions', badge:1},
   {v:'trend',     t:'Trend Analytics',         i:'trend'},
   {v:'detail',    t:'Transaction Record',      i:'detail'},
+  /* Administration. Panels of this dashboard now, not a separate application:
+     `adm:1` marks them as gated on the administrator role rather than on the
+     per-user module grants, which is what moduleAllowed() reads. */
+  {g:'ADMINISTRATION', adm:1},
+  {v:'admin',     t:'User Management',         i:'users',  adm:1},
+  {v:'access',    t:'Roles & Access',          i:'shield', adm:1},
+  {v:'logs',      t:'User Logs',               i:'clock',  adm:1},
   /* Own group: this is about the person signed in, not the scheme. */
   {g:'ACCOUNT'},
   {v:'profile',   t:'My Profile',              i:'user'}];
+/* View keys that only an administrator may open. Kept beside NAV because the
+   two must not disagree, and read by moduleAllowed() so every consumer - the
+   sidebar, go(), the global search index and applyAccess - is gated by one
+   answer rather than each remembering to ask. */
+const ADMIN_VIEWS=['admin','access','logs'];
 function svgIcon(i){ return `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[i]}"/>${i==='rc'?'<circle cx="12" cy="10" r="2.4"/>':''}</svg>`; }
 function renderNav(){
   const n=attentionCount();
   const items=NAV.filter(it=>it.g||(!viewHidden(it.v)&&moduleAllowed(it.v)))
-    .filter((it,i,a)=>!it.g || a.slice(i+1).some(x=>!x.g));   // no empty group headers
+    /* Drop a group header with nothing under it. The test is whether an ITEM
+       follows immediately - asking whether any item follows anywhere would keep
+       an empty ADMINISTRATION heading aloft on the strength of My Profile
+       further down, which is exactly what a non-administrator would see. */
+    .filter((it,i,a)=>!it.g || (!!a[i+1] && !a[i+1].g));
   document.getElementById('nav').innerHTML=items.map(it=>{
     if(it.g) return `<div class="navgroup">${it.g}</div>`;
     const active=state.view===it.v?' active':'';
@@ -3776,9 +3875,12 @@ function viewMDSD(){
 
 /* ---- render ---- */
 function renderTopFilters(){
-  /* Classification filters the scheme's figures; My Profile has none, so the
-     control is withdrawn rather than left sitting there doing nothing. */
-  if(state.view==='profile'){ document.getElementById('topFilters').innerHTML=''; syncFilterBadge(); return; }
+  /* Classification filters the scheme's figures. My Profile has none, and nor
+     does Administration - people and sign-ins are not scheme expenditure - so
+     the control is withdrawn rather than left sitting there doing nothing. */
+  if(state.view==='profile'||ADMIN_VIEWS.indexOf(state.view)>=0){
+    document.getElementById('topFilters').innerHTML=''; syncFilterBadge(); return;
+  }
   const f=state.filt;
   document.getElementById('topFilters').innerHTML = `
     <div class="sheet-hd"><span>Filters</span><button class="sheet-done" onclick="closeFilterSheet()">Done</button></div>
@@ -3970,7 +4072,7 @@ function applyViewFilterDefaults(){
 }
 
 function render(){ applyViewFilterDefaults(); applyFilter(); renderNav(); renderTopFilters(); renderSyncPill(); const v=state.view;
-  const html = v==='command'?viewCommand():v==='rc'?viewRC():v==='sv'?viewSV():v==='mdsd'?viewMDSD():v==='kigroups'?viewKI():v==='saifmt'?viewSAIFmt():v==='trend'?viewTrend():v==='exceptions'?viewExc():v==='detail'?viewDetail():v==='profile'?viewProfile():viewTracker();
+  const html = v==='command'?viewCommand():v==='rc'?viewRC():v==='sv'?viewSV():v==='mdsd'?viewMDSD():v==='kigroups'?viewKI():v==='saifmt'?viewSAIFmt():v==='trend'?viewTrend():v==='exceptions'?viewExc():v==='detail'?viewDetail():v==='profile'?viewProfile():v==='admin'?viewAdminUsers():v==='access'?viewAdminAccess():v==='logs'?viewAdminLogs():viewTracker();
   document.getElementById('content').innerHTML=html;
   labelTableCells();
   groupTreeSections();
@@ -5619,6 +5721,524 @@ function pfPassword(e) {
 }
 
 /* ============================================================================
+   ADMINISTRATION — User Management, Roles & Access, User Logs
+   ============================================================================
+   These were a separate React application at /admin. They are panels of this
+   dashboard now, for the reason My Profile moved before them: an administrator
+   adding a user was being thrown out of the product they were working in, into
+   a different one, and back again through a full page load.
+
+   Nothing here is a permission. Every endpoint under /api/admin/* resolves the
+   caller from their cookie and refuses a non-administrator with a 403, so this
+   code decides what to draw and never what is allowed. The panels are hidden
+   from anyone else only so the menu tells the truth.
+
+   The gesture throughout is the one the scheme panels already use: a row opens
+   in place to reveal its detail. There is no modal in this dashboard and this
+   did not introduce one — an editor that unfolds under the row it belongs to
+   keeps the list on screen, which a dialog covering it would not. */
+
+var ADM = { users: null, loading: false, err: null, logs: null, logsErr: null, seen: {} };
+
+/** Read the admin API. Same shape as pfSend, which is the file's fetch idiom. */
+function admGet(url) {
+  return fetch(url, { credentials: 'include' }).then(function (r) {
+    return r.text().then(function (t) {
+      var parsed = null;
+      try { parsed = t ? JSON.parse(t) : null; } catch (e) { parsed = null; }
+      if (!r.ok) throw new Error((parsed && parsed.message) || 'Request failed (' + r.status + ').');
+      return parsed;
+    });
+  });
+}
+/** Load the user list. Re-entrant: a second call while one is in flight is ignored. */
+function admLoadUsers(force) {
+  if (ADM.loading || (ADM.users && !force)) return;
+  ADM.loading = true; ADM.err = null;
+  admGet('/api/admin/users')
+    .then(function (list) { ADM.users = Array.isArray(list) ? list : []; })
+    .catch(function (err) { ADM.err = err.message; })
+    .then(function () { ADM.loading = false; render(); });
+}
+/** Load the sign-in log for the current filters, plus each person's last visit. */
+function admLoadLogs(force) {
+  if (ADM.logs && !force) return;
+  ADM.logsErr = null;
+  var q = '/api/admin/logins?limit=300';
+  if (state.logOutcome) q += '&outcome=' + encodeURIComponent(state.logOutcome);
+  if (state.logDays) q += '&days=' + encodeURIComponent(state.logDays);
+  admGet(q)
+    .then(function (r) {
+      ADM.logs = (r && r.events) || [];
+      ADM.logTotal = (r && r.total) || 0;
+      ADM.seen = {};
+      ((r && r.lastSeen) || []).forEach(function (s) { ADM.seen[s.user_id] = s.at; });
+    })
+    .catch(function (err) { ADM.logsErr = err.message; ADM.logs = []; })
+    .then(function () { render(); });
+}
+
+/* ---- shared bits ---------------------------------------------------------- */
+
+/** Every role the platform knows, for the role picker. Mirrors ROLES/ROLE_LABELS. */
+const ADM_ROLES = ['minister','secretary','joint_secretary','director','finance_officer',
+                   'senior_finance','analyst','auditor','admin','super_admin'];
+/** The panels a grant can cover. Mirrors MODULES in @efip/shared. */
+const ADM_MODULES = [
+  { k:'command',    t:'Financial Overview' },
+  { k:'tracker',    t:'Component Tracker' },
+  { k:'kigroups',   t:'SAI KI 1, KI 2 & Infra' },
+  { k:'saifmt',     t:'SAI Format Summary' },
+  { k:'mdsd',       t:'KI Infra (States/UTs)' },
+  { k:'rc',         t:'Regional Centres' },
+  { k:'exceptions', t:'Attention Centre' },
+];
+function admIsAdminRole(r) { return r === 'admin' || r === 'super_admin'; }
+function admSelect(id, value, opts, o) {
+  o = o || {};
+  return '<div><label class="pf-lb" for="' + id + '">' + esc(o.label || '') + '</label>' +
+    '<select class="pf-sel" id="' + id + '"' + (o.disabled ? ' disabled' : '') + '>' +
+    opts.map(function (op) {
+      return '<option value="' + esc(op.v) + '"' + (op.v === value ? ' selected' : '') + '>' + esc(op.t) + '</option>';
+    }).join('') + '</select>' +
+    (o.hint ? '<div class="pf-hint">' + esc(o.hint) + '</div>' : '') + '</div>';
+}
+/** "3 minutes ago" / "on 12.08.2026" — the log is scanned for recency first. */
+function admAgo(iso) {
+  if (!iso) return '';
+  var t = Date.parse(iso); if (!isFinite(t)) return '';
+  var s = Math.round((Date.now() - t) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + ' min ago';
+  if (s < 86400) return Math.floor(s / 3600) + ' hr ago';
+  var d = Math.floor(s / 86400);
+  return d === 1 ? 'yesterday' : d + ' days ago';
+}
+/** Date and clock time in IST, which is the timezone the platform reports in. */
+function admWhen(iso) {
+  var t = Date.parse(iso); if (!isFinite(t)) return '—';
+  var d = new Date(t + IST_MIN * 60000), p = function (n) { return String(n).padStart(2, '0'); };
+  return p(d.getUTCDate()) + '.' + p(d.getUTCMonth() + 1) + '.' + d.getUTCFullYear() +
+    ' · ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes());
+}
+function admHead(title, sub) { return pageHead(title, sub); }
+/** Shown when a non-administrator reaches one of these panels by URL. */
+function admDenied() {
+  return '<div class="card"><div class="dt-empty"><div class="e-ic">🔒</div>' +
+    '<div class="e-t">Administration is restricted</div>' +
+    '<div class="e-s">This area is available to administrators. If you need access, ask one to grant it.</div>' +
+    '</div></div>';
+}
+function admBusy(what) {
+  return '<div class="card"><div class="dt-empty"><div class="e-ic">◌</div>' +
+    '<div class="e-t">Loading ' + esc(what) + '…</div>' +
+    '<div class="e-s">Reading from the platform\'s own store.</div></div></div>';
+}
+function admError(msg) {
+  return '<div class="card"><div class="dt-empty"><div class="e-ic">!</div>' +
+    '<div class="e-t">Could not load</div><div class="e-s">' + esc(msg) + '</div></div></div>';
+}
+
+/* ---- User Management ------------------------------------------------------ */
+
+function admMatch(u, q) {
+  if (!q) return true;
+  q = q.toLowerCase();
+  return [u.name, u.username, u.designation, u.email, u.phone, pfRoleLabel(u.role)]
+    .some(function (f) { return String(f || '').toLowerCase().indexOf(q) >= 0; });
+}
+function viewAdminUsers() {
+  if (!isSuperAdmin()) return admDenied();
+  admLoadUsers();
+  /* The list's "Last sign-in" column comes out of the sign-in log's summary,
+     which is not filtered by the Logs panel's chips - so whichever panel loads
+     it first, both are served. Without this the column reads "Never" for
+     everyone until the administrator happens to open User Logs. */
+  admLoadLogs();
+  var head = admHead('User Management', 'Every login on the platform. Roles decide capability; access decides which panels open.');
+  if (ADM.err) return head + admError(ADM.err);
+  if (!ADM.users) return head + admBusy('users');
+
+  var q = state.admQ || '';
+  var rows = ADM.users.filter(function (u) { return admMatch(u, q); });
+  var active = ADM.users.filter(function (u) { return u.is_active !== false; }).length;
+
+  var body = rows.map(function (u) {
+    var open = state.admOpen === u.id;
+    var me = ME && ME.id === u.id;
+    var on = u.is_active !== false;
+    var seen = ADM.seen[u.id];
+    return '<tr class="ad-row' + (open ? ' open' : '') + '" onclick="admToggle(' + jstr(u.id) + ')">' +
+      '<td><div class="ad-nm"><span class="chev' + (open ? ' open' : '') + '">' + (open ? '▾' : '▸') + '</span>' +
+        '<span style="min-width:0"><b>' + esc(u.name || u.username) + '</b>' +
+        (me ? '<span class="ad-you">You</span>' : '') +
+        '<div class="un">' + esc(u.username) + '</div></span></div></td>' +
+      '<td>' + (u.designation ? esc(u.designation) : '<span class="muted">—</span>') + '</td>' +
+      '<td>' + esc(pfRoleLabel(u.role)) + '</td>' +
+      '<td><span class="ad-pill ' + (on ? 'on' : 'off') + '"><i></i>' + (on ? 'Active' : 'Deactivated') + '</span></td>' +
+      '<td class="small">' + (seen ? esc(admAgo(seen)) : '<span class="muted">Never</span>') + '</td></tr>' +
+      (open ? '<tr class="ad-drop"><td colspan="5" onclick="event.stopPropagation()">' + admEditor(u) + '</td></tr>' : '');
+  }).join('');
+
+  var table = rows.length
+    ? '<div class="tscroll"><table class="dt ad-tbl"><thead><tr>' +
+        '<th>Name</th><th>Designation</th><th>Role</th><th>Status</th><th>Last sign-in</th>' +
+      '</tr></thead><tbody>' + body + '</tbody></table></div>'
+    : '<div class="dt-empty"><div class="e-ic">🔍</div><div class="e-t">No user matches “' + esc(q) + '”</div>' +
+      '<div class="e-s">Try a name, username, designation or role.</div></div>';
+
+  return head +
+    '<div class="ad-bar">' +
+      '<div class="ad-search">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' +
+        '<input class="pf-in" id="admQ" type="search" placeholder="Filter by name, username, designation or role" ' +
+          'value="' + esc(q) + '" oninput="admFilter(this.value)" autocomplete="off">' +
+      '</div>' +
+      '<button class="pf-btn" onclick="admNewToggle()">' + (state.admNew ? 'Cancel' : '+  Add user') + '</button>' +
+      '<span class="ad-count">' + ADM.users.length + ' user' + (ADM.users.length === 1 ? '' : 's') +
+        ' · ' + active + ' active</span>' +
+    '</div>' +
+    (state.admNew ? admNewCard() : '') +
+    '<div class="card" style="padding:0;overflow:hidden">' + table + '</div>';
+}
+
+/** The editor that unfolds under a user's row. */
+function admEditor(u) {
+  var me = ME && ME.id === u.id;
+  var lockRole = me;                      // the server refuses a self-demotion too
+  return '<div class="ad-edit"><div class="ad-two">' +
+    '<div>' +
+      '<div class="ad-sec">Details</div>' +
+      '<div id="admMsg-' + esc(u.id) + '"></div>' +
+      '<form onsubmit="return admSave(event,' + jstr(u.id) + ')" novalidate>' +
+        '<div class="pf-f">' +
+          pfField('Name', 'ae-name-' + u.id, u.name, { required: true }) +
+          pfField('Designation', 'ae-desig-' + u.id, u.designation) +
+          pfField('Email ID', 'ae-email-' + u.id, u.email, { type: 'email' }) +
+          pfField('Phone Number', 'ae-phone-' + u.id, u.phone) +
+          admSelect('ae-role-' + u.id, u.role, ADM_ROLES.map(function (r) { return { v: r, t: pfRoleLabel(r) }; }),
+            { label: 'Role', disabled: lockRole,
+              hint: lockRole ? 'You cannot change your own role.' : 'Administrator and Super Administrator both reach this area.' }) +
+          admSelect('ae-active-' + u.id, u.is_active === false ? 'no' : 'yes',
+            [{ v: 'yes', t: 'Active' }, { v: 'no', t: 'Deactivated' }],
+            { label: 'Status', disabled: me,
+              hint: me ? 'You cannot deactivate your own account.' : 'A deactivated account is refused at sign-in.' }) +
+        '</div>' +
+        '<div class="pf-act"><button class="pf-btn" type="submit" id="ae-btn-' + esc(u.id) + '">Save changes</button></div>' +
+      '</form>' +
+    '</div>' +
+    '<div>' +
+      '<div class="ad-sec">Set a new password</div>' +
+      '<div id="admPwMsg-' + esc(u.id) + '"></div>' +
+      '<form onsubmit="return admSetPw(event,' + jstr(u.id) + ')" novalidate>' +
+        '<div class="pf-stack">' +
+          pfField('New password', 'ae-pw-' + u.id, '', { type: 'password', autocomplete: 'new-password', hint: 'At least 8 characters. The user is not told — pass it on yourself.' }) +
+          pfField('Confirm', 'ae-pw2-' + u.id, '', { type: 'password', autocomplete: 'new-password' }) +
+        '</div>' +
+        '<div class="pf-act"><button class="pf-btn wide" type="submit" id="ae-pwbtn-' + esc(u.id) + '">Set password</button></div>' +
+      '</form>' +
+      '<div class="ad-sec mt">Username</div>' +
+      '<div class="pf-hint" style="margin-top:-4px">' + esc(u.username) +
+        ' — a login identifier cannot be changed once issued. Create a new account instead.</div>' +
+    '</div>' +
+  '</div></div>';
+}
+
+function admNewCard() {
+  return '<div class="card"><div class="card-hd"><h3>Add a user</h3></div>' +
+    '<div id="admNewMsg"></div>' +
+    '<form onsubmit="return admCreate(event)" novalidate>' +
+      '<div class="pf-f">' +
+        pfField('Username', 'an-user', '', { required: true, autocomplete: 'off', hint: 'Letters, numbers, dot, dash or underscore. This is what they sign in with, and it is permanent.' }) +
+        pfField('Name', 'an-name', '', { required: true }) +
+        pfField('Designation', 'an-desig', '') +
+        pfField('Email ID', 'an-email', '', { type: 'email' }) +
+        pfField('Phone Number', 'an-phone', '') +
+        admSelect('an-role', 'analyst', ADM_ROLES.map(function (r) { return { v: r, t: pfRoleLabel(r) }; }), { label: 'Role' }) +
+        pfField('Password', 'an-pw', '', { type: 'password', required: true, autocomplete: 'new-password', hint: 'At least 8 characters.' }) +
+      '</div>' +
+      '<div class="pf-act"><button class="pf-btn" type="submit" id="an-btn">Create user</button></div>' +
+    '</form></div>';
+}
+
+function admFilter(v) {
+  /* Re-render would rebuild the box and drop the caret, so the list alone is
+     redrawn and the input left exactly as the user is typing in it. */
+  state.admQ = v;
+  var host = document.querySelector('#content .ad-tbl');
+  var card = host && host.closest('.card');
+  if (!card) { render(); return; }
+  var q = (v || '').toLowerCase();
+  var shown = 0;
+  ADM.users.forEach(function (u) {
+    var tr = card.querySelector('tr[onclick*="' + u.id + '"]');
+    if (!tr) return;
+    var hit = admMatch(u, q);
+    tr.style.display = hit ? '' : 'none';
+    var drop = tr.nextElementSibling;
+    if (drop && drop.classList.contains('ad-drop')) drop.style.display = hit ? '' : 'none';
+    if (hit) shown++;
+  });
+  if (!shown) render();
+}
+function admToggle(id) { state.admOpen = state.admOpen === id ? null : id; render(); }
+function admNewToggle() { state.admNew = !state.admNew; render(); }
+
+function admSave(e, id) {
+  e.preventDefault();
+  var slot = 'admMsg-' + id, btn = document.getElementById('ae-btn-' + id);
+  var name = pfVal('ae-name-' + id);
+  if (!name) { pfNote(slot, 'err', 'Name cannot be empty.'); return false; }
+  var roleEl = document.getElementById('ae-role-' + id);
+  var actEl = document.getElementById('ae-active-' + id);
+  var patch = {
+    name: name,
+    designation: pfVal('ae-desig-' + id),
+    email: pfVal('ae-email-' + id),
+    phone: pfVal('ae-phone-' + id),
+  };
+  /* A disabled control is not sent at all. Omitting the field is not the same as
+     sending it unchanged: it keeps a self-edit from ever carrying a role or an
+     is_active the server would have to refuse. */
+  if (roleEl && !roleEl.disabled) patch.role = roleEl.value;
+  if (actEl && !actEl.disabled) patch.is_active = actEl.value === 'yes';
+  btn.disabled = true; btn.textContent = 'Saving…';
+  pfNote(slot, '', '');
+  pfSend('/api/admin/users/' + encodeURIComponent(id), 'PATCH', patch)
+    .then(function (saved) {
+      /* Adopt the server's record, then repaint the list so the row's role and
+         status agree with what was stored. The notice is re-applied after the
+         repaint, which would otherwise discard it. */
+      if (saved) ADM.users = ADM.users.map(function (x) { return x.id === id ? Object.assign({}, x, saved) : x; });
+      render();
+      pfNote(slot, 'ok', 'Saved.');
+    })
+    .catch(function (err) {
+      pfNote(slot, 'err', err.message);
+      btn.disabled = false; btn.textContent = 'Save changes';
+    });
+  return false;
+}
+
+function admSetPw(e, id) {
+  e.preventDefault();
+  var slot = 'admPwMsg-' + id, btn = document.getElementById('ae-pwbtn-' + id);
+  var pw = pfVal('ae-pw-' + id), pw2 = pfVal('ae-pw2-' + id);
+  if (!pw || !pw2) { pfNote(slot, 'err', 'Fill in both fields.'); return false; }
+  if (pw !== pw2) { pfNote(slot, 'err', 'The two passwords do not match.'); return false; }
+  if (pw.length < 8) { pfNote(slot, 'err', 'The password must be at least 8 characters.'); return false; }
+  btn.disabled = true; btn.textContent = 'Saving…';
+  pfNote(slot, '', '');
+  pfSend('/api/admin/users/' + encodeURIComponent(id) + '/password', 'POST', { password: pw })
+    .then(function () {
+      ['ae-pw-' + id, 'ae-pw2-' + id].forEach(function (f) {
+        var el = document.getElementById(f); if (el) el.value = '';
+      });
+      pfNote(slot, 'ok', 'Password set. Pass it to the user yourself — it is not sent to them.');
+    })
+    .catch(function (err) { pfNote(slot, 'err', err.message); })
+    .then(function () { btn.disabled = false; btn.textContent = 'Set password'; });
+  return false;
+}
+
+function admCreate(e) {
+  e.preventDefault();
+  var btn = document.getElementById('an-btn');
+  var body = {
+    username: pfVal('an-user'),
+    name: pfVal('an-name'),
+    designation: pfVal('an-desig'),
+    email: pfVal('an-email'),
+    phone: pfVal('an-phone'),
+    role: (document.getElementById('an-role') || {}).value || 'analyst',
+    password: pfVal('an-pw'),
+  };
+  if (!body.username || !body.name) { pfNote('admNewMsg', 'err', 'Username and name are both required.'); return false; }
+  if (body.password.length < 8) { pfNote('admNewMsg', 'err', 'The password must be at least 8 characters.'); return false; }
+  btn.disabled = true; btn.textContent = 'Creating…';
+  pfNote('admNewMsg', '', '');
+  pfSend('/api/admin/users', 'POST', body)
+    .then(function () {
+      state.admNew = false;
+      /* Refetch rather than push the new record on: the list carries resolved
+         module access per user, which only the server can work out. */
+      admLoadUsers(true);
+    })
+    .catch(function (err) {
+      pfNote('admNewMsg', 'err', err.message);
+      btn.disabled = false; btn.textContent = 'Create user';
+    });
+  return false;
+}
+
+/* ---- Roles & Access ------------------------------------------------------- */
+
+function viewAdminAccess() {
+  if (!isSuperAdmin()) return admDenied();
+  admLoadUsers();
+  var head = admHead('Roles & Access',
+    'Which panels each user may open. Turning one off removes it on their next request, not merely from their menu.');
+  if (ADM.err) return head + admError(ADM.err);
+  if (!ADM.users) return head + admBusy('users');
+
+  var body = ADM.users.map(function (u) {
+    var open = state.accOpen === u.id;
+    var lock = admIsAdminRole(u.role);
+    var mods = u.modules || {};
+    var n = ADM_MODULES.filter(function (m) { return mods[m.k] !== false; }).length;
+    return '<tr class="ad-row' + (open ? ' open' : '') + '" onclick="accToggle(' + jstr(u.id) + ')">' +
+      '<td><div class="ad-nm"><span class="chev' + (open ? ' open' : '') + '">' + (open ? '▾' : '▸') + '</span>' +
+        '<span style="min-width:0"><b>' + esc(u.name || u.username) + '</b>' +
+        '<div class="un">' + esc(u.username) + '</div></span></div></td>' +
+      '<td>' + esc(pfRoleLabel(u.role)) + '</td>' +
+      '<td>' + (lock
+        ? '<span class="ad-pill on"><i></i>Every panel</span>'
+        : (n === ADM_MODULES.length
+            ? '<span class="ad-pill on"><i></i>All ' + n + '</span>'
+            : '<span class="ad-pill off"><i></i>' + n + ' of ' + ADM_MODULES.length + '</span>')) + '</td></tr>' +
+      (open ? '<tr class="ad-drop"><td colspan="3" onclick="event.stopPropagation()">' + admAccessEditor(u, lock) + '</td></tr>' : '');
+  }).join('');
+
+  return head +
+    '<div class="card" style="padding:0;overflow:hidden"><div class="tscroll"><table class="dt ad-tbl"><thead><tr>' +
+      '<th>User</th><th>Role</th><th>Panels allowed</th>' +
+    '</tr></thead><tbody>' + body + '</tbody></table></div></div>';
+}
+
+function admAccessEditor(u, lock) {
+  var mods = u.modules || {};
+  var grid = ADM_MODULES.map(function (m) {
+    var on = mods[m.k] !== false;
+    return '<div class="ad-mod' + (on ? ' on' : '') + (lock ? ' lock' : '') + '" id="am-' + esc(u.id) + '-' + m.k + '"' +
+      (lock ? '' : ' onclick="accFlip(' + jstr(u.id) + ',' + jstr(m.k) + ')"') +
+      '><span class="ad-sw"></span><span class="nm">' + esc(m.t) + '</span></div>';
+  }).join('');
+  return '<div class="ad-edit">' +
+    '<div class="ad-sec">Panels ' + esc(u.name || u.username) + ' may open</div>' +
+    '<div id="accMsg-' + esc(u.id) + '"></div>' +
+    (lock
+      ? '<div class="pf-msg ok" style="margin-top:0">' + esc(pfRoleLabel(u.role)) +
+        ' — always has every panel, whatever is stored. Change the role first if that should not be the case.</div>'
+      : '') +
+    '<div class="ad-mods" style="margin-top:10px">' + grid + '</div>' +
+    (lock ? '' :
+      '<div class="pf-act"><button class="pf-btn" id="acc-btn-' + esc(u.id) + '" onclick="accSave(' + jstr(u.id) + ')">Save access</button></div>') +
+  '</div>';
+}
+
+function accToggle(id) { state.accOpen = state.accOpen === id ? null : id; render(); }
+/* Flipped on the element, not in the data: a re-render would collapse the row
+   the administrator is working in. The set is read back off the DOM on save. */
+function accFlip(id, key) {
+  var el = document.getElementById('am-' + id + '-' + key);
+  if (el && !el.classList.contains('lock')) el.classList.toggle('on');
+}
+function accSave(id) {
+  var slot = 'accMsg-' + id, btn = document.getElementById('acc-btn-' + id);
+  var body = {};
+  ADM_MODULES.forEach(function (m) {
+    var el = document.getElementById('am-' + id + '-' + m.k);
+    body[m.k] = !!(el && el.classList.contains('on'));
+  });
+  btn.disabled = true; btn.textContent = 'Saving…';
+  pfNote(slot, '', '');
+  pfSend('/api/admin/users/' + encodeURIComponent(id) + '/access', 'PUT', body)
+    .then(function (saved) {
+      if (saved) ADM.users = ADM.users.map(function (x) { return x.id === id ? Object.assign({}, x, { modules: saved }) : x; });
+      /* If an administrator has just changed their OWN access, the sidebar is
+         now out of date; /me is the only thing that can correct it. */
+      if (ME && ME.id === id) { loadMe(); return; }
+      pfNote(slot, 'ok', 'Access saved.');
+    })
+    .catch(function (err) { pfNote(slot, 'err', err.message); })
+    .then(function () {
+      if (!btn.isConnected) return;
+      btn.disabled = false; btn.textContent = 'Save access';
+    });
+}
+
+/* ---- User Logs ------------------------------------------------------------ */
+
+const LOG_EV = {
+  success: { t: 'Signed in',  g: '✓' },
+  failed:  { t: 'Failed',     g: '✕' },
+  blocked: { t: 'Blocked',    g: '!' },
+  logout:  { t: 'Signed out', g: '→' },
+};
+function viewAdminLogs() {
+  if (!isSuperAdmin()) return admDenied();
+  admLoadLogs();
+  var head = admHead('User Logs', 'Who reached the platform, when, and from where. Refused attempts are kept as well as successful ones.');
+  if (ADM.logsErr) return head + admError(ADM.logsErr);
+  if (!ADM.logs) return head + admBusy('the sign-in log');
+
+  var ev = ADM.logs;
+  var count = function (k) { return ev.filter(function (e) { return e.outcome === k; }).length; };
+  var people = {};
+  ev.forEach(function (e) { if (e.outcome === 'success') people[e.user_id || e.username] = 1; });
+
+  var chip = function (v, l) {
+    return '<button class="fchip' + ((state.logOutcome || '') === v ? ' on' : '') + '" onclick="logSetOutcome(' + jstr(v) + ')">' + esc(l) + '</button>';
+  };
+  var dchip = function (v, l) {
+    return '<button class="fchip' + ((state.logDays || '') === v ? ' on' : '') + '" onclick="logSetDays(' + jstr(v) + ')">' + esc(l) + '</button>';
+  };
+
+  var body = ev.map(function (e) {
+    var k = LOG_EV[e.outcome] || { t: e.outcome, g: '·' };
+    var known = !!e.name;
+    return '<tr>' +
+      '<td class="lg-when" style="white-space:nowrap"><b>' + esc(admWhen(e.at)) + '</b>' +
+        '<span class="ago">' + esc(admAgo(e.at)) + '</span></td>' +
+      '<td><b>' + esc(known ? e.name : e.username) + '</b>' +
+        (known ? '<div class="un" style="font-size:11px;color:var(--text-muted)">' + esc(e.username) + '</div>'
+               : '<div class="un" style="font-size:11px;color:var(--text-muted)">No such account</div>') + '</td>' +
+      '<td>' + (e.role ? esc(pfRoleLabel(e.role)) : '<span class="muted">—</span>') + '</td>' +
+      '<td><span class="lg-ev ' + esc(e.outcome) + '"><i>' + k.g + '</i>' + esc(k.t) + '</span></td>' +
+      '<td class="lg-ip">' + (e.ip ? esc(e.ip) : '<span class="muted">—</span>') + '</td></tr>';
+  }).join('');
+
+  var table = ev.length
+    ? '<div class="tscroll"><table class="dt ad-tbl"><thead><tr>' +
+        '<th>When (IST)</th><th>User</th><th>Role</th><th>Event</th><th>From</th>' +
+      '</tr></thead><tbody>' + body + '</tbody></table></div>'
+    : '<div class="dt-empty"><div class="e-ic">🕘</div><div class="e-t">Nothing recorded for this filter</div>' +
+      '<div class="e-s">Sign-ins have been recorded since this feature was installed; anything before that is not in the log.</div></div>';
+
+  return head +
+    '<div class="lg-sum">' +
+      '<div class="lg-card"><div class="k">Sign-ins</div><div class="v" style="color:var(--good)">' + count('success') + '</div></div>' +
+      '<div class="lg-card"><div class="k">Failed attempts</div><div class="v" style="color:' + (count('failed') ? 'var(--critical)' : 'var(--text-muted)') + '">' + count('failed') + '</div></div>' +
+      '<div class="lg-card"><div class="k">Blocked accounts</div><div class="v" style="color:' + (count('blocked') ? 'var(--serious)' : 'var(--text-muted)') + '">' + count('blocked') + '</div></div>' +
+      '<div class="lg-card"><div class="k">People seen</div><div class="v">' + Object.keys(people).length + '</div></div>' +
+    '</div>' +
+    '<div class="filterbar">' +
+      dchip('1', 'Today') + dchip('7', 'Last 7 days') + dchip('30', 'Last 30 days') + dchip('', 'All time') +
+      '<span style="width:10px"></span>' +
+      chip('', 'Everything') + chip('success', 'Sign-ins') + chip('failed', 'Failed') + chip('blocked', 'Blocked') + chip('logout', 'Sign-outs') +
+      '<div class="tools"><button class="btn" onclick="logExport()">Export CSV</button></div>' +
+    '</div>' +
+    '<div class="card" style="padding:0;overflow:hidden">' + table + '</div>';
+}
+function logSetOutcome(v) { state.logOutcome = v; admLoadLogs(true); }
+function logSetDays(v) { state.logDays = v; admLoadLogs(true); }
+function logExport() {
+  var rows = [['When (IST)', 'Username', 'Name', 'Role', 'Event', 'From']];
+  (ADM.logs || []).forEach(function (e) {
+    rows.push([admWhen(e.at), e.username, e.name || '', e.role ? pfRoleLabel(e.role) : '',
+               (LOG_EV[e.outcome] || {}).t || e.outcome, e.ip || '']);
+  });
+  var csv = rows.map(function (r) {
+    return r.map(function (c) { return '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"'; }).join(',');
+  }).join('\r\n');
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'sai-user-logs-' + istDateStr(0) + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+}
+
+/* ============================================================================
    PER-USER MODULE ACCESS
    ============================================================================
    The signed-in user's allowed panels come from GET /api/auth/me, which resolves
@@ -5642,6 +6262,13 @@ function moduleAllowed(v) {
   /* Everyone has a profile. It is not a module an administrator grants, so it is
      never in ME.modules and must not be caught by the lookup below. */
   if (v === 'profile') return true;
+  /* Administration answers to the role, not to the module grants — those panels
+     are not in MODULES, so ME.modules will never speak for them.
+     Note this is hidden until /me answers, the opposite default to the panels
+     below, and deliberately so: showing every user an Administration menu for a
+     moment is a worse failure than showing an administrator theirs a moment
+     late. Nothing is protected by it either way — the server refuses. */
+  if (ADMIN_VIEWS.indexOf(v) >= 0) return isSuperAdmin();
   if (!v || !ME || !ME.modules) return true;
   return ME.modules[v] !== false;
 }
@@ -5675,21 +6302,14 @@ function applyAccess() {
   render();
 }
 
+/* Nothing lives here any more. My Profile became a panel of the sidebar, and
+   Administration has followed it: both are reached like every other panel, from
+   the menu above, so a link out to a separate application would be a second way
+   to the same place — and the slower one. The slot is kept because the sidebar
+   markup owns it and a future account-level link would belong in it. */
 function renderAccountLinks() {
   var slot = document.getElementById('acctLinks');
-  if (!slot) return;
-  var html = '';
-  if (isSuperAdmin()) {
-    html +=
-      '<a class="navitem" href="/admin/users" title="Manage users and access">' +
-      '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>' +
-      'Administration</a>';
-  }
-  /* No Profile link here any more: it is a panel in the sidebar above, reached
-     like every other panel. Administration stays a link because it is a separate
-     application surface, not a panel of this dashboard. */
-  slot.innerHTML = html;
+  if (slot) slot.innerHTML = '';
 }
 
 function loadMe() {
