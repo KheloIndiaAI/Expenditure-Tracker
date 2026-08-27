@@ -265,6 +265,10 @@ button{font-family:inherit}
 .ad-mod.on{border-color:rgba(37,106,191,.35);background:var(--primary-subtle)}
 .ad-mod.lock{cursor:not-allowed;opacity:.72}
 .ad-mod .nm{font-size:12.5px;font-weight:600;color:var(--text-primary);min-width:0;overflow-wrap:anywhere}
+/* Says which way round a toggle defaults, so an administrator can see at a
+   glance that this one is off for everyone until they turn it on. */
+.ad-req{display:block;font-size:10px;font-weight:600;color:var(--text-muted);letter-spacing:.02em;margin-top:1px}
+.ad-mod.on .ad-req{color:var(--primary-hover)}
 .ad-sw{width:34px;height:19px;border-radius:999px;background:var(--border);position:relative;flex:none;
   transition:background .14s}
 .ad-sw::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;
@@ -761,6 +765,11 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 .yd-sum:hover{background:var(--bg-app)}
 .yd-sum.open{background:var(--bg-app);border-bottom:1px solid var(--border-subtle)}
 .yd-sum>.chev{justify-self:start}
+/* On its own page there is nothing to disclose, so the strip stops behaving like
+   a control: no pointer, no hover, and the figures take the full width. */
+.yd-sum.flat{grid-template-columns:1fr;cursor:default;background:var(--bg-app);
+  border-bottom:1px solid var(--border-subtle);padding:16px 18px 18px}
+.yd-sum.flat:hover{background:var(--bg-app)}
 .yd-figs{display:flex;justify-content:center;gap:40px;min-width:0}
 .yd-fig{min-width:0;text-align:center}
 .yd-fig .k{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}
@@ -2069,9 +2078,8 @@ let state={view:'command', tr:{}, trSub:null, hsOpen:null, svOpen:null, filt:'Al
   mdsdSort:{key:'bal',dir:-1}, rcSort:{key:'bal',dir:-1}, sectSort:{key:'assign',dir:-1}, svSort:{key:'assign',dir:-1},
   dsort:{key:'act',dir:-1}, dfilt:{sv:'',rc:'',scat:'',q:''}, dmode:'alloc', cdOpen:null, sfOpen:null, tg:{}, _filtView:null, txRange:'all', txType:'',
   rcOnly:false,
-  /* Yesterday's movement panel: the strip starts shut so the Overview opens on
-     the same five KPIs it always has, and one centre expands at a time. */
-  ydOpen:false, ydCentre:null,
+  /* Yesterday's Expenditure: one centre's vouchers open at a time. */
+  ydCentre:null,
   /* Administration. One user's editor open at a time in each of the two lists;
      the sign-in log opens on the last 7 days, which is the window an
      administrator is nearly always asking about. */
@@ -2130,6 +2138,9 @@ const NAV=[{g:'ANALYSIS'},
      hold it first. `.navitem.feat.active` already covers the two states
      coinciding, which they now do on load. */
   {v:'command',   t:'Financial Overview',      i:'command', feat:1},
+  /* Sits under the Overview it used to be a strip inside, so anyone who knew it
+     there finds it in the first place they look. */
+  {v:'yday',      t:"Yesterday's Expenditure", i:'clock'},
   {v:'tracker',   t:'Component Tracker',       i:'tracker'},
   {v:'kigroups',  t:'SAI KI 1, KI 2 & Infra',  i:'kig'},
   {v:'saifmt',    t:'SAI Format Summary',      i:'saif'},
@@ -2154,6 +2165,11 @@ const NAV=[{g:'ANALYSIS'},
    sidebar, go(), the global search index and applyAccess - is gated by one
    answer rather than each remembering to ask. */
 const ADMIN_VIEWS=['admin','access','logs'];
+/* Panels nobody holds until an administrator grants them, mirroring
+   RESTRICTED_MODULES in @efip/shared. Every other panel is open unless a stored
+   decision closes it; these are closed unless a stored decision opens them, and
+   moduleAllowed() below is where the difference is applied. */
+const RESTRICTED_VIEWS=['yday'];
 function svgIcon(i){ return `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[i]}"/>${i==='rc'?'<circle cx="12" cy="10" r="2.4"/>':''}</svg>`; }
 function renderNav(){
   const n=attentionCount();
@@ -2187,7 +2203,6 @@ function trToggle(k){ state.tr[k]=!state.tr[k]; render(); }
 function trSubToggle(k){ tipHide(); state.trSub = state.trSub===k?null:k; render(); }
 function hsToggle(k){ tipHide(); state.hsOpen = state.hsOpen===k?null:k; render(); }
 function svToggle(k){ state.svOpen = state.svOpen===k?null:k; render(); }
-function ydToggle(){ tipHide(); state.ydOpen=!state.ydOpen; if(!state.ydOpen) state.ydCentre=null; render(); }
 function ydCentreToggle(k){ tipHide(); state.ydCentre = state.ydCentre===k?null:k; render(); }
 function sortDetail(k){ const s=state.dsort; if(s.key===k)s.dir*=-1; else state.dsort={key:k,dir:-1}; render(); }
 function setUtilSort(field,key,dir){ state[field]={key,dir}; render(); }
@@ -2408,7 +2423,6 @@ function viewCommand(){
      the section table beside it. */
   return pageHead('Financial Overview','')
    + kpiScheme()
-   + ydayPanel()
    + `<div class="card" style="padding:0;overflow:hidden"><div class="card-hd" style="padding:16px 18px 0"><h3>Expenditure vs balance by section</h3></div>${sectionUtilTable()}</div>`;
 }
 
@@ -2535,9 +2549,20 @@ function ydayTxns(b){
     + '<th>Component</th><th>Field</th><th class="num">Previous</th><th class="num">Updated</th>'
     + '<th class="num">Booked yesterday</th></tr></thead><tbody>'+body+'</tbody></table>';
 }
-function ydayPanel(){
+/* A panel of its own, reached from the sidebar.
+
+   It began as a strip inside Financial Overview and outgrew it: what moved
+   yesterday, at which centre, on which voucher, is a day's work in itself rather
+   than a footnote to the scheme totals - and as its own panel it is finally
+   something an administrator can grant or withhold, which a card wedged inside
+   another panel could never be.
+
+   `yday` is a RESTRICTED module (see @efip/shared): unlike every other panel it
+   is withheld until an administrator turns it on in Roles & Access. Nothing here
+   enforces that - moduleAllowed decides, and the sidebar obeys. */
+function viewYday(){
   const y=ydayMovement();
-  const on=!!state.ydOpen, has=y.n>0;
+  const has=y.n>0;
   const hint = !y.ready ? 'Reading the sheet…'
     : has ? y.n+' entr'+(y.n===1?'y':'ies')+' · '+y.places.length+' location'+(y.places.length===1?'':'s')
     : 'Nothing recorded';
@@ -2546,7 +2571,7 @@ function ydayPanel(){
          + '<div class="v">'+esc(crShort(v))+'</div></div>';
   };
   let drop='';
-  if(on){
+  {
     if(!y.ready){
       drop='<div class="yd-empty">The sheet\'s edit log has not been read yet. It is pulled on every sync.</div>';
     } else if(!has){
@@ -2575,15 +2600,17 @@ function ydayPanel(){
          + '</tr></thead><tbody>'+trs+'</tbody></table></div>';
     }
   }
-  return '<div class="card" style="padding:0;overflow:hidden">'
-    + '<div class="card-hd" style="padding:16px 18px 0"><h3>Yesterday\'s Expenditure and Assignments</h3>'
-      + '<span class="small muted">'+esc(y.label)+'</span></div>'
-    + '<div class="yd-sum'+(on?' open':'')+'" onclick="ydToggle()" role="button" tabindex="0"'
-      + ' aria-expanded="'+(on?'true':'false')+'">'
-      + '<span class="chev'+(on?' open':'')+'">'+(on?'▾':'▸')+'</span>'
+  /* No chevron and nothing to open: on its own page the figures and the centres
+     are the page. The strip needed a disclosure only because it was a guest
+     inside Financial Overview and could not take the room unasked. */
+  return pageHead("Yesterday's Expenditure and Assignments",
+      'What changed in the sheet on ' + esc(y.label) + ' — the movement booked that day, not the balance standing in the cell.')
+    + '<div class="card" style="padding:0;overflow:hidden">'
+    + '<div class="card-hd" style="padding:16px 18px 0"><h3>Booked on ' + esc(y.label) + '</h3>'
+      + '<span class="small muted">' + esc(hint) + '</span></div>'
+    + '<div class="yd-sum flat">'
       + '<div class="yd-figs">'+fig('Total Assigned', y.assigned)
-        + fig('Total Expenditure', y.spent, 'used')+'</div>'
-      + '<span class="yd-hint">'+esc(hint)+'</span></div>'
+        + fig('Total Expenditure', y.spent, 'used')+'</div></div>'
     + drop
     + '</div>';
 }
@@ -4072,7 +4099,7 @@ function applyViewFilterDefaults(){
 }
 
 function render(){ applyViewFilterDefaults(); applyFilter(); renderNav(); renderTopFilters(); renderSyncPill(); const v=state.view;
-  const html = v==='command'?viewCommand():v==='rc'?viewRC():v==='sv'?viewSV():v==='mdsd'?viewMDSD():v==='kigroups'?viewKI():v==='saifmt'?viewSAIFmt():v==='trend'?viewTrend():v==='exceptions'?viewExc():v==='detail'?viewDetail():v==='profile'?viewProfile():v==='admin'?viewAdminUsers():v==='access'?viewAdminAccess():v==='logs'?viewAdminLogs():viewTracker();
+  const html = v==='command'?viewCommand():v==='rc'?viewRC():v==='sv'?viewSV():v==='mdsd'?viewMDSD():v==='kigroups'?viewKI():v==='saifmt'?viewSAIFmt():v==='trend'?viewTrend():v==='exceptions'?viewExc():v==='detail'?viewDetail():v==='profile'?viewProfile():v==='yday'?viewYday():v==='admin'?viewAdminUsers():v==='access'?viewAdminAccess():v==='logs'?viewAdminLogs():viewTracker();
   document.getElementById('content').innerHTML=html;
   labelTableCells();
   groupTreeSections();
@@ -5783,9 +5810,12 @@ function admLoadLogs(force) {
 /** Every role the platform knows, for the role picker. Mirrors ROLES/ROLE_LABELS. */
 const ADM_ROLES = ['minister','secretary','joint_secretary','director','finance_officer',
                    'senior_finance','analyst','auditor','admin','super_admin'];
-/** The panels a grant can cover. Mirrors MODULES in @efip/shared. */
+/** The panels a grant can cover. Mirrors MODULES in @efip/shared.
+    `r:1` marks a restricted panel — off unless granted, rather than on unless
+    withdrawn — so the toggle can say which way round it is. */
 const ADM_MODULES = [
   { k:'command',    t:'Financial Overview' },
+  { k:'yday',       t:"Yesterday's Expenditure", r:1 },
   { k:'tracker',    t:'Component Tracker' },
   { k:'kigroups',   t:'SAI KI 1, KI 2 & Infra' },
   { k:'saifmt',     t:'SAI Format Summary' },
@@ -6085,7 +6115,7 @@ function viewAdminAccess() {
     var open = state.accOpen === u.id;
     var lock = admIsAdminRole(u.role);
     var mods = u.modules || {};
-    var n = ADM_MODULES.filter(function (m) { return mods[m.k] !== false; }).length;
+    var n = ADM_MODULES.filter(function (m) { return m.r ? mods[m.k] === true : mods[m.k] !== false; }).length;
     return '<tr class="ad-row' + (open ? ' open' : '') + '" onclick="accToggle(' + jstr(u.id) + ')">' +
       '<td><div class="ad-nm"><span class="chev' + (open ? ' open' : '') + '">' + (open ? '▾' : '▸') + '</span>' +
         '<span style="min-width:0"><b>' + esc(u.name || u.username) + '</b>' +
@@ -6108,10 +6138,14 @@ function viewAdminAccess() {
 function admAccessEditor(u, lock) {
   var mods = u.modules || {};
   var grid = ADM_MODULES.map(function (m) {
-    var on = mods[m.k] !== false;
+    /* A restricted panel is held only on an explicit true; every other panel is
+       held unless explicitly false. Reading them the same way would show a
+       restricted panel as already granted to everyone who has no stored row. */
+    var on = m.r ? mods[m.k] === true : mods[m.k] !== false;
     return '<div class="ad-mod' + (on ? ' on' : '') + (lock ? ' lock' : '') + '" id="am-' + esc(u.id) + '-' + m.k + '"' +
       (lock ? '' : ' onclick="accFlip(' + jstr(u.id) + ',' + jstr(m.k) + ')"') +
-      '><span class="ad-sw"></span><span class="nm">' + esc(m.t) + '</span></div>';
+      '><span class="ad-sw"></span><span class="nm">' + esc(m.t) +
+      (m.r ? '<span class="ad-req">By request</span>' : '') + '</span></div>';
   }).join('');
   return '<div class="ad-edit">' +
     '<div class="ad-sec">Panels ' + esc(u.name || u.username) + ' may open</div>' +
@@ -6269,6 +6303,15 @@ function moduleAllowed(v) {
      moment is a worse failure than showing an administrator theirs a moment
      late. Nothing is protected by it either way — the server refuses. */
   if (ADMIN_VIEWS.indexOf(v) >= 0) return isSuperAdmin();
+  /* A restricted panel is withheld until it is granted, which reverses the rule
+     below in both halves: an administrator always holds it, and everyone else
+     needs an explicit true — not merely the absence of a false. That also means
+     it stays hidden until /me answers, which is the right way round here: a
+     panel that flashes into the menu and vanishes reads as a fault, and one that
+     nobody has been given yet has nothing to lose by arriving a moment late. */
+  if (RESTRICTED_VIEWS.indexOf(v) >= 0) {
+    return isSuperAdmin() || !!(ME && ME.modules && ME.modules[v] === true);
+  }
   if (!v || !ME || !ME.modules) return true;
   return ME.modules[v] !== false;
 }

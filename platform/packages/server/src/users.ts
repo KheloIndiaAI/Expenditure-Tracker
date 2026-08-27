@@ -8,7 +8,15 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { MODULE_KEYS, isAdminRole, type ModuleAccess, type ModuleKey, type Role, type User } from '@efip/shared';
+import {
+  MODULE_KEYS,
+  isAdminRole,
+  isRestrictedModule,
+  type ModuleAccess,
+  type ModuleKey,
+  type Role,
+  type User,
+} from '@efip/shared';
 import { getDb } from './db/index.ts';
 import { hashPassword } from './auth.ts';
 
@@ -151,21 +159,31 @@ export async function setPassword(id: string, password: string): Promise<void> {
 /**
  * Resolve what a user may open.
  *
- * A user with no rows gets everything. That is what keeps every login that
- * predates this table working unchanged — the absence of a decision is not a
- * denial. An administrator always gets everything regardless of stored rows, so
- * the platform cannot be locked away from its own administrators by a stray
- * toggle.
+ * A user with no rows gets every module except the restricted ones. That is what
+ * keeps every login that predates this table working unchanged — for an ordinary
+ * module the absence of a decision is not a denial. A module in
+ * RESTRICTED_MODULES inverts exactly that: it is withheld until a row says
+ * otherwise, so shipping one does not hand it to the whole platform.
+ *
+ * An administrator always gets everything regardless of stored rows, so the
+ * platform cannot be locked away from its own administrators by a stray toggle.
  */
+function baselineAccess(): ModuleAccess {
+  return Object.fromEntries(MODULE_KEYS.map((k) => [k, !isRestrictedModule(k)])) as ModuleAccess;
+}
+
 export async function getModuleAccess(id: string, role?: Role): Promise<ModuleAccess> {
-  const all = Object.fromEntries(MODULE_KEYS.map((k) => [k, true])) as ModuleAccess;
-  if (isAdminRole(role)) return all;
+  if (isAdminRole(role)) {
+    return Object.fromEntries(MODULE_KEYS.map((k) => [k, true])) as ModuleAccess;
+  }
+  const all = baselineAccess();
   const db = await getDb();
   const rows = await db.all<{ module: string; allowed: number | boolean }>(
     'SELECT module, allowed FROM user_module_access WHERE user_id = ?',
     [id],
   );
-  if (!rows.length) return all;
+  /* No early return for the empty case: the baseline is already the answer, and
+     a short-circuit here would have to repeat it. */
   for (const r of rows) {
     if ((MODULE_KEYS as readonly string[]).includes(r.module)) {
       all[r.module as ModuleKey] = r.allowed === true || r.allowed === 1;
@@ -174,12 +192,21 @@ export async function getModuleAccess(id: string, role?: Role): Promise<ModuleAc
   return all;
 }
 
-/** Replaces the whole set in one go, so the stored rows always mirror the UI. */
+/**
+ * Replaces the whole set in one go, so the stored rows always mirror the UI.
+ *
+ * The two kinds of module read a MISSING key oppositely, and that asymmetry is
+ * the point. For an ordinary module, absent means "not mentioned", which is not
+ * a denial — a caller sending a partial set must not switch off what it failed
+ * to mention. For a restricted one, absent means not granted: reading silence as
+ * a grant would let any partial request hand out the very panel that is meant to
+ * stay shut until someone deliberately opens it.
+ */
 export async function setModuleAccess(id: string, access: Partial<ModuleAccess>): Promise<ModuleAccess> {
   const db = await getDb();
   await db.run('DELETE FROM user_module_access WHERE user_id = ?', [id]);
   for (const key of MODULE_KEYS) {
-    const allowed = access[key] !== false;
+    const allowed = isRestrictedModule(key) ? access[key] === true : access[key] !== false;
     await db.run('INSERT INTO user_module_access (user_id, module, allowed) VALUES (?, ?, ?)', [
       id,
       key,

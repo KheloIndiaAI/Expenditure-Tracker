@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ADMIN_ROLES, ROLES, can } from '@efip/shared';
+import { ADMIN_ROLES, MODULE_KEYS, RESTRICTED_MODULES, ROLES, can, isRestrictedModule } from '@efip/shared';
 
 const dir = mkdtempSync(join(tmpdir(), 'efip-test-'));
 process.env.EFIP_DB = join(dir, 'test.db');
@@ -93,9 +93,22 @@ describe('module access', () => {
     superId = (await upsertUser({ username: 'test_super', password: 'password123', name: 'Super', role: 'super_admin' })).id;
   });
 
-  it('grants everything to a user with no stored decision', async () => {
+  it('grants every ordinary module to a user with no stored decision', async () => {
     const access = await getModuleAccess(plainId, 'analyst');
-    assert.deepEqual(Object.values(access).every(Boolean), true);
+    for (const k of MODULE_KEYS) {
+      if (isRestrictedModule(k)) continue;
+      assert.equal(access[k], true, `${k} should be open with no decision stored`);
+    }
+  });
+
+  /* The whole point of the restricted list: shipping one of these must not hand
+     it to every existing login the moment it appears in MODULES. */
+  it('withholds a restricted module until it is granted', async () => {
+    assert.ok(RESTRICTED_MODULES.length > 0, 'this suite is meaningless with none');
+    const access = await getModuleAccess(plainId, 'analyst');
+    for (const k of RESTRICTED_MODULES) {
+      assert.equal(access[k], false, `${k} must be withheld until granted`);
+    }
   });
 
   it('honours a stored decision', async () => {
@@ -105,6 +118,41 @@ describe('module access', () => {
     assert.equal(access.exceptions, false);
     assert.equal(access.command, true);
     assert.equal(access.rc, true);
+  });
+
+  /* A partial save must not become a back door. Omitting an ordinary key leaves
+     it granted (silence is not a denial); omitting a restricted one leaves it
+     withheld (silence is not a grant). Same call, opposite readings. */
+  it('reads a missing key as granted for an ordinary module and withheld for a restricted one', async () => {
+    await setModuleAccess(plainId, { command: true });
+    const access = await getModuleAccess(plainId, 'analyst');
+    assert.equal(access.tracker, true, 'an unmentioned ordinary module stays granted');
+    for (const k of RESTRICTED_MODULES) {
+      assert.equal(access[k], false, `${k} must not be granted by omission`);
+    }
+  });
+
+  it('grants a restricted module when it is explicitly turned on', async () => {
+    const patch: Record<string, boolean> = {};
+    for (const k of MODULE_KEYS) patch[k] = true;
+    await setModuleAccess(plainId, patch as never);
+    const access = await getModuleAccess(plainId, 'analyst');
+    for (const k of RESTRICTED_MODULES) {
+      assert.equal(access[k], true, `${k} must be granted once switched on`);
+    }
+    /* And revocable again — a grant that cannot be taken back is not a toggle. */
+    await setModuleAccess(plainId, { command: true } as never);
+    const after = await getModuleAccess(plainId, 'analyst');
+    for (const k of RESTRICTED_MODULES) assert.equal(after[k], false, `${k} must be revocable`);
+  });
+
+  it('gives an administrator a restricted module without any stored grant', async () => {
+    for (const role of ADMIN_ROLES) {
+      const access = await getModuleAccess(superId, role);
+      for (const k of RESTRICTED_MODULES) {
+        assert.equal(access[k], true, `${role} must hold ${k} without being granted it`);
+      }
+    }
   });
 
   it('cannot lock an administrator out, even when everything is stored as off', async () => {

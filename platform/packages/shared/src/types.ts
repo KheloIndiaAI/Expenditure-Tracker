@@ -530,12 +530,37 @@ export const MODULES = [
   { key: 'mdsd', label: 'KI Infra (States/UTs)' },
   { key: 'rc', label: 'Regional Centres' },
   { key: 'exceptions', label: 'Attention Centre' },
+  { key: 'yday', label: "Yesterday's Expenditure" },
 ] as const;
 
 export type ModuleKey = (typeof MODULES)[number]['key'];
 export const MODULE_KEYS: readonly ModuleKey[] = MODULES.map((m) => m.key);
 
-/** A user with no rows in `user_module_access` gets everything — see users.ts. */
+/**
+ * Modules nobody holds until an administrator says so.
+ *
+ * Every other module works the other way round: a user with no stored decision
+ * gets it, because the absence of a decision is not a denial and that is what
+ * kept logins predating the access table working unchanged. Adding a panel to
+ * MODULES therefore hands it to the whole platform on the day it ships, which
+ * is the right default for a panel that merely re-cuts figures people can
+ * already see — and the wrong one for a panel that should start closed.
+ *
+ * Listing a key here inverts the default for that key alone: denied unless a
+ * row explicitly allows it. Administrators are unaffected, as everywhere else.
+ * Both halves matter and both live in users.ts — getModuleAccess must not grant
+ * it by default, and setModuleAccess must not read a missing key as a grant.
+ */
+export const RESTRICTED_MODULES = ['yday'] as const satisfies readonly ModuleKey[];
+
+export function isRestrictedModule(key: ModuleKey): boolean {
+  return (RESTRICTED_MODULES as readonly string[]).includes(key);
+}
+
+/**
+ * A user with no rows in `user_module_access` gets every module except those in
+ * RESTRICTED_MODULES — see users.ts.
+ */
 export type ModuleAccess = Record<ModuleKey, boolean>;
 
 export function can(role: Role, capability: Capability): boolean {
