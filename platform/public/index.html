@@ -5631,7 +5631,7 @@ function pfPassword(e) {
    anyone with developer tools can still reach figures for a panel they are not
    shown. Enforcing that properly would mean serving each panel's data from the
    server per request, which is a different platform. What IS enforced
-   server-side is everything that mutates: /api/admin/* refuses non-Super-Admins
+   server-side is everything that mutates: /api/admin/* refuses non-administrators
    outright, and a deactivated account is refused at login and on every request.
 
    Until /me answers, nothing is hidden: a network hiccup must not blank the menu
@@ -5639,15 +5639,20 @@ function pfPassword(e) {
 var ME = null;
 
 function moduleAllowed(v) {
-  /* Everyone has a profile. It is not a module a Super Admin grants, so it is
+  /* Everyone has a profile. It is not a module an administrator grants, so it is
      never in ME.modules and must not be caught by the lookup below. */
   if (v === 'profile') return true;
   if (!v || !ME || !ME.modules) return true;
   return ME.modules[v] !== false;
 }
 
+/* Mirrors ADMIN_ROLES in @efip/shared. This document is served as static HTML
+   and cannot import from the workspace, so the list is repeated by hand - the
+   one place in the platform where it is. Keep the two in step: the server is
+   what actually refuses, so a role missing here only hides a link the holder is
+   entitled to, and a role wrongly added here shows a link that 403s. */
 function isSuperAdmin() {
-  return !!(ME && ME.role === 'super_admin');
+  return !!(ME && (ME.role === 'super_admin' || ME.role === 'admin'));
 }
 
 /* Landing on a panel that is no longer permitted moves to the first that is,

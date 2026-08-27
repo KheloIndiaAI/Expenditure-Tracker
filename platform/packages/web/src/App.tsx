@@ -14,6 +14,7 @@
  */
 
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { isAdminRole } from '@efip/shared';
 import { Login } from './pages/Login.tsx';
 import { AdminUsers } from './pages/AdminUsers.tsx';
 import { AdminAccess } from './pages/AdminAccess.tsx';
@@ -27,7 +28,7 @@ function Gate({ children, superOnly }: { children: React.ReactNode; superOnly?: 
     window.location.href = '/login';
     return null;
   }
-  if (superOnly && user.role !== 'super_admin') {
+  if (superOnly && !isAdminRole(user.role)) {
     /* Nothing in this bundle is theirs to see. My Profile is a dashboard panel
        now, so the only sensible destination is the dashboard itself. */
     window.location.href = '/?panel=profile';

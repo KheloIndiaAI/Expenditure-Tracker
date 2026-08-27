@@ -12,6 +12,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import * as Icons from 'lucide-react';
 import type { ReactNode } from 'react';
+import { isAdminRole } from '@efip/shared';
 import { useAuth } from '../lib/auth.tsx';
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -26,7 +27,7 @@ export function AdminShell({ title, subtitle, actions, children }: {
   children: ReactNode;
 }) {
   const { user, logout } = useAuth();
-  const isSuper = user?.role === 'super_admin';
+  const isSuper = isAdminRole(user?.role);
   const { pathname } = useLocation();
 
   return (

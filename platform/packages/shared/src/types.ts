@@ -423,8 +423,9 @@ export const ROLES = [
   'senior_finance',
   'analyst',
   'auditor',
+  /** Administrator. Carries the same authority as Super Administrator — see ADMIN_ROLES. */
   'admin',
-  /** Platform owner: the only role that may reach /api/admin/*. */
+  /** Platform owner. */
   'super_admin',
 ] as const;
 export type Role = (typeof ROLES)[number];
@@ -489,6 +490,27 @@ export const ROLE_MATRIX: Record<Role, Capability[]> = {
   admin: [...CAPABILITIES],
   super_admin: [...CAPABILITIES],
 };
+
+/**
+ * The roles that administer the platform.
+ *
+ * `admin` and `super_admin` are one authority, not two tiers. They already held
+ * identical capabilities in ROLE_MATRIX above — every one of them — so an
+ * Administrator who could not open the administration area was not a narrower
+ * permission but a contradiction: full rights, no door. This is the single
+ * definition of who holds that authority, and every gate in the platform reads
+ * it, so the server, the admin SPA and the dashboard can never drift apart on
+ * the question.
+ *
+ * Widening this list widens what /api/admin/* accepts. It governs user
+ * creation, role changes, password resets and per-user module access, so a role
+ * added here can administer every account on the platform.
+ */
+export const ADMIN_ROLES = ['admin', 'super_admin'] as const satisfies readonly Role[];
+
+export function isAdminRole(role: Role | null | undefined): boolean {
+  return !!role && (ADMIN_ROLES as readonly string[]).includes(role);
+}
 
 // ─── Dashboard modules · the unit of per-user access ─────────────────────────
 

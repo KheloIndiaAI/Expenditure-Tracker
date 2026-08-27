@@ -16,7 +16,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { MODULE_KEYS, ROLES, type ModuleAccess } from '@efip/shared';
+import { MODULE_KEYS, ROLES, isAdminRole, type ModuleAccess } from '@efip/shared';
 import { isSuperAdmin, toAuthedUser, verifyPassword } from '../auth.ts';
 import { currentUser } from '../session.ts';
 import {
@@ -79,7 +79,7 @@ function firstError(err: z.ZodError): string {
 }
 
 export function registerAdminRoutes(app: FastifyInstance): void {
-  /** Resolve the caller and refuse anyone who is not a Super Admin. */
+  /** Resolve the caller and refuse anyone who is not an administrator. */
   const requireSuperAdmin = async (req: never, reply: never) => {
     const user = await currentUser(req as never);
     if (!user) {
@@ -96,7 +96,7 @@ export function registerAdminRoutes(app: FastifyInstance): void {
       });
       (reply as never as { code: (n: number) => { send: (b: unknown) => unknown } })
         .code(403)
-        .send({ message: 'Administration is restricted to Super Administrators.' });
+        .send({ message: 'Administration is restricted to Administrators.' });
       return null;
     }
     return user;
@@ -141,7 +141,9 @@ export function registerAdminRoutes(app: FastifyInstance): void {
       if (patch.is_active === false) {
         return reply.code(400).send({ message: 'You cannot deactivate your own account.' });
       }
-      if (patch.role && patch.role !== 'super_admin') {
+      /* Moving between the two administrator roles is not a demotion - they are
+         one authority - so only a step outside them is refused. */
+      if (patch.role && !isAdminRole(patch.role)) {
         return reply.code(400).send({ message: 'You cannot change your own role.' });
       }
     }

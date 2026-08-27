@@ -5,15 +5,16 @@
  * what the signed-in user may see. Turning a module off here removes it for that
  * user on their next request, not merely from their menu.
  *
- * Super Admins are shown read-only at full access, matching what the server will
- * always return for them — the platform must not be administrable into a state
- * where nobody can reach Administration.
+ * Administrators are shown read-only at full access, matching what the server
+ * will always return for them — the platform must not be administrable into a
+ * state where nobody can reach Administration. Leaving their toggles editable
+ * would be worse than useless: it would accept a decision the server discards.
  */
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import * as Icons from 'lucide-react';
-import { MODULES, ROLE_LABELS, type ModuleAccess, type ModuleKey } from '@efip/shared';
+import { MODULES, ROLE_LABELS, isAdminRole, type ModuleAccess, type ModuleKey } from '@efip/shared';
 import { api, type AdminUser } from '../lib/api.ts';
 import { AdminShell } from '../components/AdminShell.tsx';
 import { Button, Card, Empty, Notice, StatusPill, Toggle, inputClass } from '../components/ui.tsx';
@@ -44,7 +45,7 @@ export function AdminAccess() {
   }, [selectedId]);
 
   const selected = users?.find((u) => u.id === selectedId) ?? null;
-  const locked = selected?.role === 'super_admin';
+  const locked = isAdminRole(selected?.role ?? null);
 
   const save = async () => {
     if (!selected || !access) return;
@@ -110,8 +111,8 @@ export function AdminAccess() {
           {locked && (
             <div className="border-b border-hairline px-4 py-3">
               <Notice kind="ok">
-                {selected?.name} is a Super Administrator and always has every module. Change their role first if this
-                should not be the case.
+                {selected ? ROLE_LABELS[selected.role] : 'This user'} {selected?.name} always has every module. Change
+                their role first if this should not be the case.
               </Notice>
             </div>
           )}

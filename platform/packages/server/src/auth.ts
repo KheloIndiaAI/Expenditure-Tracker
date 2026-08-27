@@ -9,7 +9,7 @@
 
 import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { ROLE_MATRIX, type AuthedUser, type ModuleAccess, type Role, type User } from '@efip/shared';
+import { ROLE_MATRIX, isAdminRole, type AuthedUser, type ModuleAccess, type Role, type User } from '@efip/shared';
 
 const SECRET: string = process.env.JWT_SECRET || 'dev-insecure-secret-change-me';
 const TTL: string = process.env.JWT_TTL || '12h';
@@ -76,7 +76,11 @@ export function toAuthedUser(u: User, modules: ModuleAccess): AuthedUser {
   return { ...u, capabilities: ROLE_MATRIX[u.role] ?? [], modules };
 }
 
-/** The single definition of who may reach /api/admin/*. */
+/**
+ * Who may reach /api/admin/*: an Administrator or a Super Administrator, which
+ * ADMIN_ROLES defines as one authority. Kept as a named function because it is
+ * the boundary the routes call, not because it decides anything itself.
+ */
 export function isSuperAdmin(u: { role: Role } | null | undefined): boolean {
-  return u?.role === 'super_admin';
+  return isAdminRole(u?.role);
 }

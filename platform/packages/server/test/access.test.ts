@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { ADMIN_ROLES, ROLES, can } from '@efip/shared';
 
 const dir = mkdtempSync(join(tmpdir(), 'efip-test-'));
 process.env.EFIP_DB = join(dir, 'test.db');
@@ -54,12 +55,32 @@ describe('passwords', () => {
 });
 
 describe('isSuperAdmin', () => {
-  it('recognises only the super_admin role', () => {
+  it('admits both administrator roles', () => {
     assert.equal(isSuperAdmin({ role: 'super_admin' }), true);
-    assert.equal(isSuperAdmin({ role: 'admin' }), false);
-    assert.equal(isSuperAdmin({ role: 'analyst' }), false);
+    assert.equal(isSuperAdmin({ role: 'admin' }), true);
+  });
+
+  it('admits nobody else', () => {
+    for (const role of ROLES) {
+      if ((ADMIN_ROLES as readonly string[]).includes(role)) continue;
+      assert.equal(isSuperAdmin({ role }), false, `${role} must not reach administration`);
+    }
     assert.equal(isSuperAdmin(null), false);
     assert.equal(isSuperAdmin(undefined), false);
+  });
+
+  /* The gate and the capability matrix must agree. If a role is ever given
+     manage_users without being added to ADMIN_ROLES it would hold the right on
+     paper and be refused at the door, which is the kind of contradiction that
+     gets worked around rather than fixed. */
+  it('agrees with the capability matrix on who may manage users', () => {
+    for (const role of ROLES) {
+      assert.equal(
+        isSuperAdmin({ role }),
+        can(role, 'manage_users'),
+        `${role}: administration gate and manage_users capability disagree`,
+      );
+    }
   });
 });
 
@@ -86,12 +107,20 @@ describe('module access', () => {
     assert.equal(access.rc, true);
   });
 
-  it('cannot lock a Super Admin out, even when everything is stored as off', async () => {
+  it('cannot lock an administrator out, even when everything is stored as off', async () => {
     await setModuleAccess(superId, {
       command: false, tracker: false, kigroups: false, mdsd: false, rc: false, exceptions: false,
     });
-    const access = await getModuleAccess(superId, 'super_admin');
-    assert.deepEqual(Object.values(access).every(Boolean), true, 'a Super Admin must keep every module');
+    /* Both administrator roles, against the same all-off stored rows: the role
+       is what grants the modules back, so each has to be asked for separately. */
+    for (const role of ADMIN_ROLES) {
+      const access = await getModuleAccess(superId, role);
+      assert.deepEqual(
+        Object.values(access).every(Boolean),
+        true,
+        `${role} must keep every module`,
+      );
+    }
   });
 
   it('replaces the whole set rather than merging, so the UI and store agree', async () => {

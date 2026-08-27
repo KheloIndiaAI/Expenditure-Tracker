@@ -8,7 +8,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { MODULE_KEYS, type ModuleAccess, type ModuleKey, type Role, type User } from '@efip/shared';
+import { MODULE_KEYS, isAdminRole, type ModuleAccess, type ModuleKey, type Role, type User } from '@efip/shared';
 import { getDb } from './db/index.ts';
 import { hashPassword } from './auth.ts';
 
@@ -153,12 +153,13 @@ export async function setPassword(id: string, password: string): Promise<void> {
  *
  * A user with no rows gets everything. That is what keeps every login that
  * predates this table working unchanged — the absence of a decision is not a
- * denial. A Super Admin always gets everything regardless of stored rows, so the
- * platform cannot be locked away from its own administrator by a stray toggle.
+ * denial. An administrator always gets everything regardless of stored rows, so
+ * the platform cannot be locked away from its own administrators by a stray
+ * toggle.
  */
 export async function getModuleAccess(id: string, role?: Role): Promise<ModuleAccess> {
   const all = Object.fromEntries(MODULE_KEYS.map((k) => [k, true])) as ModuleAccess;
-  if (role === 'super_admin') return all;
+  if (isAdminRole(role)) return all;
   const db = await getDb();
   const rows = await db.all<{ module: string; allowed: number | boolean }>(
     'SELECT module, allowed FROM user_module_access WHERE user_id = ?',

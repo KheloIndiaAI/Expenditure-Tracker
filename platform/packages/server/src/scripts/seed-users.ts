@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Role } from '@efip/shared';
-import { ROLES } from '@efip/shared';
+import { ROLES, ROLE_LABELS, isAdminRole } from '@efip/shared';
 import { countUsers, findByUsername, upsertUser } from '../users.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -43,20 +43,24 @@ for (const r of records) {
     console.error(`✗ Row "${username}" has unknown role "${role}". Valid: ${ROLES.join(', ')}`);
     process.exit(1);
   }
-  /* Never demote the Super Administrator by re-running a seed.
-     The CSV is a roster of ordinary logins and usually lists this account at
+  /* Never demote an administrator by re-running a seed.
+     The CSV is a roster of ordinary logins and usually lists such an account at
      whatever rank it held before promotion, so a routine re-seed would quietly
-     strip the only role that can reach /api/admin/* - and nobody would be left
-     able to put it back. The rest of the row (name, contact, password) is still
-     applied; only the demotion is refused, loudly. */
+     strip a role that can reach /api/admin/* - and if it were the last one,
+     nobody would be left able to put it back. The rest of the row (name,
+     contact, password) is still applied; only the demotion is refused, loudly.
+
+     Moving between admin and super_admin is not a demotion - ADMIN_ROLES holds
+     them to be one authority - so the CSV may still switch between the two. */
   const existing = await findByUsername(username);
   let effectiveRole = role;
-  if (existing?.role === 'super_admin' && role !== 'super_admin') {
+  if (isAdminRole(existing?.role) && !isAdminRole(role)) {
+    const held = ROLE_LABELS[existing!.role];
     console.warn(
-      `!  "${username}" is the Super Administrator; keeping that role rather than ` +
-        `demoting to "${role}". Set the CSV row to super_admin to silence this.`,
+      `!  "${username}" is ${held === 'Administrator' ? 'an' : 'a'} ${held}; keeping that role rather than ` +
+        `demoting to "${role}". Set the CSV row to an administrator role to silence this.`,
     );
-    effectiveRole = 'super_admin';
+    effectiveRole = existing!.role;
   }
   await upsertUser({
     username,
