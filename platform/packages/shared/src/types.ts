@@ -494,14 +494,17 @@ export const ROLE_MATRIX: Record<Role, Capability[]> = {
 
 /**
  * The panels a user can be granted or denied, keyed by the dashboard's own view
- * name so a grant maps 1:1 onto what the UI renders. Hidden views (`sv`,
- * `trend`, `detail`, `saifmt`) are deliberately absent: they are unreachable, so
- * granting them would be a permission that means nothing.
+ * name so a grant maps 1:1 onto what the UI renders. The dashboard's remaining
+ * hidden views (`sv`, `trend`, `detail`) are deliberately absent: they are
+ * unreachable, so granting them would be a permission that means nothing. A
+ * panel must appear in BOTH places to be governable - listed here, and out of
+ * HIDDEN_VIEWS in the dashboard.
  */
 export const MODULES = [
   { key: 'command', label: 'Financial Overview' },
   { key: 'tracker', label: 'Component Tracker' },
   { key: 'kigroups', label: 'SAI KI 1, KI 2 & Infra' },
+  { key: 'saifmt', label: 'SAI Format Summary' },
   { key: 'mdsd', label: 'KI Infra (States/UTs)' },
   { key: 'rc', label: 'Regional Centres' },
   { key: 'exceptions', label: 'Attention Centre' },

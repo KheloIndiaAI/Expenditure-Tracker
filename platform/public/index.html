@@ -664,11 +664,12 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 .small{font-size:12.5px}
 #tip{position:fixed;z-index:200;pointer-events:none;background:var(--bg-surface);border:1px solid var(--border);box-shadow:var(--elev-2);border-radius:8px;padding:8px 11px;font-size:12.5px;color:var(--text-secondary);display:none;max-width:340px;line-height:1.5}
 /* ---- Live-sync hover card -------------------------------------------------
-   A structured card rather than a list of label: value lines, so the state of
-   the feed reads at a glance: status in the header, the latest movement given
-   the most visual weight, supporting facts in a quiet key/value block, and any
-   data problem as a distinct alert. #tip drops its own padding for this one so
-   the card can run its sections full-bleed. */
+   The card answers one question - what changed in the sheet last? - so it holds
+   one subject and gives it the whole of the space: status in the header, the
+   latest entry and its two figures below it, any data problem as a distinct
+   alert, and the sync time in the footer. Nothing else earns a line; a tooltip
+   that has to be read twice is not doing its job. #tip drops its own padding
+   for this one so the card can run its sections full-bleed. */
 /* ---- Trend Analytics ---- */
 .ta-top{align-items:center;gap:8px;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:9px 12px;box-shadow:var(--elev-1);margin-bottom:14px}
 .ta-cap{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-right:2px}
@@ -723,7 +724,10 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 .sy-meta{font-size:11.5px;color:var(--text-muted);margin-top:2px}
 .sy-figs{display:flex;gap:8px;margin-top:9px}
 .sy-fig{flex:1;background:var(--bg-app);border-radius:8px;padding:7px 10px;min-width:0}
-.sy-fig .k{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}
+/* The two labels name the platform's measure and the sheet's column for it, so
+   they run long and wrap. A floor of two lines keeps the figures on a shared
+   baseline whether one label wraps or both do. */
+.sy-fig .k{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted);line-height:1.3;min-height:2.6em}
 .sy-fig .v{font-size:14px;font-weight:700;color:var(--text-primary);font-variant-numeric:tabular-nums;margin-top:1px}
 .sy-fig.used .v{color:var(--primary)}
 .sy-fig.wd .v{color:var(--serious)}
@@ -743,7 +747,9 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 .sy-note .nb{font-size:11.5px;color:var(--text-secondary);margin-top:2px;line-height:1.4;overflow-wrap:anywhere}
 .sy-foot{display:flex;align-items:center;gap:6px;padding:8px 14px;background:var(--bg-app);
   font-size:11px;color:var(--text-muted);font-weight:600}
-.sy-foot .rf{margin-left:auto;font-size:12px}
+.sy-foot .fv{margin-left:auto;color:var(--text-primary);font-variant-numeric:tabular-nums}
+.sy-foot .ago{color:var(--text-muted);font-weight:500}
+.sy-foot .rf{font-size:12px}
 /* per-centre breakdown rendered inside any "Unspent by Centre" tooltip */
 .tipbd-h{font-weight:700;color:var(--text-primary);margin:7px 0 3px;padding-top:6px;border-top:1px dashed var(--border)}
 .tipbd{width:100%;border-collapse:collapse;font-size:11.5px;line-height:1.45}
@@ -1717,8 +1723,17 @@ function toggleInfraSai(){ if(rcOnlyOn()) return; state.inclInfraSai=state.inclI
 
 /* ---- formatting ---- */
 function grpIN(v){ v=Math.round(v); const neg=v<0; let s=String(Math.abs(v)); if(s.length<=3) return (neg?'-':'')+s; let last3=s.slice(-3), rest=s.slice(0,-3); rest=rest.replace(/\B(?=(\d\d)+(?!\d))/g,','); return (neg?'-':'')+rest+','+last3; }
-function cr(v){ return '₹'+(v/1e7).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})+' Cr'; }
-function crShort(v){ if(v==null) return '-'; const sg=v<0?'-':''; v=Math.abs(v); if(v>=1e7) return sg+'₹'+(v/1e7).toFixed(2)+' Cr'; if(v>=1e5) return sg+'₹'+(v/1e5).toFixed(2)+' L'; return sg+'₹'+grpIN(v); }
+/* Round to 2dp from the WHOLE RUPEE figure, not from a float already divided
+   down. Money sits on rounding boundaries often, and there the two formatters
+   this file uses disagree: 376.585 Cr renders as "376.58" through toFixed and
+   "376.59" through toLocaleString, because 376.585 is 376.58499999... in binary.
+   That put two different totals for the same money on one screen the moment KI
+   Infra started syncing at 35.375 Cr. Dividing to lakh first keeps the value an
+   exact half-integer (37658.5), which Math.round resolves the same way every
+   time, and every formatter then agrees because there is nothing left to round. */
+function crRound(v, unit){ return Math.round(v/(unit/100))/100; }
+function cr(v){ return '₹'+crRound(v,1e7).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})+' Cr'; }
+function crShort(v){ if(v==null) return '-'; const sg=v<0?'-':''; v=Math.abs(v); if(v>=1e7) return sg+'₹'+crRound(v,1e7).toFixed(2)+' Cr'; if(v>=1e5) return sg+'₹'+crRound(v,1e5).toFixed(2)+' L'; return sg+'₹'+grpIN(v); }
 function pct(v,d){ d=d||0; return (v*100).toFixed(d)+'%'; }
 /* Panel subtitle / "as on" date: the date the figures were last pulled from the
    Google Sheet, formatted DD.MM.YYYY. Falls back to the source position date
@@ -1981,7 +1996,7 @@ const ICON={
    panel; empty the array to restore them all. Search results and direct
    navigation honour the same list, so a hidden panel cannot be reached by a
    side door and leave the sidebar looking wrong. */
-const HIDDEN_VIEWS=['saifmt','sv','trend','detail'];
+const HIDDEN_VIEWS=['sv','trend','detail'];
 function viewHidden(v){ return HIDDEN_VIEWS.indexOf(v)>=0; }
 
 const NAV=[{g:'ANALYSIS'},
@@ -2043,7 +2058,9 @@ function toggleBtns(id){ const m=state.tg[id]||'chart'; return `<div class="togg
 
 /* ---- shared bits ---- */
 function pageHead(t,q){ return `<div class="pagehead"><h1>${t}</h1>${q?`<div class="sub">${q}</div>`:''}</div>`; }
-function crC(v){ return v?(v/1e7).toFixed(2):'<span class="muted-cell">–</span>'; }
+/* Same rounding as cr() above - these two render the same figures on the same
+   screen (KPI vs table), so they must never disagree. */
+function crC(v){ return v?crRound(v,1e7).toFixed(2):'<span class="muted-cell">–</span>'; }
 /* Budget Estimate for the scheme, FY 2026-27 — the ceiling the Ministry set,
    against which the assignment is released in tranches. It is a fixed
    scheme-level figure, not something the expenditure sheet carries, so it is
@@ -3093,11 +3110,6 @@ function txRecentUpdates(){
       return x.type==='update'||x.type==='removed'||x.type==='sheet'||x.type==='assign'; })
     .sort(function(a,b){ return b.ts-a.ts; }).slice(0,40);
 }
-/** Direct summary-tab edits only - used by the Live sync card. */
-function sheetEdits(){
-  return (TXLOG.entries||[]).filter(function(x){ return x.type==='sheet'||x.type==='assign'; })
-    .sort(function(a,b){ return b.ts-a.ts; });
-}
 /** Where a logged revision came from, for the Transaction Record table. */
 function txSource(t){
   return (t==='sheet'||t==='assign')
@@ -4103,9 +4115,24 @@ const SYNC={
   summaryTab:'Sheet3',
   txTabs:['DDO HQ','PATIALA','BANGALORE','BHOPAL','CHANDIGARH','GANDHINAGAR','KOLKATA',
           'GUWAHATI','IMPHAL','LUCKNOW','MUMBAI','SONEPAT','TRIVANDRUM'],
+  /* The workbook's own edit log - see parseEditHistory. It is read AFTER the
+     figures, on its own request, and never gates a sync: the platform's numbers
+     do not depend on it, so an absent or malformed log costs the card its
+     detail and nothing else.
+     historyId is for the case where the log lives in a different workbook from
+     the figures. Leave it empty for the normal case - same workbook, same id.
+
+     TEMPORARY: it is set, because the workbook the figures come from has no
+     EditHistory tab yet and the log currently lives only in "Test sheet 2".
+     The figures are NOT read from there - only the edit log - so the card can
+     name a voucher the figures do not carry, and fall back to the platform's
+     own row for the figure the log is silent on. Clear this the moment the
+     main workbook grows its own EditHistory tab. */
+  historyTab:'EditHistory',
+  historyId:'1dlHnw6Y63GiV24wMC9y0cny22mSIx_VZtBtWv4V6cOc',
   intervalMs:10*60*1000,
-  status:'idle', last:null, lastTry:null, err:null, timer:null, applied:0, updates:0, newPoints:[],
-  lastTxn:null, notes:[]
+  status:'idle', last:null, lastTry:null, err:null, timer:null, applied:0,
+  lastTxn:null, editLog:null, lastEdit:null, notes:[]
 };
 /* Transport. A page opened from the filesystem cannot fetch() a remote URL - Chrome blocks
    it outright, whatever CORS headers the server sends - so the sheet is pulled with a
@@ -4128,7 +4155,8 @@ function gvizRows(o){
     return out;
   });
 }
-function jsonpTabOnce(tab){
+function jsonpTabOnce(tab,id){
+  id=id||SYNC.id;
   return new Promise(function(res,rej){
     let done=false;
     const el=document.createElement('script');
@@ -4139,7 +4167,7 @@ function jsonpTabOnce(tab){
     el.onerror=function(){ if(done) return; done=true; fin();
       /* Flagged so jsonpTab knows this one is safe to retry - see there. */
       const e=new Error(tab+': could not reach the sheet'); e.transport=true; rej(e); };
-    el.src='https://docs.google.com/spreadsheets/d/'+SYNC.id+'/gviz/tq?tqx=out:json&headers=0&sheet='+
+    el.src='https://docs.google.com/spreadsheets/d/'+id+'/gviz/tq?tqx=out:json&headers=0&sheet='+
            encodeURIComponent(tab)+'&_='+Date.now();
     document.head.appendChild(el);
   });
@@ -4153,11 +4181,11 @@ function jsonpTabOnce(tab){
    would land on whichever request is registered when it finally arrives, handing one tab's
    rows to another. onerror means the request definitively failed, so no late response can
    arrive and no such collision is possible. */
-function jsonpTab(tab,tries){
+function jsonpTab(tab,tries,id){
   tries=(tries==null)?3:tries;
-  return jsonpTabOnce(tab).catch(function(err){
+  return jsonpTabOnce(tab,id).catch(function(err){
     if(!err||!err.transport||tries<=1) throw err;
-    return new Promise(function(r){ setTimeout(r,1200); }).then(function(){ return jsonpTab(tab,tries-1); });
+    return new Promise(function(r){ setTimeout(r,1200); }).then(function(){ return jsonpTab(tab,tries-1,id); });
   });
 }
 /* the endpoint's default callback - route it into whichever jsonpTab is in flight */
@@ -4280,22 +4308,10 @@ function syncValidate(b){
   return {ok:e.length===0,errors:e.slice(0,6)};
 }
 function syncApply(b){
-  /* Detect genuinely NEW releases (data points) before the live set is overwritten.
-     Keyed exactly as syncBuild preserves labels: centre|voucher|amount. An amount
-     change surfaces as a new point (old key drops, new key appears) - which is the
-     "what changed" behaviour we want. Only replace SYNC.newPoints when this sync
-     actually brought something new, so the tooltip keeps showing the latest arrivals. */
   /* Transaction Record: diff this build against the stored baseline and log
      what changed, with the time of observation. Runs before DATA is replaced;
      it reads its own persisted baseline, so ordering here is not load-bearing. */
   txDetect(b);
-  var _prev={}; (DATA.txns||[]).forEach(function(t){ _prev[t.rc+'|'+t.voucher+'|'+t.net]=1; });
-  var _fresh=(b.txns||[]).filter(function(t){ return !_prev[t.rc+'|'+t.voucher+'|'+t.net]; })
-    .sort(function(x,y){ return (y.date||'').localeCompare(x.date||''); });   // newest first
-  /* First successful sync = baseline (SYNC.applied is still 0 here, bumped at the end).
-     Differences against the build-time seed are not "updates"; only later syncs that bring
-     genuine changes count, so a plain refresh with no new data never inflates the number. */
-  if(SYNC.applied>0 && _fresh.length){ SYNC.newPoints=_fresh.map(function(t){ return {name:pointName(t), amt:t.net}; }); SYNC.updates++; }
   DATA.asOf=b.asOf; AS_OF=b.asOf;
   DATA.subverticals=b.subverticals;
   DATA.sectionTotals=b.sectionTotals; DATA.grand=b.grand;
@@ -4334,7 +4350,8 @@ function syncNow(manual){
   }).catch(function(err){
     SYNC.status='error';
     SYNC.err=(''+(err&&err.message||err)).slice(0,180);
-  }).then(function(){
+  /* After the figures, pass or fail, and never able to reject - see syncHistory. */
+  }).then(syncHistory).then(function(){
     SYNC.lastTry=new Date();
     render();
   });
@@ -4346,14 +4363,6 @@ function syncAgo(d){
   if(s<3600) return Math.floor(s/60)+' min ago';
   return Math.floor(s/3600)+' hr ago';
 }
-/* A short, human label for a release, used in the Live-sync tooltip. Prefers the
-   grantee, then the narration, then the component / centre. */
-function pointName(t){
-  var s=(t.grantee||t.nar||t.sv||t.rc||'Release');
-  s=(''+s).replace(/\s+/g,' ').trim();
-  return s.length>36 ? s.slice(0,34)+'…' : s;
-}
-
 /* ---- Last update: the most recent release actually present in the data -------
    Taken from the applied dataset (not the filtered view), so the tooltip always
    reports what the sheet holds rather than what the current chips happen to show.
@@ -4380,6 +4389,181 @@ function txnBrief(t){
     etype: t.etype||'',
     net: t.net, util: t.util
   };
+}
+
+/* ---- EditHistory: what the sheet says changed, and when ----------------------
+   The workbook keeps its own edit log on an `EditHistory` tab - one row per cell
+   edited, recording the time, the centre's tab, the voucher, the column, and the
+   value either side. That is a direct answer to "what moved, just now?", where
+   latestTxn() can only offer "which release carries the newest date" - a
+   different question, and the wrong one for a live-sync card. So the card reads
+   the log when it is there, and falls back to latestTxn() when it is not.
+
+   Two of the sheet's columns carry money. They are named for the sheet's own
+   headers, not the platform's, so they are mapped once, here:
+       Utilization by RC    ->  Expenditure done / Utilised
+       Type of Expenditure  ->  Limit assigned / Released
+   Every other column is an edit the card does not price, and is ignored.
+
+   `(empty)` is how the log writes a cell that held nothing. It means zero, not
+   "unknown" - a first utilisation against a voucher reads `(empty) -> 22,00,000`
+   and the previous figure genuinely was nil. Blank and null are read the same.
+   Text that is neither a number nor one of those markers is NOT silently zeroed,
+   because a zero we invented is indistinguishable from one the sheet meant. */
+const EH_EMPTY=/^\s*(\(empty\)|-|–|—|n\/?a|nil|null|undefined)?\s*$/i;
+function ehNum(s){
+  if(s==null) return 0;
+  const t=String(s).trim();
+  if(EH_EMPTY.test(t)) return 0;
+  const n=Number(t.replace(/[₹,\s]/g,''));
+  return isFinite(n)?n:null;          // unparseable is not zero - say so
+}
+function ehKind(col){
+  const s=String(col||'');
+  if(/utili[sz]ation/i.test(s)) return 'util';
+  if(/type\s*of\s*expenditure/i.test(s)) return 'rel';
+  return null;
+}
+/* Timestamps arrive as the sheet's formatted string ("2026-08-27 12:29:19 am"),
+   because gvizCell prefers the formatted value. Date.parse cannot be trusted
+   with that - the lowercase meridiem alone defeats some engines, and a bare
+   dd/mm/yyyy is read as US month-first - so it is parsed by hand. The raw gviz
+   Date(y,m,d,...) form is accepted too, for the case where the cell carries no
+   format. Returns ms, or NaN when there is no date in the cell. */
+function ehTime(s){
+  const t=String(s==null?'':s).trim(); if(!t) return NaN;
+  let m=/^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)$/.exec(t);
+  if(m) return new Date(+m[1],+m[2],+m[3],+(m[4]||0),+(m[5]||0),+(m[6]||0)).getTime();
+  m=/^(\d{4})-(\d{1,2})-(\d{1,2})|^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/.exec(t);
+  if(!m) return NaN;
+  let y,mo,d;
+  if(m[1]!=null){ y=+m[1]; mo=+m[2]-1; d=+m[3]; } else { d=+m[4]; mo=+m[5]-1; y=+m[6]; }
+  let hh=0,mi=0,ss=0;
+  const tm=/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?/i.exec(t.slice(m[0].length));
+  if(tm){
+    hh=+tm[1]; mi=+tm[2]; ss=+(tm[3]||0);
+    const ap=(tm[4]||'').toLowerCase();
+    if(ap==='pm'&&hh<12) hh+=12;
+    if(ap==='am'&&hh===12) hh=0;      // 12:29 am is 00:29
+  }
+  const dt=new Date(y,mo,d,hh,mi,ss);
+  return isNaN(dt.getTime())?NaN:dt.getTime();
+}
+/* Rows out of the EditHistory tab, or null if this is not that tab.
+
+   The null matters, and is the reason the header row is required rather than
+   assumed: asking gviz for a sheet name the workbook does not have returns the
+   FIRST tab with a 200 and no hint that it substituted. A renamed, deleted or
+   not-yet-created EditHistory would otherwise be parsed as release rows and put
+   nonsense in the card. Finding the header is the only proof we have that the
+   response is the tab we asked for.
+
+   Columns are located by name so a reordering does not break this. Two of them
+   cannot be: the sheet types Timestamp as a date and New Value as a number, and
+   gviz drops the text header of a typed column, so both come back empty. They
+   are taken from their position against the neighbours that do carry a name. */
+function parseEditHistory(rows){
+  if(!rows||!rows.length) return null;
+  let hi=-1,H=null;
+  for(let i=0;i<Math.min(rows.length,10);i++){
+    const j=(rows[i]||[]).map(function(c){ return String(c==null?'':c).trim().toLowerCase(); });
+    if(j.indexOf('voucher number')>=0 && j.indexOf('column changed')>=0){ hi=i; H=j; break; }
+  }
+  if(hi<0) return null;
+  const col=function(){
+    for(let a=0;a<arguments.length;a++){ const k=H.indexOf(arguments[a]); if(k>=0) return k; }
+    return -1;
+  };
+  const cRc=col('sheet name (state)','sheet name','state','regional centre'),
+        cV =col('voucher number','voucher'),
+        cC =col('column changed','column');
+  let   cO =col('old value','old'),
+        cN =col('new value','new'),
+        cT =col('timestamp','time','date');
+  if(cRc<0||cV<0||cC<0) return null;
+  if(cN<0&&cO>=0) cN=cO+1;            // New Value sits after Old Value
+  if(cT<0&&cRc>0)  cT=cRc-1;          // Timestamp sits before the state name
+  if(cN<0) return null;
+  const out=[];
+  for(let r=hi+1;r<rows.length;r++){
+    const c=rows[r]||[];
+    const rc=String(c[cRc]==null?'':c[cRc]).trim();
+    const vch=String(c[cV]==null?'':c[cV]).trim();
+    if(!rc&&!vch) continue;           // trailing blank rows the sheet pads with
+    out.push({ts:cT>=0?ehTime(c[cT]):NaN, rc:rc, voucher:vch,
+      kind:ehKind(c[cC]), col:String(c[cC]==null?'':c[cC]).trim(),
+      oldV:ehNum(cO>=0?c[cO]:null), newV:ehNum(c[cN])});
+  }
+  return out;
+}
+/* The card's subject: the single most recent edit in the log, and both money
+   figures for the voucher it names.
+
+   "Most recent" is decided on the parsed timestamp, never on row order - the log
+   is appended to by a script and nothing guarantees the bottom row is the newest.
+   Rows sharing a timestamp to the second are common (one script run touching
+   several vouchers), so the voucher breaks the tie and the pick stays stable
+   across syncs rather than flickering between equals.
+
+   The subject is the newest edit to a column that carries money. An edit to one
+   that does not - a narration reworded - would otherwise take the card and leave
+   both figures blank, which is a worse answer to "what moved?" than the release
+   it displaced. Those columns are all the log records in practice, so this only
+   decides the odd case; the newest edit of any kind is still the fallback, so
+   the card is never empty while the log holds anything at all.
+
+   Only one column is edited at a time, so the log answers one of the two figures
+   and is silent on the other. The platform's own row for that voucher supplies
+   the standing value for the silent one, so the pair reads as the state of a
+   voucher rather than a number beside a blank. Nothing found either way stays
+   null, and the card shows a dash - it does not invent a zero. */
+function editBrief(){
+  const rows=SYNC.editLog;
+  if(!rows||!rows.length) return null;
+  const newer=function(e,b){
+    return !b || e.ts>b.ts || (e.ts===b.ts && String(e.voucher)>String(b.voucher));
+  };
+  let any=null, best=null;
+  for(let i=0;i<rows.length;i++){
+    const e=rows[i]; if(!e||!isFinite(e.ts)) continue;
+    if(newer(e,any)) any=e;
+    if(e.kind && newer(e,best)) best=e;
+  }
+  best=best||any;
+  if(!best) return null;
+  const pick={};
+  for(let i=0;i<rows.length;i++){
+    const e=rows[i];
+    if(!e||!e.kind||!isFinite(e.ts)||e.rc!==best.rc||e.voucher!==best.voucher) continue;
+    const p=pick[e.kind];
+    if(!p||e.ts>p.ts) pick[e.kind]=e;
+  }
+  let tx=null; const tl=DATA.txns||[];
+  for(let i=0;i<tl.length;i++){
+    if(tl[i]&&tl[i].rc===best.rc&&tl[i].voucher===best.voucher){ tx=tl[i]; break; }
+  }
+  const d=new Date(best.ts), p2=function(n){ return ('0'+n).slice(-2); };
+  return {
+    when: fmtD(d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())),
+    rc: best.rc||'—',
+    voucher: best.voucher||'—',
+    rel:  pick.rel  ? pick.rel.newV  : (tx?tx.net :null),
+    util: pick.util ? pick.util.newV : (tx?tx.util:null)
+  };
+}
+/* Pull the edit log. Deliberately outside the sync's validation gate: the log is
+   what the card reads, not what the figures are built from, so a missing tab or
+   a dropped request must cost the card its detail and never the sync. It cannot
+   share the tab loop either - the tabs run one at a time through a single global
+   callback, so this waits its turn. */
+function syncHistory(){
+  return jsonpTab(SYNC.historyTab,2,SYNC.historyId||SYNC.id).then(function(rows){
+    SYNC.editLog=parseEditHistory(rows);
+  }).catch(function(){
+    /* leave the last good log in place - a blip should not blank the card */
+  }).then(function(){
+    SYNC.lastEdit=editBrief();
+  });
 }
 
 /* ---- Data-integrity audit (non-blocking) ------------------------------------
@@ -4686,9 +4870,12 @@ function sheetDMY(s){
 }
 
 
-/** Refresh the derived sync facts (latest release + integrity notes). */
+/** Refresh the derived sync facts (latest entry + integrity notes). */
 function refreshSyncFacts(){
-  try{ SYNC.lastTxn=txnBrief(latestTxn()); SYNC.notes=auditData(); }
+  /* lastEdit is recomputed here as well as after the log is fetched: it reads
+     DATA.txns for the figure the log does not carry, so a new dataset changes
+     the answer even when the log itself has not moved. */
+  try{ SYNC.lastTxn=txnBrief(latestTxn()); SYNC.lastEdit=editBrief(); SYNC.notes=auditData(); }
   catch(e){ SYNC.notes=['Integrity check could not run: '+(e&&e.message||e)]; }
 }
 function renderSyncPill(){
@@ -4701,8 +4888,8 @@ function renderSyncPill(){
       :'Data as of '+AS_OF;
   /* ---- Live-sync hover card -------------------------------------------------
      Structured so the feed's state reads in one glance: status in the header,
-     the latest movement carrying the most visual weight, supporting facts in a
-     quiet key/value block, and any data problem as its own alert strip. */
+     the sheet's latest entry carrying the whole of the visual weight, any data
+     problem as its own alert strip, and the sync time in the footer. */
   const tip=(st==='error'||SYNC.err)
     ? '<div class="syncard">'
       + '<div class="sy-hd"><span class="dot err"></span><span class="sy-t">Live sync</span>'
@@ -4719,46 +4906,40 @@ function renderSyncPill(){
     : (function(){
         const pill = st==='syncing' ? ['run','Syncing'] : st==='ok' ? ['ok','Live'] : ['idle','Idle'];
 
-        /* Latest movement - the most recent release the sheet holds. */
-        const lt=SYNC.lastTxn;
-        /* A "Limit Withdraw" row is a recovery, not a release. Its figures are negative by
-           design, and "Released  -₹2.50 L" reads as a broken number rather than as money
-           coming back. Name it, and show the magnitude - the sign is carried by the label. */
-        const wd = lt && /withdraw/i.test(lt.etype||'');
-        const last = lt
-          ? '<div class="sy-main">'+esc(lt.sv)+(wd?' <span class="sy-tag">Limit withdrawal</span>':'')+'</div>'
-            + '<div class="sy-meta">'+esc(lt.when)+' &middot; '+esc(lt.rc)+' &middot; Voucher '+esc(lt.voucher)+'</div>'
-            + '<div class="sy-figs">'
-              + '<div class="sy-fig'+(wd?' wd':'')+'"><div class="k">'+(wd?'Withdrawn':'Released')+'</div><div class="v">'+esc(crShort(wd?Math.abs(lt.net):lt.net))+'</div></div>'
-              + '<div class="sy-fig used"><div class="k">Utilised</div><div class="v">'+esc(crShort(lt.util))+'</div></div>'
-            + '</div>'
-          : '<div class="sy-meta">No releases in the current data</div>';
+        /* Latest entry in the sheet.
 
-        /* Supporting facts. */
-        const np=SYNC.newPoints||[];
-        const fresh = np.length
-          ? np.slice(0,2).map(function(p){ return esc(p.name)+' &middot; '+esc(crShort(p.amt)); }).join('<br>')
-            + (np.length>2 ? '<br>+'+(np.length-2)+' more' : '')
-          : '<span class="v mut">None yet</span>';
-        let facts='<div class="sy-kv"><span class="k">New this session</span><span class="v">'+fresh+'</span></div>';
-        if(SYNC.updates>0) facts+='<div class="sy-kv"><span class="k">Updates applied</span><span class="v">'+SYNC.updates+'</span></div>';
-        /* Direct edits to the summary tab - these move the headline figures without
-           any release row changing, so they are called out explicitly. */
-        var se=(typeof sheetEdits==='function')?sheetEdits():[];
-        if(se.length){
-          var s0=se[0];
-          facts+='<div class="sy-kv"><span class="k">Summary sheet</span><span class="v">'
-               + se.length+' direct edit'+(se.length===1?'':'s')+'</span></div>'
-               + '<div class="sy-kv"><span class="k"></span><span class="v mut">'
-               + esc(s0.sv||'')+(s0.rc?' · '+esc(s0.rc):'')+'<br>'
-               + esc(s0.field||'Assignment')+' '+esc(crShort(s0.pVal!=null?s0.pVal:s0.pAssign))
-               + ' → '+esc(crShort(s0.val!=null?s0.val:s0.assign))+'</span></div>';
+           The edit log answers this directly - which voucher was touched, when,
+           and what the money reads now - so it is preferred whenever it parsed.
+           Without it (tab absent, renamed, or the request dropped) the card
+           falls back to the newest release in the applied data, exactly as it
+           read before the log existed. */
+        const eb=SYNC.lastEdit, lt=SYNC.lastTxn;
+        /* A figure the sheet does not carry is a dash, not a zero. `(empty)` in
+           the log IS zero and arrives as one - the two are not the same thing
+           and must not print the same way. */
+        const money=function(v){ return v==null?'—':crShort(v); };
+        let last;
+        if(eb){
+          last='<div class="sy-main">'+esc(eb.rc)+'</div>'
+             + '<div class="sy-meta">'+esc(eb.when)+' &middot; '+esc(eb.rc)+' &middot; Voucher '+esc(eb.voucher)+'</div>'
+             + '<div class="sy-figs">'
+               + '<div class="sy-fig"><div class="k">Limit assigned / Released</div><div class="v">'+esc(money(eb.rel))+'</div></div>'
+               + '<div class="sy-fig used"><div class="k">Expenditure done / Utilised</div><div class="v">'+esc(money(eb.util))+'</div></div>'
+             + '</div>';
+        } else if(lt){
+          /* A "Limit Withdraw" row is a recovery, not a release. Its figures are negative by
+             design, and "Released  -₹2.50 L" reads as a broken number rather than as money
+             coming back. Name it, and show the magnitude - the sign is carried by the label. */
+          const wd=/withdraw/i.test(lt.etype||'');
+          last='<div class="sy-main">'+esc(lt.sv)+(wd?' <span class="sy-tag">Limit withdrawal</span>':'')+'</div>'
+             + '<div class="sy-meta">'+esc(lt.when)+' &middot; '+esc(lt.rc)+' &middot; Voucher '+esc(lt.voucher)+'</div>'
+             + '<div class="sy-figs">'
+               + '<div class="sy-fig'+(wd?' wd':'')+'"><div class="k">'+(wd?'Withdrawn':'Limit assigned / Released')+'</div><div class="v">'+esc(money(wd?Math.abs(lt.net):lt.net))+'</div></div>'
+               + '<div class="sy-fig used"><div class="k">Expenditure done / Utilised</div><div class="v">'+esc(money(lt.util))+'</div></div>'
+             + '</div>';
+        } else {
+          last='<div class="sy-meta">No entries in the current data</div>';
         }
-        facts+='<div class="sy-kv"><span class="k">Last sync</span><span class="v">'
-             +(SYNC.last?esc(SYNC.last.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}))
-                        +' <span style="color:var(--text-muted);font-weight:500">('+esc(syncAgo(SYNC.last))+')</span>'
-                      :'<span class="mut">not yet</span>')+'</span></div>';
-        facts+='<div class="sy-kv"><span class="k">Source</span><span class="v mut">SAI Expenditure SYNC · Google Sheet</span></div>';
 
         /* Data-integrity result - sums that do not add up, never a blocker. */
         const nt=SYNC.notes||[];
@@ -4771,13 +4952,18 @@ function renderSyncPill(){
             + '<div class="nh">Figures reconcile</div>'
             + '<div class="nb">All totals and cross-checks add up.</div></div></div>';
 
+        /* The one supporting fact worth the space: how fresh this all is. */
+        const stamp = SYNC.last
+          ? esc(SYNC.last.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}))
+            + ' <span class="ago">('+esc(syncAgo(SYNC.last))+')</span>'
+          : '<span class="ago">not yet</span>';
+
         return '<div class="syncard">'
           + '<div class="sy-hd"><span class="dot '+pill[0]+'"></span><span class="sy-t">Live sync</span>'
             + '<span class="sy-pill '+pill[0]+'">'+pill[1]+'</span></div>'
           + '<div class="sy-sec"><div class="sy-lbl">Latest entry in sheet</div>'+last+'</div>'
-          + '<div class="sy-sec">'+facts+'</div>'
           + note
-          + '<div class="sy-foot">Click to sync now<span class="rf">↻</span></div>'
+          + '<div class="sy-foot">Last sync<span class="fv">'+stamp+'</span><span class="rf">↻</span></div>'
           + '</div>';
       })();
   el.innerHTML='<span class="syncp"'+tattr(tip)+' onclick="syncNow(true)"><span class="dot '+cls+'"></span>'+txt+'<span class="rf">↻</span></span>';
