@@ -675,19 +675,24 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
    figures at KPI weight because they are the panel's whole answer; the table
    below reuses the .usage / .txmini idiom the component drop-downs already
    use, so a row that expands looks the same here as everywhere else. */
-.yd-sum{display:flex;align-items:center;gap:18px;padding:13px 18px 15px;cursor:pointer;
+/* Three columns, the outer two equal, so the pair of figures sits on the tile's
+   true centre line - not merely after the chevron. Flex with an auto margin
+   would centre them in the space LEFT OVER, which drifts as the hint on the
+   right changes length ("6 entries" vs "Reading the sheet…"). */
+.yd-sum{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;
+  padding:13px 18px 15px;cursor:pointer;
   border-top:1px solid var(--border-subtle);transition:background .12s}
 .yd-sum:hover{background:var(--bg-app)}
 .yd-sum.open{background:var(--bg-app);border-bottom:1px solid var(--border-subtle)}
-.yd-sum>.chev{flex:none}
-.yd-fig{min-width:0}
+.yd-sum>.chev{justify-self:start}
+.yd-figs{display:flex;justify-content:center;gap:40px;min-width:0}
+.yd-fig{min-width:0;text-align:center}
 .yd-fig .k{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}
 .yd-fig .v{font-size:21px;font-weight:700;letter-spacing:-.01em;color:var(--text-primary);
   font-variant-numeric:tabular-nums;margin-top:2px}
 .yd-fig.used .v{color:var(--good)}
-.yd-hint{margin-left:auto;font-size:11.5px;color:var(--text-muted);text-align:right}
-.yd-empty{padding:16px 18px 20px;font-size:12.5px;color:var(--text-muted)}
-.yd-note{padding:9px 4px 2px;color:var(--text-muted);line-height:1.45}
+.yd-hint{font-size:11.5px;color:var(--text-muted);text-align:right}
+.yd-empty{padding:16px 18px 20px;font-size:12.5px;color:var(--text-muted);text-align:center}
 /* Group band - separates Regional Centres from States/UTs when both moved. */
 .usage tr.yd-band>td{background:rgba(37,106,191,.06);font-weight:700;color:var(--primary-hover);
   font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;
@@ -697,9 +702,12 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 .yd-tag{display:inline-block;padding:1px 7px;border-radius:999px;background:#e9f6ef;color:#1b7a4b;
   font-size:10.5px;font-weight:700;white-space:nowrap}
 .yd-tag.asg{background:var(--primary-subtle);color:var(--primary-hover)}
+/* Too narrow for three columns: the chevron keeps the left, the figures take
+   the width and stay centred, and the hint drops beneath them. */
 @media(max-width:720px){
-  .yd-sum{flex-wrap:wrap;gap:12px 16px}
-  .yd-hint{margin-left:0;flex-basis:100%;text-align:left}
+  .yd-sum{grid-template-columns:auto 1fr;gap:10px 12px}
+  .yd-figs{gap:22px}
+  .yd-hint{grid-column:1/-1;text-align:center}
 }
 /* ---- Trend Analytics ---- */
 .ta-top{align-items:center;gap:8px;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:9px 12px;box-shadow:var(--elev-1);margin-bottom:14px}
@@ -2465,9 +2473,7 @@ function ydayPanel(){
       });
       drop='<div class="usage"><table><thead><tr><th>Centre / State</th>'
          + '<th class="num">Assigned</th><th class="num">Expenditure</th><th class="num">Entries</th>'
-         + '</tr></thead><tbody>'+trs+'</tbody></table>'
-         + '<div class="small yd-note">Each figure is the movement booked on '+esc(y.label)
-         + ' - the change to the cell, not the balance standing in it. Repeat edits to one cell are counted once.</div></div>';
+         + '</tr></thead><tbody>'+trs+'</tbody></table></div>';
     }
   }
   return '<div class="card" style="padding:0;overflow:hidden">'
@@ -2476,8 +2482,8 @@ function ydayPanel(){
     + '<div class="yd-sum'+(on?' open':'')+'" onclick="ydToggle()" role="button" tabindex="0"'
       + ' aria-expanded="'+(on?'true':'false')+'">'
       + '<span class="chev'+(on?' open':'')+'">'+(on?'▾':'▸')+'</span>'
-      + fig('Total Assigned', y.assigned)
-      + fig('Total Expenditure', y.spent, 'used')
+      + '<div class="yd-figs">'+fig('Total Assigned', y.assigned)
+        + fig('Total Expenditure', y.spent, 'used')+'</div>'
       + '<span class="yd-hint">'+esc(hint)+'</span></div>'
     + drop
     + '</div>';
