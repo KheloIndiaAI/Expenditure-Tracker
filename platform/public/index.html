@@ -2491,9 +2491,18 @@ function cmtCell(t,k,centre){
        than written by its author. They go through esc() into element content
        and into a plain title attribute - never through tattr(), which stores
        HTML for innerHTML and would hand an <img onerror> straight back. */
+    /* The byline carries the date and, once the voucher closes, that fact - and
+       not who wrote it. A comment already belongs to exactly one centre, and
+       within a centre only that centre's own login can have written it, so the
+       name added a line of text without adding an answer. The author is still
+       recorded on the row for the audit trail; it is simply not on screen.
+       Built as parts so a missing date cannot leave a leading separator. */
+    const meta=[];
+    if(c.updated_at) meta.push(esc(fmtD(String(c.updated_at).slice(0,10))));
+    if(c.locked) meta.push('closed');
     out+=`<div class="txcmt" title="${esc(c.body)}">${esc(c.body)}`
-      +`<div class="txcmt-by">${esc(c.author_name||'')}${c.updated_at?' · '+esc(fmtD(String(c.updated_at).slice(0,10))):''}`
-      +`${c.locked?' · closed':''}</div></div>`;
+      +(meta.length?`<div class="txcmt-by">${meta.join(' · ')}</div>`:'')
+      +`</div>`;
   }
   /* While this row's editor is open the button is withdrawn: it sits directly
      above the textarea, and clicking it would reload the stored body over
