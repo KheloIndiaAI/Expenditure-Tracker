@@ -12,7 +12,16 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { RC_SHEET_NAMES, TX_KEY_RE, centreOfTxKey, txCommentKey, type User } from '@efip/shared';
+import {
+  ASSIGNABLE_CENTRES,
+  RC_SHEET_NAMES,
+  TX_KEY_RE,
+  centreFromUsername,
+  centreOfTxKey,
+  isAssignableCentre,
+  txCommentKey,
+  type User,
+} from '@efip/shared';
 
 const dir = mkdtempSync(join(tmpdir(), 'efip-comments-'));
 process.env.EFIP_DB = join(dir, 'test.db');
@@ -230,6 +239,37 @@ describe('freezing at a nil balance', () => {
 
   it('ignores malformed keys handed to the sealer', async () => {
     assert.equal(await lockComments('PATIALA', ['PATIALA', '', '|', 'A|B|C']), 0);
+  });
+});
+
+describe('deriving a centre from a login name', () => {
+  /* This is what spares an administrator from having to assign thirteen centres
+     by hand, and what makes an existing RC login work the moment it migrates. */
+  it('reads the RC_<Centre> convention, however it is punctuated or cased', () => {
+    for (const u of ['RC_Kolkata', 'rc_kolkata', 'RC-KOLKATA', 'rc.Kolkata', 'RC_KOLKATA']) {
+      assert.equal(centreFromUsername(u), 'KOLKATA', u);
+    }
+  });
+
+  it('places every assignable centre from its own conventional username', () => {
+    for (const c of ASSIGNABLE_CENTRES) {
+      assert.equal(centreFromUsername('RC_' + c.replace(/ /g, '_')), c, c);
+    }
+  });
+
+  /* No fuzzy matching anywhere: a name it cannot place is left for a person. */
+  it('leaves anything it cannot place exactly', () => {
+    for (const u of ['RC_Kolkatta', 'RC_Kol', 'RC_', 'kolkata', 'MYAS_OSD', 'ki_1', '', 'rc']) {
+      assert.equal(centreFromUsername(u), '', JSON.stringify(u));
+    }
+  });
+
+  /* DDO HQ is a worksheet tab but not an assignable centre: the Regional Centres
+     panel filters it out, so a login assigned to it could never use the right. */
+  it('will not derive DDO HQ, which the panel never shows', () => {
+    assert.equal(centreFromUsername('RC_DDO_HQ'), '');
+    assert.equal(isAssignableCentre('DDO HQ'), false);
+    assert.equal(ASSIGNABLE_CENTRES.length, RC_SHEET_NAMES.length - 1);
   });
 });
 

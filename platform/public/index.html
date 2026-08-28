@@ -6117,6 +6117,9 @@ const ADM_ROLES = ['minister','secretary','joint_secretary','director','finance_
    permission that quietly does nothing. */
 const ADM_RC = ['PATIALA','BANGALORE','BHOPAL','CHANDIGARH','GANDHINAGAR',
                 'GUWAHATI','IMPHAL','KOLKATA','LUCKNOW','MUMBAI','SONEPAT','TRIVANDRUM'];
+/* Mirrors ASSIGNABLE_CENTRES in @efip/shared. This document imports nothing, so
+   the list is restated; the server validates against its own copy, so a value
+   missing here can only ever hide an option, never admit an invalid one. */
 function admRcOpts(){
   return [{v:'',t:'— None —'}].concat(ADM_RC.map(function(c){ return {v:c,t:c}; }));
 }

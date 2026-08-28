@@ -99,6 +99,44 @@ export const RC_SHEET_NAMES = [
   'TRIVANDRUM',
 ] as const;
 
+/**
+ * The centres a login can be assigned to, for the purpose of commenting on its
+ * own vouchers.
+ *
+ * Every worksheet tab except DDO HQ. That tab does hold vouchers, but the
+ * Regional Centres panel pins `inclHQ:false` in its own filter preset, so DDO HQ
+ * rows never appear there and a login assigned to it would hold a right it could
+ * never exercise. It is also not a regional centre in this platform's own
+ * vocabulary — `isRegionalCentre()` excludes it — and these comments are a
+ * centre's query TO headquarters.
+ *
+ * One list, read by all three of: the server's validation, the Administration
+ * dropdown, and the boot-time backfill. They must not be able to disagree about
+ * which centres exist.
+ */
+export const ASSIGNABLE_CENTRES = RC_SHEET_NAMES.filter((n) => n !== 'DDO HQ');
+
+export function isAssignableCentre(name: string): boolean {
+  return (ASSIGNABLE_CENTRES as readonly string[]).includes(name);
+}
+
+/**
+ * Derive a centre from a login name following the `RC_<Centre>` convention,
+ * or '' when it does not resolve to exactly one centre.
+ *
+ * Used ONLY to fill an unset column — at first boot after the column is added,
+ * and by the centres:assign script. Never at request time: authorisation reads
+ * the stored column, because a rule parsed out of a display string fails on a
+ * typo and cannot be reviewed. Exact matches only, and no fuzzy fallback: a name
+ * that does not resolve is left unset for a person to decide.
+ */
+export function centreFromUsername(username: string): string {
+  const m = /^rc[_.\-\s]+(.+)$/i.exec(String(username || '').trim());
+  if (!m) return '';
+  const guess = m[1].replace(/[_.\-\s]+/g, ' ').trim().toUpperCase();
+  return isAssignableCentre(guess) ? guess : '';
+}
+
 export const MASTER_SHEET = 'MASTER DATA';
 export const SUB_CATEGORY_MASTER_SHEET = 'SUB CATEGORY MASTER';
 export const CLASSIFICATION_AUDIT_SHEET = 'CLASSIFICATION AUDIT';

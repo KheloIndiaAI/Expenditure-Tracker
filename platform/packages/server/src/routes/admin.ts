@@ -16,7 +16,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { MODULE_KEYS, RC_SHEET_NAMES, ROLES, isAdminRole, type ModuleAccess } from '@efip/shared';
+import { ASSIGNABLE_CENTRES, MODULE_KEYS, ROLES, isAdminRole, type ModuleAccess } from '@efip/shared';
 import { isSuperAdmin, toAuthedUser, verifyPassword } from '../auth.ts';
 import { currentUser } from '../session.ts';
 import { LOGIN_OUTCOMES, listLogins, loginSummary } from '../logins.ts';
@@ -43,7 +43,7 @@ const PHONE = z.union([z.string().trim().regex(/^[0-9+\-\s()]{6,20}$/, 'Enter a 
    own tab names, so a typo cannot create a centre that no transaction belongs
    to; '' means the user belongs to none and may comment nowhere. Present on the
    two administrator schemas and deliberately absent from PROFILE below. */
-const REGIONAL_CENTRE = z.union([z.enum(RC_SHEET_NAMES), z.literal('')]);
+const REGIONAL_CENTRE = z.union([z.enum(ASSIGNABLE_CENTRES as unknown as [string, ...string[]]), z.literal('')]);
 
 const NEW_USER = z.object({
   username: z.string().trim().min(2).max(60).regex(/^[A-Za-z0-9._-]+$/, 'Use letters, numbers, dot, dash or underscore.'),

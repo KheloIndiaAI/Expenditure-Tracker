@@ -18,18 +18,14 @@
  * reported and skipped, so re-running cannot undo a correction made by hand.
  */
 
-import { RC_SHEET_NAMES } from '@efip/shared';
+import { centreFromUsername } from '@efip/shared';
 import { listUsers, updateUser } from '../users.ts';
 
 const apply = process.argv.includes('--apply');
 
-/** `rc_kolkata` → `KOLKATA`, `rc-new-delhi` → `NEW DELHI`. Exact matches only. */
-function proposeCentre(username: string): string {
-  const m = /^rc[_.-](.+)$/i.exec(username.trim());
-  if (!m) return '';
-  const guess = m[1].replace(/[_.-]+/g, ' ').trim().toUpperCase();
-  return (RC_SHEET_NAMES as readonly string[]).includes(guess) ? guess : '';
-}
+/* The derivation lives in @efip/shared, shared with the boot-time backfill, so
+   the script and the server can never disagree about what a username implies. */
+const proposeCentre = centreFromUsername;
 
 const users = await listUsers();
 const rows = users.map((u) => ({
