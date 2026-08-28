@@ -1946,6 +1946,18 @@ function idleOf(s){ return s.mdsd ? Math.max(0,s.bal) : Math.max(0,(s.totLim||0)
      - DDO HQ, the headquarters DDO.
    All three are summed back to the card's own headline, so the split never changes a total. */
 const HQ_KEY='DDO HQ', INFRA_KEY='INFRA-SAI';
+/**
+ * What a centre is called on screen.
+ *
+ * INFRA-SAI is the workbook's own column heading for the INFRA lim/act pair
+ * (Sheet3 columns AF and AG) - SAI's own infrastructure spending, released to
+ * vendors rather than through a Regional Centre. "INFRA-SAI" says nothing to a
+ * reader about what that money is, so it is named here rather than at each of
+ * the six places it is drawn, which is what keeps the panels agreeing.
+ * Every other centre is shown as the workbook names it.
+ */
+const CENTRE_LABEL={'INFRA-SAI':'SAI-Infra to vendors'};
+function centreLabel(name){ return CENTRE_LABEL[name]||name; }
 function idleByCentre(list){
   const L=list||SV;
   return ACTIVE_CENTRES.map(c=>{ let lim=0,act=0;
@@ -1979,13 +1991,13 @@ function rcTipRows(metric,label){
   var tot=rcTot+(infraOn?val(infra):0)+(hqOn?val(hq):0);
   var shown=rc.filter(function(r){ return Math.round(val(r))!==0; }).sort(function(a,b){ return val(b)-val(a); });
   var nil=rc.length-shown.length;
-  var off=[!hqOn?'DDO HQ':null,!infraOn?'INFRA-SAI':null].filter(Boolean);
+  var off=[!hqOn?centreLabel(HQ_KEY):null,!infraOn?centreLabel(INFRA_KEY):null].filter(Boolean);
   if(!shown.length && !hqOn && !infraOn) return '';
   return '<div class="tipbd-h">'+esc(label)+'</div><table class="tipbd">'
    + shown.map(function(r){ return '<tr><td>'+esc(r.key)+'</td><td>'+crShort(val(r))+'</td></tr>'; }).join('')
    + (nil?'<tr class="nil"><td>'+nil+' other centre'+(nil===1?'':'s')+' · nil</td><td>–</td></tr>':'')
    + '<tr class="sub"><td>Regional Centres ('+rc.length+')</td><td>'+crShort(rcTot)+'</td></tr>'
-   + (infraOn?'<tr class="infra"><td>INFRA-SAI</td><td>'+crShort(val(infra))+'</td></tr>':'')
+   + (infraOn?'<tr class="infra"><td>'+esc(centreLabel(INFRA_KEY))+'</td><td>'+crShort(val(infra))+'</td></tr>':'')
    + (hqOn?'<tr class="hq"><td>DDO HQ</td><td>'+crShort(val(hq))+'</td></tr>':'')
    + '<tr class="tot"><td>Total</td><td>'+crShort(tot)+'</td></tr>'
    + (off.length?'<tr class="nil"><td colspan="2">'+off.join(' and ')+' not counted in this panel</td></tr>':'')
@@ -2007,12 +2019,12 @@ function idleTipRows(list,posOnly){
   const z=v=>Math.round(v)===0;
   if(!shown.length && (!hqOn||z(hq.idle)) && (!infraOn||z(infra.idle))) return '';
   const nil=rc.length-shown.length;
-  const off=[!hqOn?'DDO HQ':null,!infraOn?'INFRA-SAI':null].filter(Boolean);
+  const off=[!hqOn?centreLabel(HQ_KEY):null,!infraOn?centreLabel(INFRA_KEY):null].filter(Boolean);
   return `<div class="tipbd-h">Unspent by centre</div><table class="tipbd">`
    + shown.map(r=>`<tr><td>${esc(r.key)}</td><td>${crShort(r.idle)}</td></tr>`).join('')
    + (nil?`<tr class="nil"><td>${nil} other centre${nil===1?'':'s'} · nil unspent</td><td>–</td></tr>`:'')
    + `<tr class="sub"><td>Regional Centres (${rc.length})</td><td>${crShort(rcIdle)}</td></tr>`
-   + (infraOn?`<tr class="infra"><td>INFRA-SAI <span class="nb">· SAI infrastructure wing</span></td><td>${crShort(infra.idle)}</td></tr>`:'')
+   + (infraOn?`<tr class="infra"><td>${esc(centreLabel(INFRA_KEY))}</td><td>${crShort(infra.idle)}</td></tr>`:'')
    + (hqOn?`<tr class="hq"><td>DDO HQ <span class="nb">· HQ, not an RC</span></td><td>${crShort(hq.idle)}</td></tr>`:'')
    + `<tr class="tot"><td>Total unspent</td><td>${crShort(tot)}</td></tr>`
    + (off.length?`<tr class="nil"><td colspan="2">${off.join(' and ')} not counted in this panel</td></tr>`:'')
@@ -2129,6 +2141,8 @@ let state={view:'command', tr:{}, trSub:null, hsOpen:null, svOpen:null, filt:'Al
      draft is mirrored on every keystroke so a background sync that repaints the
      page cannot throw away what someone is halfway through typing. */
   cmtEdit:null, cmtDraft:'',
+  /* Which sub-vertical is open inside a section's by-sub-vertical table. */
+  secSv:null,
   /* Administration. One user's editor open at a time in each of the two lists;
      the sign-in log opens on the last 7 days, which is the window an
      administrator is nearly always asking about. */
@@ -2350,7 +2364,7 @@ function centreDetail(s){
     const tx=txForSVCentre(s.name,r.name), has=tx.length>0, k='C|'+s.name+'|'+r.name, open=has&&state.cdOpen===k;
     const chev=has?`<span class="chev${open?' open':''}" style="margin-right:6px">${open?'▾':'▸'}</span>`:'<span style="display:inline-block;width:25px"></span>';
     let out=`<tr${has?` class="click" style="cursor:pointer${open?';background:rgba(37,106,191,.10)':''}" onclick="event.stopPropagation();cdToggle(${jstr(k)})"`:''}>`
-     +`<td class="subc">${chev}${esc(r.name)}${has?` <span class="muted" style="font-weight:400;font-size:10.5px">· ${tx.length} txn${tx.length>1?'s':''}</span>`:''}</td>`
+     +`<td class="subc">${chev}${esc(centreLabel(r.name))}${has?` <span class="muted" style="font-weight:400;font-size:10.5px">· ${tx.length} txn${tx.length>1?'s':''}</span>`:''}</td>`
      +`<td class="num tnum">${r.lim==null?'<span class="muted">-</span>':crShort(r.lim)}</td>`
      +`<td class="num tnum" style="color:${r.act===0?'var(--text-muted)':'var(--text-primary)'}">${crShort(r.act)}</td>`
      +`<td class="num tnum" style="color:${idle>0?'var(--serious)':'var(--text-muted)'}">${idle==null?'-':crShort(idle)}</td>`
@@ -2899,7 +2913,31 @@ function viewYday(){
     + drop
     + '</div>';
 }
-function svMiniTable(rows){ return `<div class="tscroll"><table class="dt"><thead><tr><th>Sub-Vertical</th><th class="num">Assignment</th><th class="num">Expenditure</th><th class="num">Balance</th><th class="num">Used</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.key)}</td><td class="num tnum">${crShort(r.net)}</td><td class="num tnum">${crShort(r.util)}</td><td class="num tnum">${crShort(r.bal)}</td><td class="num tnum">${pct(r.up,0)}</td></tr>`).join('')}</tbody></table></div>`; }
+/* A sub-vertical opens onto the same centre breakdown the Component Tracker
+   uses - literally centreDetail, so the two panels cannot drift. That is what
+   surfaces the workbook's INFRA pair (Sheet3 AF/AG) here: it is one of the
+   fourteen centre columns, shown as "SAI-Infra to vendors".
+
+   It belongs inside the sub-vertical rather than beside it. SAI-Infra is where
+   part of that sub-vertical's money went, not a sub-vertical of its own, so a
+   sibling row would be counted twice against the section total. */
+function svMiniTable(rows){
+  const body=rows.map(r=>{
+    const sv=r.sv, k=sv?('S|'+sv.section+'|'+sv.name):null;
+    const open=!!k&&state.secSv===k;
+    const chev=k?`<span class="chev${open?' open':''}" style="margin-right:6px">${open?'▾':'▸'}</span>`
+               :'<span style="display:inline-block;width:25px"></span>';
+    return `<tr${k?` class="click${open?' rc-open':''}" style="cursor:pointer" onclick="secSvToggle(${jstr(k)})"`:''}>`
+      +`<td>${chev}${esc(r.key)}</td>`
+      +`<td class="num tnum">${crShort(r.net)}</td>`
+      +`<td class="num tnum">${crShort(r.util)}</td>`
+      +`<td class="num tnum">${crShort(r.bal)}</td>`
+      +`<td class="num tnum">${pct(r.up,0)}</td></tr>`
+      +(open?`<tr class="det"><td colspan="5" onclick="event.stopPropagation()">${centreDetail(sv)}</td></tr>`:'');
+  }).join('');
+  return `<div class="tscroll"><table class="dt"><thead><tr><th>Sub-Vertical</th><th class="num">Assignment</th><th class="num">Expenditure</th><th class="num">Balance</th><th class="num">Used</th></tr></thead><tbody>${body}</tbody></table></div>`;
+}
+function secSvToggle(k){ tipHide(); state.secSv = state.secSv===k?null:k; render(); }
 /* ---- section-level utilisation (Recurring / Infrastructure / Non-Recurring) - same shared
    entityUtilTable component used by Infrastructure MDSD and Regional Centres, so the
    Financial Overview's section view stays pixel-for-pixel consistent with those two panels. */
@@ -2908,7 +2946,7 @@ function sectionUtilItems(){
 }
 function sectionDetail(sec){
   const rows=SV.filter(s=>s.section===sec&&s.assign>0).sort((a,b)=>b.assign-a.assign).map(s=>({key:s.name,net:s.assign,util:s.exp,bal:s.bal,up:s.up,sv:s}));
-  return `<div class="grp-drop"><div class="small" style="margin:0 4px 7px;font-weight:600">${esc(sec)} · by sub-vertical <span class="muted" style="font-weight:400">· ${rows.length} sub-vertical${rows.length!==1?'s':''}</span></div>${svMiniTable(rows)}</div>`;
+  return `<div class="grp-drop"><div class="small" style="margin:0 4px 7px;font-weight:600">${esc(sec)} · by sub-vertical <span class="muted" style="font-weight:400">· ${rows.length} sub-vertical${rows.length!==1?'s':''} · click one for its centre breakdown</span></div>${svMiniTable(rows)}</div>`;
 }
 function sectionIcon(name){
   if(name==='Infrastructure') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 11h.01M15 11h.01M9 7h.01M15 7h.01"/></svg>`;
@@ -2958,7 +2996,7 @@ function rcKpis(){
   const actUp=lim?act/lim:0, idleUp=lim?idle/lim:0;
   const funded=agg.filter(c=>c.lim>0).length, drawing=agg.filter(c=>c.act>0).length;
   const scope=(state.filt==='All')?'all classifications':state.filt;
-  const inc=[G.inclHQ?'DDO HQ':null,G.inclInfraSai?'INFRA-SAI':null].filter(Boolean);
+  const inc=[G.inclHQ?centreLabel(HQ_KEY):null,G.inclInfraSai?centreLabel(INFRA_KEY):null].filter(Boolean);
   const exOut=(G.exCentres||[]);
   /* Every tooltip on this page follows one shape: the bridge equation first, then a
      single short line of scope, then the itemised centre table with its subtotal,
