@@ -23,7 +23,7 @@ import { hashPassword } from './auth.ts';
 export type UserWithHash = User & { password_hash: string };
 
 /** Every column of a user except the hash — the shape the API returns. */
-const COLS = 'id, username, name, role, designation, email, phone, is_active';
+const COLS = 'id, username, name, role, designation, email, phone, is_active, regional_centre';
 
 /** SQLite and Postgres both hand back 0/1 here; the API contract is boolean. */
 type Row = Omit<User, 'is_active'> & { is_active: number | boolean; password_hash?: string };
@@ -68,6 +68,7 @@ export interface NewUser {
   email?: string;
   phone?: string;
   is_active?: boolean;
+  regional_centre?: string;
 }
 
 /** Idempotent upsert on username — used by both seed scripts, safe to re-run. */
@@ -82,24 +83,41 @@ export async function upsertUser(input: NewUser): Promise<User> {
     email: input.email ?? '',
     phone: input.phone ?? '',
     is_active: input.is_active === false ? 0 : 1,
+    regional_centre: input.regional_centre ?? '',
   };
   if (existing) {
-    /* Re-seeding must not silently revive a login a Super Admin deactivated, so
-       is_active is only written when the caller states one. */
-    const keepActive = input.is_active === undefined;
-    await db.run(
-      `UPDATE app_user SET name = ?, role = ?, designation = ?, email = ?, phone = ?, password_hash = ?
-       ${keepActive ? '' : ', is_active = ?'} WHERE username = ?`,
-      keepActive
-        ? [fields.name, fields.role, fields.designation, fields.email, fields.phone, hashPassword(input.password), username]
-        : [fields.name, fields.role, fields.designation, fields.email, fields.phone, hashPassword(input.password), fields.is_active, username],
-    );
+    /* Two fields are written only when the caller actually states one, because
+       a re-seed must not undo a decision an administrator made in the platform.
+       The CSV roster is a list of logins, not a record of every setting: it
+       carries no is_active and no centre, so writing the defaults for those
+       would silently revive a login that was deactivated on purpose, and strip
+       the centre from every RC account on the next routine re-seed. Absent
+       means "not stated", never "set it back to the default". */
+    const sets = ['name = ?', 'role = ?', 'designation = ?', 'email = ?', 'phone = ?', 'password_hash = ?'];
+    const args: unknown[] = [
+      fields.name,
+      fields.role,
+      fields.designation,
+      fields.email,
+      fields.phone,
+      hashPassword(input.password),
+    ];
+    if (input.is_active !== undefined) {
+      sets.push('is_active = ?');
+      args.push(fields.is_active);
+    }
+    if (input.regional_centre !== undefined) {
+      sets.push('regional_centre = ?');
+      args.push(fields.regional_centre);
+    }
+    args.push(username);
+    await db.run(`UPDATE app_user SET ${sets.join(', ')} WHERE username = ?`, args);
     return (await findByUsername(username)) as User;
   }
   const id = randomUUID();
   await db.run(
-    `INSERT INTO app_user (id, username, name, role, designation, email, phone, is_active, password_hash, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO app_user (id, username, name, role, designation, email, phone, is_active, regional_centre, password_hash, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       username,
@@ -109,6 +127,7 @@ export async function upsertUser(input: NewUser): Promise<User> {
       fields.email,
       fields.phone,
       fields.is_active,
+      fields.regional_centre,
       hashPassword(input.password),
       new Date().toISOString(),
     ],
@@ -124,9 +143,11 @@ export interface AdminPatch {
   phone?: string;
   role?: Role;
   is_active?: boolean;
+  /** Which centre's vouchers they may comment on. Super Admin only. */
+  regional_centre?: string;
 }
 
-/** Fields a user may change on themselves — role and access are not among them. */
+/** Fields a user may change on themselves — role, centre and access are not among them. */
 export type ProfilePatch = Pick<AdminPatch, 'name' | 'designation' | 'email' | 'phone'>;
 
 export async function updateUser(id: string, patch: AdminPatch): Promise<User | undefined> {
@@ -143,6 +164,7 @@ export async function updateUser(id: string, patch: AdminPatch): Promise<User | 
   if (patch.phone !== undefined) put('phone', patch.phone);
   if (patch.role !== undefined) put('role', patch.role);
   if (patch.is_active !== undefined) put('is_active', patch.is_active ? 1 : 0);
+  if (patch.regional_centre !== undefined) put('regional_centre', patch.regional_centre);
   if (!sets.length) return findById(id);
   args.push(id);
   await db.run(`UPDATE app_user SET ${sets.join(', ')} WHERE id = ?`, args);

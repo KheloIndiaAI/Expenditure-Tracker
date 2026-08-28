@@ -579,6 +579,20 @@ export interface User {
   phone: string;
   /** A deactivated user keeps their record but is refused at login. */
   is_active: boolean;
+  /**
+   * The Regional Centre whose vouchers this user may comment on, or '' for
+   * none. One of RC_SHEET_NAMES — the worksheet tab names, which are what the
+   * dashboard stamps onto every transaction's `rc`.
+   *
+   * Explicit, and never inferred from the username. `RC_Kolkata` is a
+   * convention nothing enforces; usernames are stored lower-cased and cannot
+   * contain the space in "DDO HQ"; and a rule parsed out of a display string at
+   * request time fails silently on a typo. Only a Super Admin may set it — it
+   * is absent from the self-service profile patch for the same reason `role`
+   * is, because a field a user can change on themselves is a field they can use
+   * to grant themselves someone else's centre.
+   */
+  regional_centre: string;
 }
 
 export interface AuthedUser extends User {
@@ -586,6 +600,42 @@ export interface AuthedUser extends User {
   /** Which dashboard panels this user may open, resolved server-side. */
   modules: ModuleAccess;
 }
+
+// ─── Voucher comments · a centre's note to HQ about one release ──────────────
+
+/**
+ * A comment is identified by `CENTRE|VOUCHER` — the same identity the change log
+ * uses, and deliberately free of any amount, so a comment survives the figures
+ * moving. Both halves must be non-empty and neither may contain the separator,
+ * or the key cannot be split back apart unambiguously.
+ */
+export const TX_KEY_RE = /^[^|]+\|[^|]+$/;
+
+export function txCommentKey(centre: string, voucher: string): string {
+  return `${centre}|${voucher}`;
+}
+
+/** The centre half of a key, or '' when the key is malformed. */
+export function centreOfTxKey(key: string): string {
+  if (!TX_KEY_RE.test(key)) return '';
+  return key.slice(0, key.indexOf('|'));
+}
+
+export interface TransactionComment {
+  tx_key: string;
+  centre: string;
+  voucher: string;
+  body: string;
+  author_id: string;
+  author_name: string;
+  /** Latched when the balance is reported nil; never cleared. */
+  locked: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** The longest comment the store accepts. Long enough for a real explanation. */
+export const COMMENT_MAX = 2000;
 
 // ─── 07 §7 · Audit ───────────────────────────────────────────────────────────
 

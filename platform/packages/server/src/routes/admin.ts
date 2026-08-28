@@ -16,7 +16,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { MODULE_KEYS, ROLES, isAdminRole, type ModuleAccess } from '@efip/shared';
+import { MODULE_KEYS, RC_SHEET_NAMES, ROLES, isAdminRole, type ModuleAccess } from '@efip/shared';
 import { isSuperAdmin, toAuthedUser, verifyPassword } from '../auth.ts';
 import { currentUser } from '../session.ts';
 import { LOGIN_OUTCOMES, listLogins, loginSummary } from '../logins.ts';
@@ -39,6 +39,12 @@ const OPTIONAL_TEXT = z.string().trim().max(160);
 const EMAIL = z.union([z.string().trim().email('Enter a valid email address.'), z.literal('')]);
 const PHONE = z.union([z.string().trim().regex(/^[0-9+\-\s()]{6,20}$/, 'Enter a valid phone number.'), z.literal('')]);
 
+/* Which centre's vouchers a login may comment on. Validated against the sheet's
+   own tab names, so a typo cannot create a centre that no transaction belongs
+   to; '' means the user belongs to none and may comment nowhere. Present on the
+   two administrator schemas and deliberately absent from PROFILE below. */
+const REGIONAL_CENTRE = z.union([z.enum(RC_SHEET_NAMES), z.literal('')]);
+
 const NEW_USER = z.object({
   username: z.string().trim().min(2).max(60).regex(/^[A-Za-z0-9._-]+$/, 'Use letters, numbers, dot, dash or underscore.'),
   name: z.string().trim().min(1).max(160),
@@ -48,6 +54,7 @@ const NEW_USER = z.object({
   role: z.enum(ROLES),
   password: PASSWORD,
   is_active: z.boolean().optional(),
+  regional_centre: REGIONAL_CENTRE.optional(),
 });
 
 const EDIT_USER = z.object({
@@ -57,6 +64,7 @@ const EDIT_USER = z.object({
   phone: PHONE.optional(),
   role: z.enum(ROLES).optional(),
   is_active: z.boolean().optional(),
+  regional_centre: REGIONAL_CENTRE.optional(),
 });
 
 const ACCESS = z.object(

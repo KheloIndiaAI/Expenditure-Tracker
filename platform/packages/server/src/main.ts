@@ -27,6 +27,7 @@ import { dummyVerify, signToken, toAuthedUser, verifyPassword } from './auth.ts'
 import { COOKIE_NAME, currentUser, stripHash } from './session.ts';
 import { recordLogin } from './logins.ts';
 import { registerAdminRoutes } from './routes/admin.ts';
+import { registerCommentRoutes } from './routes/comments.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -197,6 +198,9 @@ async function start(): Promise<void> {
   // Super Admin (/api/admin/*) and self-service (/api/me*) routes. Every one of
   // them re-checks the caller against the database — see routes/admin.ts.
   registerAdminRoutes(app);
+  /* Voucher comments. Read is open to any signed-in user; writing is restricted
+     to the centre the caller is assigned to — see comments.ts. */
+  registerCommentRoutes(app);
 
   // Public liveness probe — no user count or other internal detail is exposed.
   app.get('/api/health', async () => ({ ok: true }));

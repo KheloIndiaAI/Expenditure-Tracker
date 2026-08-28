@@ -214,6 +214,39 @@ button{font-family:inherit}
 .pf-msg.err{background:rgba(198,45,45,.07);color:var(--critical);border:1px solid rgba(198,45,45,.26)}
 .card-hd .link{font-size:12.5px;font-weight:600;cursor:pointer}
 
+/* ---- Voucher comments ------------------------------------------------------
+   A column in the Regional Centres voucher table, and the editor that unfolds
+   beneath a row. The button borrows .saif-print's shape - the file's only other
+   small bordered action control - so it reads as the same kind of thing. */
+.txmini.hascmt th:first-child,.txmini.hascmt td:first-child{width:34%;max-width:0}
+.txmini.hascmt .txnar{max-width:none}
+.txmini.hascmt th:nth-child(2),.txmini.hascmt td.cmtcell{width:20%}
+.cmtcell{vertical-align:top}
+.cmt-btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);
+  background:var(--bg-surface);border-radius:7px;padding:3px 8px;cursor:pointer;font-family:inherit;
+  font-size:11px;font-weight:600;color:var(--text-secondary);white-space:nowrap;
+  transition:background .12s,border-color .12s,color .12s}
+.cmt-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-subtle)}
+.cmt-btn:active{transform:translateY(1px)}
+.cmt-btn svg{width:12px;height:12px;flex:none}
+.cmt-btn.has{margin-top:5px}
+/* The saved note. Clamped to three lines so one long comment cannot stretch a
+   row past everything beside it; the full text is on the title attribute. */
+.txcmt{font-size:11.5px;line-height:1.45;color:var(--text-primary);overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.txcmt-by{font-size:10px;color:var(--text-muted);font-weight:500;margin-top:2px;
+  -webkit-line-clamp:none;display:block}
+.cmtrow>td{padding:0!important;background:linear-gradient(180deg,rgba(37,106,191,.06),rgba(37,106,191,.01))!important}
+.cmt-ed{padding:11px 12px 12px}
+.cmt-ed-hd{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:7px}
+.cmt-ta{width:100%;border:1px solid var(--border);border-radius:8px;background:var(--bg-surface);
+  padding:9px 11px;font-family:inherit;font-size:13px;line-height:1.5;color:var(--text-primary);
+  outline:0;resize:vertical;min-height:66px;transition:border-color .12s,box-shadow .12s}
+.cmt-ta:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-subtle)}
+.cmt-act{display:flex;align-items:center;gap:9px;margin-top:9px}
+.cmt-act .pf-hint{margin:0;margin-right:auto}
+
 /* ---- Administration panels -------------------------------------------------
    User Management, Roles & Access and User Logs. These extend the .pf-* form
    language above rather than starting a second one, and the row that opens to
@@ -1321,6 +1354,18 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
     border-bottom:1px solid var(--border-subtle);font-size:12.5px}
   table.txcards tbody td:first-child::before{display:none}
   table.txcards .txnar{margin-top:6px}
+  /* A comment is prose, not a figure: the right-aligned label/value row every
+     other cell uses would squeeze it into a column two words wide. */
+  table.txcards tbody td.cmtcell{display:block;text-align:left;padding:5px 0 3px}
+  table.txcards tbody td.cmtcell::before{display:block;margin-bottom:4px}
+  table.txcards .txcmt{-webkit-line-clamp:6}
+  /* The editor row carries a colspan, so labelTableCells leaves it unlabelled
+     and it must not inherit the card padding meant for a data row. */
+  table.txcards tbody tr.cmtrow{padding:0;border:0;background:none;margin:0 0 7px}
+  table.txcards tbody tr.cmtrow td{display:block;text-align:left;padding:0}
+  table.txcards tbody tr.cmtrow td::before{display:none}
+  .cmt-act{flex-wrap:wrap}
+  .cmt-act .pf-hint{margin-right:0;flex-basis:100%;order:-1}
 
   /* ---- The KPI band leads with one hero figure, then supporting numbers ---- */
   .kpi-grid,.kpi-grid.k3,.kpi-grid.k5{grid-template-columns:repeat(2,1fr);gap:10px}
@@ -2080,6 +2125,10 @@ let state={view:'command', tr:{}, trSub:null, hsOpen:null, svOpen:null, filt:'Al
   rcOnly:false,
   /* Yesterday's Expenditure: one centre's vouchers open at a time. */
   ydCentre:null,
+  /* Voucher comments: which row's editor is open, and its unsaved text. The
+     draft is mirrored on every keystroke so a background sync that repaints the
+     page cannot throw away what someone is halfway through typing. */
+  cmtEdit:null, cmtDraft:'',
   /* Administration. One user's editor open at a time in each of the two lists;
      the sign-in log opens on the last 7 days, which is the window an
      administrator is nearly always asking about. */
@@ -2309,9 +2358,8 @@ function centreDetail(s){
     if(open) out+=`<tr class="txrow"><td colspan="5" onclick="event.stopPropagation()">${txnList(tx)}</td></tr>`;
     return out;
   }).join('');
-  const anyTx=txForSV(s.name).length;
   return `<div class="grp-drop">
-    <div class="small" style="margin:0 4px 7px;font-weight:600">Sub-component detail · where ${esc(s.name)} is spent <span class="muted" style="font-weight:400">· ${rows.length} spending points${anyTx?` · ${anyTx} classified release${anyTx>1?'s':''} - click a centre with a ▸ for its vouchers`:''}</span></div>
+    <div class="small" style="margin:0 4px 7px;font-weight:600">Sub-component detail · where ${esc(s.name)} is spent</div>
     <div class="usage"><table><thead><tr><th>Centre / Head</th><th class="num">Limit Assigned</th><th class="num">Actual Exp.</th><th class="num">Unspent</th><th class="num">Used</th></tr></thead><tbody>${body}</tbody></table></div>
     <div class="small" style="margin-top:9px;color:var(--text-secondary)">Assignment <b>${crShort(s.assign)}</b> &nbsp;·&nbsp; Expenditure <b>${crShort(s.exp)}</b> &nbsp;·&nbsp; Balance <b>${crShort(s.bal)}</b> &nbsp;·&nbsp; Utilisation <b>${pct(s.up,1)}</b></div>
   </div>`;
@@ -2325,12 +2373,12 @@ function svDetailForCentre(centre){
      +`<td class="subc">${chev}${esc(x.s.name)}${has?` <span class="muted" style="font-weight:400;font-size:10.5px">· ${tx.length} txn${tx.length>1?'s':''}</span>`:''}<div class="muted" style="font-size:11px;font-weight:400;padding-left:${has?'25px':'25px'}">${esc(x.s.section)}</div></td>`
      +`<td class="num tnum">${crShort(b.lim)}</td><td class="num tnum">${crShort(b.act)}</td>`
      +`<td class="num tnum" style="color:${idle>0?'var(--serious)':'var(--text-muted)'}">${crShort(idle)}</td><td class="num tnum">${pct(up,0)}</td></tr>`;
-    if(open) out+=`<tr class="txrow"><td colspan="5" onclick="event.stopPropagation()">${txnList(tx)}</td></tr>`;
+    if(open) out+=`<tr class="txrow"><td colspan="5" onclick="event.stopPropagation()">${txnList(tx,centre)}</td></tr>`;
     return out;
   }).join('');
-  const tl=sum(rows,x=>x.b.lim),ta=sum(rows,x=>x.b.act), anyTx=txForCentre(centre).length;
+  const tl=sum(rows,x=>x.b.lim),ta=sum(rows,x=>x.b.act);
   return `<div class="grp-drop">
-    <div class="small" style="margin:0 4px 7px;font-weight:600">Sub-component detail · ${esc(centre)} by sub-vertical <span class="muted" style="font-weight:400">· ${rows.length} sub-verticals${anyTx?` · ${anyTx} classified release${anyTx>1?'s':''} - click a sub-vertical with a ▸ for its vouchers`:''}</span></div>
+    <div class="small" style="margin:0 4px 7px;font-weight:600">Sub-component detail · ${esc(centre)}</div>
     <div class="usage"><table><thead><tr><th>Sub-Vertical</th><th class="num">Limit Assigned</th><th class="num">Actual Exp.</th><th class="num">Unspent</th><th class="num">Used</th></tr></thead><tbody>${body}</tbody></table></div>
     <div class="small" style="margin-top:9px;color:var(--text-secondary)">Total Limit <b>${crShort(tl)}</b> &nbsp;·&nbsp; Actual <b>${crShort(ta)}</b> &nbsp;·&nbsp; Idle <b>${crShort(tl-ta)}</b> &nbsp;·&nbsp; Used <b>${pct(tl?ta/tl:0,1)}</b></div>
   </div>`;
@@ -2338,8 +2386,6 @@ function svDetailForCentre(centre){
 
 
 /* ---- classified RC releases (voucher detail, linked to component) ---- */
-function txForSV(n){ return TXN.filter(t=>t.sv===n).sort((a,b)=>b.net-a.net); }
-function txForCentre(c){ return TXN.filter(t=>t.rc===c).sort((a,b)=> a.section<b.section?-1:a.section>b.section?1:(a.sv<b.sv?-1:a.sv>b.sv?1:(b.net-a.net))); }
 const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function fmtD(d){ if(!d) return ''; const p=String(d).split('-'); if(p.length<3) return d; return p[2]+' '+MON[(+p[1])-1]; }
 function releasesTable(rows,showCol){
@@ -2358,14 +2404,244 @@ function releasesBlock(rows,showCol,ctx){
 }
 function txForSVCentre(sv,c){ return TXN.filter(t=>t.sv===sv&&t.rc===c).sort((a,b)=>b.net-a.net); }
 function cdToggle(k){ tipHide(); state.cdOpen = state.cdOpen===k?null:k; render(); }
-function txnList(rows){
-  const body=rows.map(t=>`<tr title="${esc(t.nar)}">
-    <td><b>${esc(t.voucher||t.sanction)}</b> <span class="muted">· ${esc(t.sanction)} · ${fmtD(t.date)}</span><div class="txnar">${esc(t.nar)}</div></td>
-    <td>${esc(t.scat)}</td>
-    <td class="num tnum">${crShort(t.net)}</td>
-    <td class="num tnum" style="color:${t.util>0?'var(--good)':'var(--text-muted)'}">${crShort(t.util)}</td>
-    <td class="num tnum">${crShort(t.bal)}</td></tr>`).join('');
-  return `<table class="txmini"><thead><tr><th>Voucher · Sanction · Date</th><th>Sub-category</th><th class="num">Released</th><th class="num">Utilised</th><th class="num">Balance</th></tr></thead><tbody>${body}</tbody></table>`;
+/* The voucher table. `centre` is passed by the Regional Centres panel alone and
+   is what turns the Comment column on; every other caller gets the five-column
+   table it has always had. Scoping it by an argument rather than by reading
+   state.view means the two other panels that share this function - Component
+   Tracker and Sub-Vertical Analysis, both via centreDetail - cannot grow the
+   column by accident.
+
+   The header cells and the body cells are driven by the SAME `cmt` flag on
+   purpose: labelTableCells() silently skips a row whose cell count differs from
+   the header's, leaving every mobile label blank rather than erroring, so the
+   two must be incapable of disagreeing. */
+function txnList(rows,centre){
+  const cmt=!!centre;
+  const body=rows.map(t=>{
+    const k=txKey(t);
+    const row=`<tr title="${esc(t.nar)}">`
+      +`<td><b>${esc(t.voucher||t.sanction)}</b> <span class="muted">· ${esc(t.sanction)} · ${fmtD(t.date)}</span><div class="txnar">${esc(t.nar)}</div></td>`
+      +(cmt?`<td class="cmtcell">${cmtCell(t,k,centre)}</td>`:'')
+      +`<td>${esc(t.scat)}</td>`
+      +`<td class="num tnum">${crShort(t.net)}</td>`
+      +`<td class="num tnum" style="color:${t.util>0?'var(--good)':'var(--text-muted)'}">${crShort(t.util)}</td>`
+      +`<td class="num tnum">${crShort(t.bal)}</td></tr>`;
+    /* The editor is a full-width row of its own rather than a cell, so it can
+       hold a real textarea without squeezing the columns. Its colspan makes the
+       cell count differ from the header, which is exactly why labelTableCells
+       leaves it alone. */
+    return row+((cmt&&state.cmtEdit===k)
+      ? `<tr class="cmtrow"><td colspan="6">${cmtEditor(t,k)}</td></tr>` : '');
+  }).join('');
+  return `<table class="txmini${cmt?' hascmt':''}"><thead><tr><th>Voucher · Sanction · Date</th>`
+    +(cmt?'<th>Comment</th>':'')
+    +`<th>Sub-category</th><th class="num">Released</th><th class="num">Utilised</th><th class="num">Balance</th></tr></thead><tbody>${body}</tbody></table>`;
+}
+
+/* ---- Voucher comments ------------------------------------------------------
+   A Regional Centre's note to HQ about one release: what it is for, or what is
+   holding it up.
+
+   Who may write. Only the user assigned to that centre, and only while the
+   voucher still has a balance. Both are re-checked server-side on every write -
+   see comments.ts - so what follows decides what to DRAW and never what is
+   allowed. A user who edits their own state gets a 403, not a saved comment.
+
+   Why the balance rule is only kept here. The server holds no financial data at
+   all: the dashboard reads the sheet in the browser, so the balance is
+   something only this code knows. The server therefore latches a comment closed
+   when it is TOLD the balance is nil, and the honest description of the rule is
+   that the UI keeps it and the latch makes it durable - not that it is verified.
+
+   Identity. txKey(t) is `CENTRE|VOUCHER`, the same key the change log uses, and
+   it deliberately carries no amount: the figures move on every sync, and the
+   balance reaching nil must freeze a comment rather than orphan it. */
+var CMT = { byKey:{}, loaded:false, loading:false, err:null, dup:{} };
+
+/** Comments cannot be keyed on a blank or pipe-bearing voucher - see txKey. */
+function cmtKeyable(t){
+  return !!(t && t.rc && t.voucher && String(t.voucher).indexOf('|')<0 && String(t.rc).indexOf('|')<0);
+}
+/**
+ * May the signed-in user write on this row?
+ *
+ * Every clause is a reason the button must not appear; the server enforces the
+ * first three again. `bal` is read as a number because the sheet can hand back
+ * a string, and `'0' > 0` is false but `'' > 0` is too - both mean no button.
+ */
+function cmtCanWrite(t,centre){
+  /* Until the store has actually loaded, an empty CMT.byKey is indistinguishable
+     from "no comment here" - and saving against that would silently overwrite a
+     colleague's note. No store, no writing. */
+  if(!CMT.loaded||CMT.err) return false;
+  if(!ME||!ME.regional_centre) return false;
+  if(ME.regional_centre!==centre||t.rc!==centre) return false;
+  if(!cmtKeyable(t)) return false;
+  if(CMT.dup[txKey(t)]) return false;              // ambiguous identity - see cmtIndex
+  if(!(Number(t.bal)>0)) return false;             // closed voucher: frozen
+  const c=CMT.byKey[txKey(t)];
+  return !(c&&c.locked);
+}
+/** One cell: the comment if there is one, and the button if they may write. */
+function cmtCell(t,k,centre){
+  const c=CMT.byKey[k], can=cmtCanWrite(t,centre);
+  let out='';
+  if(c){
+    /* Comment bodies are the only text in this document typed by a user rather
+       than written by its author. They go through esc() into element content
+       and into a plain title attribute - never through tattr(), which stores
+       HTML for innerHTML and would hand an <img onerror> straight back. */
+    out+=`<div class="txcmt" title="${esc(c.body)}">${esc(c.body)}`
+      +`<div class="txcmt-by">${esc(c.author_name||'')}${c.updated_at?' · '+esc(fmtD(String(c.updated_at).slice(0,10))):''}`
+      +`${c.locked?' · closed':''}</div></div>`;
+  }
+  /* While this row's editor is open the button is withdrawn: it sits directly
+     above the textarea, and clicking it would reload the stored body over
+     whatever was being typed. */
+  if(can&&state.cmtEdit!==k){
+    out+=`<button class="cmt-btn${c?' has':''}" onclick="event.stopPropagation();cmtOpen(${jstr(k)})"`
+      +` title="Please type your query/explanation or any support you needed from HQ for this transaction"`
+      +` aria-label="${c?'Edit the comment on this transaction':'Add a comment on this transaction'}">`
+      +`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">`
+      +`<path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.4 8.6 8.6 0 0 1-3.9-.9L3 21l2-4.9a8.4 8.4 0 0 1-1-4 8.5 8.5 0 0 1 8.5-8.4h.5a8.4 8.4 0 0 1 8 8v.3z"/></svg>`
+      +`<span>${c?'Edit':'Comment'}</span></button>`;
+  } else if(!c){
+    out+='<span class="muted">—</span>';
+  }
+  return out;
+}
+function cmtEditor(t,k){
+  return `<div class="cmt-ed" onclick="event.stopPropagation()">`
+    +`<div class="cmt-ed-hd">Query or explanation for HQ <span class="muted">· ${esc(t.voucher||'')} · ${esc(t.rc||'')}</span></div>`
+    +`<div id="cmtMsg"></div>`
+    +`<textarea class="cmt-ta" id="cmtTa" rows="3" maxlength="2000"`
+    +` placeholder="What is this release for, or what support do you need from HQ?"`
+    +` oninput="state.cmtDraft=this.value">${esc(state.cmtDraft)}</textarea>`
+    +`<div class="cmt-act"><span class="pf-hint">Visible to HQ. Editable until the balance reaches nil.</span>`
+    +`<button class="btn" onclick="cmtCancel()">Cancel</button>`
+    +`<button class="pf-btn" id="cmtSaveBtn" onclick="cmtSave(${jstr(k)},${Number(t.bal)||0})">Save comment</button>`
+    +`</div></div>`;
+}
+/**
+ * Is an editor actually on screen?
+ *
+ * state.cmtEdit alone is not the answer. Nothing clears it when the row is
+ * collapsed or the panel is left, so a flag left standing would have stopped
+ * every timed repaint for the rest of the session - the sync would keep
+ * applying figures the page never showed. Asking the DOM cannot go stale, and
+ * the chance to tidy the flag is taken while we are here.
+ */
+function cmtEditorLive(){
+  if(!state.cmtEdit) return false;
+  if(document.getElementById('cmtTa')) return true;
+  state.cmtEdit=null; state.cmtDraft='';
+  return false;
+}
+/**
+ * Recompute which keys are ambiguous.
+ *
+ * The duplicate check reads DATA.txns, which syncApply replaces wholesale every
+ * ten minutes. Computed once at load it would answer for a dataset that no
+ * longer exists, so it is redone whenever the transactions are.
+ */
+function cmtReindexDups(){
+  if(!CMT.loaded) return;
+  CMT.dup={};
+  const seen={};
+  (DATA.txns||[]).forEach(function(t){
+    if(!cmtKeyable(t)) return;
+    const k=txKey(t);
+    if(seen[k]) CMT.dup[k]=true; else seen[k]=1;
+  });
+}
+function cmtOpen(k){
+  tipHide();
+  state.cmtEdit=k;
+  state.cmtDraft=(CMT.byKey[k]&&CMT.byKey[k].body)||'';
+  render();
+  const el=document.getElementById('cmtTa');
+  if(el){ el.focus(); el.selectionStart=el.selectionEnd=el.value.length; }
+}
+function cmtCancel(){ state.cmtEdit=null; state.cmtDraft=''; render(); }   // repaints the deferred sync too
+function cmtSave(k,bal){
+  const btn=document.getElementById('cmtSaveBtn');
+  const body=(state.cmtDraft||'').trim();
+  if(!body){ pfNote('cmtMsg','err','Enter a comment before saving.'); return; }
+  btn.disabled=true; btn.textContent='Saving…';
+  pfNote('cmtMsg','','');
+  pfSend('/api/comments','POST',{tx_key:k, body:body, balance:Number(bal)||0})
+    .then(function(r){
+      /* Adopt the server's stored record rather than the draft - it is the one
+         that was actually saved, trimmed and capped - then repaint so the cell
+         shows it. The editor closes, so there is no notice to preserve. */
+      if(r&&r.comment) CMT.byKey[k]=r.comment;
+      state.cmtEdit=null; state.cmtDraft='';
+      render();
+    })
+    .catch(function(err){
+      pfNote('cmtMsg','err',err.message);
+      /* Only here: on success the button no longer exists to re-enable. */
+      if(btn.isConnected){ btn.disabled=false; btn.textContent='Save comment'; }
+    });
+}
+/**
+ * Index the comments for one centre, and note any key two rows share.
+ *
+ * (centre, voucher) was verified unique within each worksheet tab, but nothing
+ * in the sheet enforces it. If it is ever violated, two rows would share one
+ * comment; rather than let that happen silently the duplicate is recorded and
+ * cmtCanWrite withholds the button from both, so the ambiguity shows up as a
+ * missing control rather than as one centre's note appearing on another's row.
+ */
+function cmtIndex(list){
+  CMT.byKey={}; CMT.dup={}; CMT.loaded=true;
+  (list||[]).forEach(function(c){ if(c&&c.tx_key) CMT.byKey[c.tx_key]=c; });
+  cmtReindexDups();
+  const dups=Object.keys(CMT.dup);
+  if(dups.length) console.warn('These voucher numbers repeat within one centre, so a comment could not be attributed to a single row and the control was withheld:',dups);
+}
+/** Load every comment once. Re-entrant, and refetched only on request. */
+function cmtLoad(force){
+  if(CMT.loading) return;
+  if(CMT.loaded&&!force) return;
+  CMT.loading=true; CMT.err=null;
+  fetch('/api/comments',{credentials:'include'})
+    .then(function(r){ return r.text().then(function(t){
+      let p=null; try{ p=t?JSON.parse(t):null; }catch(e){ p=null; }
+      if(!r.ok) throw new Error((p&&p.message)||('Request failed ('+r.status+').'));
+      return p;
+    }); })
+    .then(function(p){
+      cmtIndex(p&&p.comments);
+      /* Seal anything that has closed since it was last written. Fire-and-
+         forget: the panel already treats a nil balance as frozen. */
+      if(ME&&ME.regional_centre) cmtSealClosed(ME.regional_centre);
+    })
+    .catch(function(err){ CMT.err=err.message; CMT.byKey={}; CMT.loaded=true; })
+    /* Same deferral as the sync: this fetch can land while someone is typing. */
+    .then(function(){ CMT.loading=false; if(!cmtEditorLive()) render(); });
+}
+/**
+ * Seal comments whose voucher has since closed.
+ *
+ * A comment written while the balance was healthy leaves no later write, so
+ * nothing would ever record that the voucher has closed and the latch would
+ * stay open forever. The panel reports the keys it now sees at nil; the server
+ * only ever sets the latch, never clears it. Only the owning centre may ask.
+ */
+function cmtSealClosed(centre){
+  if(!ME||ME.regional_centre!==centre) return;
+  const keys=[];
+  (DATA.txns||[]).forEach(function(t){
+    if(t.rc!==centre||!cmtKeyable(t)) return;
+    if(Number(t.bal)>0) return;
+    const k=txKey(t), c=CMT.byKey[k];
+    if(c&&!c.locked) keys.push(k);
+  });
+  if(!keys.length) return;
+  pfSend('/api/comments/lock','POST',{keys:keys})
+    .then(function(){ keys.forEach(function(k){ if(CMT.byKey[k]) CMT.byKey[k].locked=true; }); })
+    .catch(function(){ /* decorative: the UI already treats these as closed */ });
 }
 
 /* ---- insights ---- */
@@ -3115,10 +3391,17 @@ function kiPills(groups){
   }).join('')}</div>`;
 }
 function viewRC(){
+  /* The voucher tables in this panel carry the comment column, so the comments
+     are needed before one is expanded. Loads once; re-entrant. */
+  cmtLoad();
   const items=utilSorted(centreAgg().map(c=>({name:c.key,assign:c.lim,exp:c.act,bal:c.idle,up:c.up})),state.rcSort);
   return pageHead('Regional Centre Dashboard','')
    + rcKpis()
    + rcReco()
+   /* A comment column that is silently empty is worse than one that says why. */
+   + (CMT.err
+      ? `<div class="dki-note"><div class="ico">!</div><div>Voucher comments could not be loaded, so none are shown and none can be added. <b>${esc(CMT.err)}</b></div></div>`
+      : '')
    + `<div class="card" style="padding:0;overflow:hidden"><div class="card-hd" style="padding:16px 18px 0"><h3>Centre utilisation</h3></div>${entityUtilTable(items,RC_CFG)}</div>`;
 }
 /* small, honest per-sub-vertical iconography - one recognisable glyph per scheme
@@ -4682,6 +4965,10 @@ function syncApply(b){
   }
   DATA.txns=b.txns;
   TXN.length=0; Array.prototype.push.apply(TXN,b.txns);
+  /* The comment layer's ambiguity check reads these rows, so it is recomputed
+     against the set that just replaced them rather than the one it was built
+     from at load. */
+  cmtReindexDups();
   Object.keys(b.releasesMeta).forEach(function(k){ RMETA[k]=b.releasesMeta[k]; });
   DATA.releasesMeta=b.releasesMeta;
   SYNC.applied++;
@@ -4703,6 +4990,12 @@ function syncNow(manual){
   /* After the figures, pass or fail, and never able to reject - see syncHistory. */
   }).then(syncHistory).then(function(){
     SYNC.lastTry=new Date();
+    /* A sync lands every ten minutes and render() replaces the whole page. That
+       was harmless while nothing held unsaved input; a half-written comment is
+       the first thing it could throw away, so the repaint waits. The figures
+       behind the open row are already applied - only the paint is deferred, and
+       closing the editor repaints immediately. */
+    if(cmtEditorLive()) return;
     render();
   });
 }
@@ -5810,6 +6103,23 @@ function admLoadLogs(force) {
 /** Every role the platform knows, for the role picker. Mirrors ROLES/ROLE_LABELS. */
 const ADM_ROLES = ['minister','secretary','joint_secretary','director','finance_officer',
                    'senior_finance','analyst','auditor','admin','super_admin'];
+/* The Regional Centres a login can be assigned to. Mirrors RC_SHEET_NAMES in
+   @efip/shared - the worksheet tab names, which are what every transaction's
+   `rc` is stamped with. Deliberately NOT DATA.centres, which also holds
+   INFRA-SAI: that has no worksheet tab and therefore no vouchers, so assigning
+   someone to it would grant the right to comment on nothing. */
+/* DDO HQ is deliberately absent. It is a worksheet tab and it does have
+   vouchers, but the Regional Centres panel pins inclHQ:false in its own filter
+   preset, so DDO HQ rows never appear there and a login assigned to it would
+   hold a right it could never exercise. It is also, in this platform's own
+   vocabulary, not a regional centre - isRegionalCentre() excludes it - and
+   these comments are a centre's query TO headquarters. Offering it would be a
+   permission that quietly does nothing. */
+const ADM_RC = ['PATIALA','BANGALORE','BHOPAL','CHANDIGARH','GANDHINAGAR',
+                'GUWAHATI','IMPHAL','KOLKATA','LUCKNOW','MUMBAI','SONEPAT','TRIVANDRUM'];
+function admRcOpts(){
+  return [{v:'',t:'— None —'}].concat(ADM_RC.map(function(c){ return {v:c,t:c}; }));
+}
 /** The panels a grant can cover. Mirrors MODULES in @efip/shared.
     `r:1` marks a restricted panel — off unless granted, rather than on unless
     withdrawn — so the toggle can say which way round it is. */
@@ -5874,7 +6184,7 @@ function admError(msg) {
 function admMatch(u, q) {
   if (!q) return true;
   q = q.toLowerCase();
-  return [u.name, u.username, u.designation, u.email, u.phone, pfRoleLabel(u.role)]
+  return [u.name, u.username, u.designation, u.email, u.phone, u.regional_centre, pfRoleLabel(u.role)]
     .some(function (f) { return String(f || '').toLowerCase().indexOf(q) >= 0; });
 }
 function viewAdminUsers() {
@@ -5905,14 +6215,15 @@ function viewAdminUsers() {
         '<div class="un">' + esc(u.username) + '</div></span></div></td>' +
       '<td>' + (u.designation ? esc(u.designation) : '<span class="muted">—</span>') + '</td>' +
       '<td>' + esc(pfRoleLabel(u.role)) + '</td>' +
+      '<td>' + (u.regional_centre ? esc(u.regional_centre) : '<span class="muted">—</span>') + '</td>' +
       '<td><span class="ad-pill ' + (on ? 'on' : 'off') + '"><i></i>' + (on ? 'Active' : 'Deactivated') + '</span></td>' +
       '<td class="small">' + (seen ? esc(admAgo(seen)) : '<span class="muted">Never</span>') + '</td></tr>' +
-      (open ? '<tr class="ad-drop"><td colspan="5" onclick="event.stopPropagation()">' + admEditor(u) + '</td></tr>' : '');
+      (open ? '<tr class="ad-drop"><td colspan="6" onclick="event.stopPropagation()">' + admEditor(u) + '</td></tr>' : '');
   }).join('');
 
   var table = rows.length
     ? '<div class="tscroll"><table class="dt ad-tbl"><thead><tr>' +
-        '<th>Name</th><th>Designation</th><th>Role</th><th>Status</th><th>Last sign-in</th>' +
+        '<th>Name</th><th>Designation</th><th>Role</th><th>Centre</th><th>Status</th><th>Last sign-in</th>' +
       '</tr></thead><tbody>' + body + '</tbody></table></div>'
     : '<div class="dt-empty"><div class="e-ic">🔍</div><div class="e-t">No user matches “' + esc(q) + '”</div>' +
       '<div class="e-s">Try a name, username, designation or role.</div></div>';
@@ -5953,6 +6264,9 @@ function admEditor(u) {
             [{ v: 'yes', t: 'Active' }, { v: 'no', t: 'Deactivated' }],
             { label: 'Status', disabled: me,
               hint: me ? 'You cannot deactivate your own account.' : 'A deactivated account is refused at sign-in.' }) +
+          admSelect('ae-rc-' + u.id, u.regional_centre || '', admRcOpts(),
+            { label: 'Regional Centre',
+              hint: 'The centre whose vouchers this user may comment on. None means they may comment nowhere.' }) +
         '</div>' +
         '<div class="pf-act"><button class="pf-btn" type="submit" id="ae-btn-' + esc(u.id) + '">Save changes</button></div>' +
       '</form>' +
@@ -5985,6 +6299,8 @@ function admNewCard() {
         pfField('Email ID', 'an-email', '', { type: 'email' }) +
         pfField('Phone Number', 'an-phone', '') +
         admSelect('an-role', 'analyst', ADM_ROLES.map(function (r) { return { v: r, t: pfRoleLabel(r) }; }), { label: 'Role' }) +
+        admSelect('an-rc', '', admRcOpts(),
+          { label: 'Regional Centre', hint: 'Only needed for a centre login that will comment on its own vouchers.' }) +
         pfField('Password', 'an-pw', '', { type: 'password', required: true, autocomplete: 'new-password', hint: 'At least 8 characters.' }) +
       '</div>' +
       '<div class="pf-act"><button class="pf-btn" type="submit" id="an-btn">Create user</button></div>' +
@@ -6032,6 +6348,8 @@ function admSave(e, id) {
      is_active the server would have to refuse. */
   if (roleEl && !roleEl.disabled) patch.role = roleEl.value;
   if (actEl && !actEl.disabled) patch.is_active = actEl.value === 'yes';
+  const rcEl = document.getElementById('ae-rc-' + id);
+  if (rcEl) patch.regional_centre = rcEl.value;
   btn.disabled = true; btn.textContent = 'Saving…';
   pfNote(slot, '', '');
   pfSend('/api/admin/users/' + encodeURIComponent(id), 'PATCH', patch)
@@ -6081,6 +6399,7 @@ function admCreate(e) {
     email: pfVal('an-email'),
     phone: pfVal('an-phone'),
     role: (document.getElementById('an-role') || {}).value || 'analyst',
+    regional_centre: (document.getElementById('an-rc') || {}).value || '',
     password: pfVal('an-pw'),
   };
   if (!body.username || !body.name) { pfNote('admNewMsg', 'err', 'Username and name are both required.'); return false; }

@@ -43,6 +43,10 @@ const ADD_COLUMNS = [
   "ALTER TABLE app_user ADD COLUMN email TEXT NOT NULL DEFAULT ''",
   "ALTER TABLE app_user ADD COLUMN phone TEXT NOT NULL DEFAULT ''",
   'ALTER TABLE app_user ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1',
+  /* Append only, never reorder or edit: this list replays from the top on every
+     boot. Empty means "belongs to no centre", which is the safe default — it
+     grants nothing, so an existing login gains no write access by migrating. */
+  "ALTER TABLE app_user ADD COLUMN regional_centre TEXT NOT NULL DEFAULT ''",
 ];
 
 async function applyMigrations(db: Db): Promise<void> {
