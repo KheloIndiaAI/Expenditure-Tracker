@@ -551,7 +551,7 @@ export const MODULE_KEYS: readonly ModuleKey[] = MODULES.map((m) => m.key);
  * Both halves matter and both live in users.ts — getModuleAccess must not grant
  * it by default, and setModuleAccess must not read a missing key as a grant.
  */
-export const RESTRICTED_MODULES = ['yday'] as const satisfies readonly ModuleKey[];
+export const RESTRICTED_MODULES = ['saifmt', 'yday'] as const satisfies readonly ModuleKey[];
 
 export function isRestrictedModule(key: ModuleKey): boolean {
   return (RESTRICTED_MODULES as readonly string[]).includes(key);

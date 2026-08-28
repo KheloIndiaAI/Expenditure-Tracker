@@ -2169,7 +2169,7 @@ const ADMIN_VIEWS=['admin','access','logs'];
    RESTRICTED_MODULES in @efip/shared. Every other panel is open unless a stored
    decision closes it; these are closed unless a stored decision opens them, and
    moduleAllowed() below is where the difference is applied. */
-const RESTRICTED_VIEWS=['yday'];
+const RESTRICTED_VIEWS=['saifmt','yday'];
 function svgIcon(i){ return `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[i]}"/>${i==='rc'?'<circle cx="12" cy="10" r="2.4"/>':''}</svg>`; }
 function renderNav(){
   const n=attentionCount();
@@ -5818,7 +5818,7 @@ const ADM_MODULES = [
   { k:'yday',       t:"Yesterday's Expenditure", r:1 },
   { k:'tracker',    t:'Component Tracker' },
   { k:'kigroups',   t:'SAI KI 1, KI 2 & Infra' },
-  { k:'saifmt',     t:'SAI Format Summary' },
+  { k:'saifmt',     t:'SAI Format Summary', r:1 },
   { k:'mdsd',       t:'KI Infra (States/UTs)' },
   { k:'rc',         t:'Regional Centres' },
   { k:'exceptions', t:'Attention Centre' },
