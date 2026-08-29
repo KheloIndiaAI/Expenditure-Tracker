@@ -377,23 +377,31 @@ tr.click:hover .chev:not(.open),.tree .comprow:hover .chev:not(.open),.tree .sub
 .tree .nm{display:flex;align-items:center;gap:8px}
 .tree .chev{margin:0}
 .tree tr.comprow{cursor:pointer}
-.tree tr.comprow>td{background:var(--bg-raised);border-bottom:1px solid var(--border)}
-.tree tr.comprow:hover>td{background:rgba(37,106,191,.06)}
+.tree tr.comprow>td{background:var(--scbg2,var(--bg-raised));border-bottom:1px solid var(--border)}
+.tree tr.comprow:hover>td{background:var(--scbg,rgba(37,106,191,.06))}
 .tree tr.subrow{cursor:pointer}
-.tree tr.subrow:hover>td{background:var(--bg-raised)}
+.tree tr.subrow>td{background:var(--scbg3,transparent)}
+.tree tr.subrow:hover>td{background:var(--scbg2,var(--bg-raised))}
 .tree tr.total>td{font-weight:700;border-top:2px solid var(--border);background:var(--primary-subtle)}
 .tree .muted-cell{color:var(--text-muted)}
-.tree tr.det>td{padding:14px 16px;background:linear-gradient(135deg,rgba(37,106,191,.08) 0%,rgba(74,58,167,.06) 45%,rgba(27,175,122,.05) 100%)}
+/* The drill-down belongs to the section it opened from, so it takes that
+   section's hue at the faintest rung rather than a fixed blue-purple-green
+   wash - which read as a fourth, unrelated colour under Infrastructure's
+   orange or Non-Recurring's green. */
+.tree tr.det>td{padding:14px 16px;background:var(--scbg3,rgba(37,106,191,.05))}
 .tree thead th{position:static;vertical-align:bottom}
-.tree tr.secrow>td{background:rgba(37,106,191,.06);font-weight:700;color:var(--primary-hover);font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border)}
+/* The desktop tree runs the same ladder as the phone cards - see
+   paintSection - so a reader moving between the two sees one hierarchy, and a
+   section's own colour rather than a blue that belonged to none of them. */
+.tree tr.secrow>td{background:var(--scbg,rgba(37,106,191,.06));font-weight:700;color:var(--sc,var(--primary-hover));font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border)}
 .tree tr.secrow>td.num{color:var(--text-secondary)}
 .tree .vname{font-weight:700}
 .tree .subname{padding-left:22px;font-weight:600}
-.tree tr.subrow.open>td,.tree tr.subrow.open:hover>td{background:var(--primary-subtle)}
-.tree tr.subrow.open>td:first-child{box-shadow:inset 3px 0 0 var(--primary)}
-.tree tr.subrow.open .nm{color:var(--primary-hover);font-weight:700}
-.tree tr.comprow.open>td,.tree tr.comprow.open:hover>td{background:var(--primary-subtle)}
-.tree tr.comprow.open .vname{color:var(--primary-hover)}
+.tree tr.subrow.open>td,.tree tr.subrow.open:hover>td{background:var(--scop3,var(--primary-subtle))}
+.tree tr.subrow.open>td:first-child{box-shadow:inset 3px 0 0 var(--sc,var(--primary))}
+.tree tr.subrow.open .nm{color:var(--sc,var(--primary-hover));font-weight:700}
+.tree tr.comprow.open>td,.tree tr.comprow.open:hover>td{background:var(--scop2,var(--primary-subtle))}
+.tree tr.comprow.open .vname{color:var(--sc,var(--primary-hover))}
 @keyframes drop{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 .tree tr.subrow{animation:drop .22s ease}
 .ubar{height:6px;border-radius:4px;background:var(--bg-page);overflow:hidden;margin-top:4px;min-width:52px;display:inline-block;width:100%;max-width:80px;vertical-align:middle}
@@ -1259,11 +1267,16 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
   .treecards table.dt.tree tr.secrow.sec-open>td:nth-child(1)::before{transform:rotate(90deg)}
   .treecards table.dt.tree tr.secrow>td:nth-child(5) .ubar>span{background:var(--sc)}
 
-  /* Components and sub-verticals sit inside their section's colour. */
+  /* Components and sub-verticals sit inside their section's colour, each a
+     lighter tint of it than the level above - see paintSection. The left edge
+     steps down with the fill and the indent grows, so three cues agree on the
+     same answer instead of one carrying it alone. */
   .treecards table.dt.tree tr.comprow{
-    margin-left:10px;border-left:3px solid var(--scbd)}
+    margin-left:10px;background:var(--scbg2);
+    border-color:var(--scbd3);border-left:3px solid var(--scbd2)}
   .treecards table.dt.tree tr.subrow{
-    margin-left:22px;border-left:3px solid var(--scbd)}
+    margin-left:22px;background:var(--scbg3);
+    border-color:var(--scbd3);border-left:2px solid var(--scbd3)}
   .treecards table.dt.tree tr.comprow.open,
   .treecards table.dt.tree tr.subrow.open{
     border-color:var(--sc);border-left-color:var(--sc);
@@ -1273,6 +1286,11 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
   .treecards table.dt.tree tr.comprow>td:nth-child(5) .ubar>span,
   .treecards table.dt.tree tr.subrow>td:nth-child(5) .ubar>span{background:var(--sc)}
 
+  /* The drill-down is the CONTENTS of the row above, not another rung: it takes
+     the faintest tint of the same hue and a hairline, so the ladder reads
+     section - component - sub-vertical and then stops. */
+  .treecards table.dt.tree tr.det .grp-drop{
+    background:var(--scbg3);border:1px solid var(--scbd3)}
   /* The opened detail keeps its own layout, tucked under the row it belongs to. */
   .treecards table.dt.tree tr.det{
     display:block;margin:-6px 0 10px 22px;padding:0;
@@ -4623,8 +4641,31 @@ function paintSection(row,sec){
   const c=SECTCOL[sec]||'#88909f';
   row.setAttribute('data-sec',sec);
   row.style.setProperty('--sc',c);
-  row.style.setProperty('--scbg',hexToRgba(c,.10));
-  row.style.setProperty('--scbd',hexToRgba(c,.32));
+  /* A ladder of one hue, not three colours.
+     Depth is carried by how much of the section's own colour a card holds:
+     the section is the strongest, a component lighter, a sub-vertical lighter
+     still. Indentation alone was doing this job and could not - twelve pixels
+     between two white cards is not a difference a reader sees, so a component
+     and the sub-vertical inside it read as siblings. Tint answers "how deep am
+     I" before the eye reaches the indent, and because every step is the same
+     hue it also answers "which section is this" at the same time.
+     The steps roughly halve, which is what keeps three levels apart at a glance
+     while leaving the deepest one barely tinted rather than muddy. */
+  row.style.setProperty('--scbg',hexToRgba(c,.10));    // section
+  row.style.setProperty('--scbg2',hexToRgba(c,.052));  // component
+  row.style.setProperty('--scbg3',hexToRgba(c,.024));  // sub-vertical
+  row.style.setProperty('--scbd',hexToRgba(c,.32));    // section edge
+  row.style.setProperty('--scbd2',hexToRgba(c,.26));   // component edge
+  row.style.setProperty('--scbd3',hexToRgba(c,.16));   // sub-vertical edge
+  /* Open is brighter than the same level at rest, and still lighter than the
+     level above it. Two rules are in play and they can fight: hierarchy says
+     deeper is lighter, emphasis says active is stronger. Letting emphasis win
+     outright inverts the ladder - an open component came out darker than its
+     own section - so open moves a row UP its own rung and never past its
+     parent. The previous code sidestepped this by giving both levels the same
+     --primary-subtle, which cost the distinction entirely. */
+  row.style.setProperty('--scop2',hexToRgba(c,.08));   // component, open
+  row.style.setProperty('--scop3',hexToRgba(c,.045));  // sub-vertical, open
 }
 
 /* ============================================================================
