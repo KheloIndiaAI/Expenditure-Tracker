@@ -2280,8 +2280,71 @@ function logout(){
 }
 
 /* ---- toggles / sorting ---- */
-function trToggle(k){ state.tr[k]=!state.tr[k]; render(); }
-function trSubToggle(k){ tipHide(); state.trSub = state.trSub===k?null:k; render(); }
+/**
+ * Open one scheme component, and only one.
+ *
+ * These were a map, so every component a reader opened stayed open and the page
+ * grew a stack of them - on a phone, several screens of it, with the row just
+ * tapped pushed somewhere off-view. One at a time keeps the answer to "what is
+ * inside this?" next to the question.
+ *
+ * Closing a component closes what was open inside it too. A sub-vertical left
+ * expanded under a collapsed parent is invisible state: reopen the parent and it
+ * springs back to a place the reader did not leave it.
+ */
+function trToggle(k){
+  tipHide();
+  const wasOpen=!!state.tr[k];
+  state.tr={};
+  state.trSub=null; state.cdOpen=null;
+  if(!wasOpen) state.tr[k]=true;
+  anchorRender('tr.comprow', k);
+}
+/**
+ * Do the work, then leave the tapped row exactly where the finger left it.
+ *
+ * Opening one row closes another, and when the one that closes sits higher up
+ * the page everything below jumps toward the top - the row just tapped can
+ * travel hundreds of pixels, or off the screen entirely. The reader's own
+ * gesture becomes the thing that loses their place.
+ *
+ * So: note where the row sits, do the work, find it again, and scroll by the
+ * difference. From the reader's side nothing moved but the content.
+ */
+function keepInPlace(findEl,work){
+  const before=findEl();
+  const top=before?before.getBoundingClientRect().top:null;
+  work();
+  if(top==null) return;
+  const after=findEl();
+  if(!after) return;
+  const delta=Math.round(after.getBoundingClientRect().top-top);
+  if(!delta) return;
+  /* Instant, never smooth. The document sets scroll-behavior:smooth, which is
+     right for a navigation the reader asked for and wrong here: this is a
+     correction meant to be invisible, and animating it turns a row that never
+     moved into a row that visibly slides. */
+  try{ window.scrollBy({top:delta,left:0,behavior:'instant'}); }
+  catch(e){ (document.scrollingElement||document.documentElement).scrollTop+=delta; }
+}
+/** The row a toggle handler was called from, found by the key in its onclick. */
+function rowByKey(sel,key){
+  const want=JSON.stringify(key);
+  return function(){
+    return [].slice.call(document.querySelectorAll('#content '+sel))
+      .filter(function(r){ return (r.getAttribute('onclick')||'').indexOf(want)>=0; })[0]||null;
+  };
+}
+function anchorRender(sel,key){ keepInPlace(rowByKey(sel,key),render); }
+function trSubToggle(k){
+  tipHide();
+  const open=state.trSub===k;
+  state.trSub=open?null:k;
+  /* The centre drill-down belongs to the sub-vertical above it; leaving it open
+     under a closed row is state the reader cannot see and did not set. */
+  state.cdOpen=null;
+  anchorRender('tr.subrow',k);
+}
 function hsToggle(k){ tipHide(); state.hsOpen = state.hsOpen===k?null:k; render(); }
 function svToggle(k){ state.svOpen = state.svOpen===k?null:k; render(); }
 function ydCentreToggle(k){ tipHide(); state.ydCentre = state.ydCentre===k?null:k; render(); }
@@ -4481,9 +4544,41 @@ function treeSectionsInit(){
   const lead=SECTIONS.indexOf('Recurring')>=0?'Recurring':SECTIONS[0];
   SECTIONS.forEach(function(s){ TREE_SEC_OPEN[s]=(s===lead); });
 }
+/**
+ * Open one section, and only one.
+ *
+ * Sections were independent switches, so a reader working down the page ended
+ * with all three open and a very long scroll - and no way to see, at a glance,
+ * which one they were actually reading. An accordion keeps the page the length
+ * of one section and makes the open heading the answer to "where am I".
+ *
+ * Closing a section also closes whatever was open inside it, for the same reason
+ * a closed component closes its sub-vertical: expansion nobody can see is
+ * expansion nobody chose.
+ */
 function toggleTreeSection(sec){
-  TREE_SEC_OPEN[sec]=!TREE_SEC_OPEN[sec];
-  groupTreeSections();          /* re-marks in place — no re-render, no scroll jump */
+  const open=!!TREE_SEC_OPEN[sec];
+  Object.keys(TREE_SEC_OPEN).forEach(function(k){ TREE_SEC_OPEN[k]=false; });
+  if(!open) TREE_SEC_OPEN[sec]=true;
+  /* Components live under a section, so a section closing closes them. Their
+     keys are prefixed with the section name - see viewTracker. */
+  /* Everything the reader had opened belonged to the section they just left, so
+     it all closes with it. A leaf component expands through state.trSub rather
+     than state.tr, so checking only the latter would leave a sub-vertical
+     expanded under a section nobody can see - and springing back open, at a
+     place they never left it, the next time that section is opened. */
+  let touched=!!state.trSub||!!state.cdOpen;
+  Object.keys(state.tr).forEach(function(k){
+    if(state.tr[k]){ delete state.tr[k]; touched=true; }
+  });
+  state.trSub=null; state.cdOpen=null;
+  /* The heading the reader tapped stays put. Without this, closing the section
+     above it pulls it hundreds of pixels up the screen the instant it is
+     touched - the one row that must not move is the one being used. */
+  keepInPlace(
+    function(){ return document.querySelector('#content tr.secrow[data-sec="'+sec.replace(/"/g,'\\"')+'"]'); },
+    function(){ if(touched) render(); else groupTreeSections(); }
+  );
 }
 const TREE_PHONE=window.matchMedia?window.matchMedia('(max-width:640px)'):null;
 function groupTreeSections(){
