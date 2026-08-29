@@ -218,9 +218,15 @@ button{font-family:inherit}
    A column in the Regional Centres voucher table, and the editor that unfolds
    beneath a row. The button borrows .saif-print's shape - the file's only other
    small bordered action control - so it reads as the same kind of thing. */
-.txmini.hascmt th:first-child,.txmini.hascmt td:first-child{width:34%;max-width:0}
+/* Column widths for the comment variant. These proportion a real table, so they
+   are held to the widths where one exists: below the card breakpoint every row
+   becomes a stacked block and a percentage width would pin the voucher line to a
+   third of the screen and wrap its narration to a few characters a line. */
+@media(min-width:641px){
+  .txmini.hascmt th:first-child,.txmini.hascmt td:first-child{width:34%}
+  .txmini.hascmt th:nth-child(2),.txmini.hascmt td.cmtcell{width:20%}
+}
 .txmini.hascmt .txnar{max-width:none}
-.txmini.hascmt th:nth-child(2),.txmini.hascmt td.cmtcell{width:20%}
 .cmtcell{vertical-align:top}
 .cmt-btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);
   background:var(--bg-surface);border-radius:7px;padding:3px 8px;cursor:pointer;font-family:inherit;
@@ -1289,53 +1295,65 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
      per centre. It is the innermost thing on the page, so it stays flatter:
      no shadow, a lighter border, and the height cap lifted, since a phone
      scrolls the page rather than a 290px box inside it.                     */
+  /* Every selector below is scoped with `>` to this wrapper's OWN table. An
+     expanded row nests a second table (the voucher list) inside a cell, and as
+     descendant selectors these rules reached it too - imposing a three-column
+     grid built for a five-cell centre row onto its six cells, which collapsed
+     every one of them to zero width and printed the narration one letter per
+     line. The child combinators are what keep the two tables apart. */
   .usage.usagecards{max-height:none;overflow:visible;border:0;box-shadow:none;
     background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}
-  .usage.usagecards table{display:block;width:100%}
-  .usage.usagecards thead{display:none}
-  .usage.usagecards tbody{display:block}
-  .usage.usagecards tbody tr:not(.txrow){
+  .usage.usagecards > table{display:block;width:100%}
+  .usage.usagecards > table > thead{display:none}
+  .usage.usagecards > table > tbody{display:block}
+  .usage.usagecards > table > tbody > tr:not(.txrow){
     display:grid;grid-template-columns:1fr 1fr 1fr;
     grid-template-areas:"nm nm pct" "as ex ba";
     gap:7px 10px;margin:0 0 8px;padding:11px 12px;
     background:var(--bg-surface);border:1px solid var(--border);border-radius:12px}
   /* Rows that state a utilisation get the split bar between name and figures,
      so the card matches the centre card it was opened from. */
-  .usage.usagecards tbody tr.ub{grid-template-areas:"nm nm pct" "bar bar bar" "as ex ba"}
-  .usage.usagecards tbody tr.ub::after{
+  .usage.usagecards > table > tbody > tr.ub{grid-template-areas:"nm nm pct" "bar bar bar" "as ex ba"}
+  .usage.usagecards > table > tbody > tr.ub::after{
     content:'';grid-area:bar;height:9px;border-radius:5px;
     background:linear-gradient(90deg,
       var(--good) 0 calc(var(--up,0)*1%),
       var(--serious) calc(var(--up,0)*1%) 100%)}
-  .usage.usagecards tbody tr:not(.txrow):hover{background:var(--bg-surface)}
-  .usage.usagecards tbody tr:not(.txrow)>td,
-  .usage.usagecards tbody tr:not(.txrow):hover>td{
+  .usage.usagecards > table > tbody > tr:not(.txrow):hover{background:var(--bg-surface)}
+  .usage.usagecards > table > tbody > tr:not(.txrow)>td,
+  .usage.usagecards > table > tbody > tr:not(.txrow):hover>td{
     display:block;padding:0;border:0;background:transparent;
     text-align:left;vertical-align:baseline;white-space:normal}
-  .usage.usagecards tbody tr:not(.txrow)>td:nth-child(1){
+  .usage.usagecards > table > tbody > tr:not(.txrow)>td:nth-child(1){
     grid-area:nm;font-size:13px;font-weight:600;color:var(--text-primary)}
-  .usage.usagecards tbody tr:not(.txrow)>td:nth-child(2){grid-area:as}
-  .usage.usagecards tbody tr:not(.txrow)>td:nth-child(3){grid-area:ex}
-  .usage.usagecards tbody tr:not(.txrow)>td:nth-child(4){grid-area:ba}
+  .usage.usagecards > table > tbody > tr:not(.txrow)>td:nth-child(2){grid-area:as}
+  .usage.usagecards > table > tbody > tr:not(.txrow)>td:nth-child(3){grid-area:ex}
+  .usage.usagecards > table > tbody > tr:not(.txrow)>td:nth-child(4){grid-area:ba}
   /* "Used" reads as a pill in the top-right corner rather than taking a column
      of its own, which would squeeze the three figures below. */
-  .usage.usagecards tbody tr:not(.txrow)>td:nth-child(5){
+  .usage.usagecards > table > tbody > tr:not(.txrow)>td:nth-child(5){
     grid-area:pct;justify-self:end;align-self:start;
     padding:2px 9px;border-radius:20px;white-space:nowrap;
     background:var(--bg-page);color:var(--text-secondary);
     font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
-  .usage.usagecards tbody tr:not(.txrow)>td:nth-child(n+2):nth-child(-n+4){
+  .usage.usagecards > table > tbody > tr:not(.txrow)>td:nth-child(n+2):nth-child(-n+4){
     font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums}
-  .usage.usagecards tbody tr:not(.txrow)>td:nth-child(n+2):nth-child(-n+4)::before{
+  .usage.usagecards > table > tbody > tr:not(.txrow)>td:nth-child(n+2):nth-child(-n+4)::before{
     content:attr(data-label);display:block;font-size:9px;letter-spacing:.03em;
     text-transform:uppercase;font-weight:600;color:var(--text-muted);margin-bottom:1px}
   /* The voucher list an expanded centre reveals keeps its own full-width layout. */
-  .usage.usagecards tbody tr.txrow{display:block;margin:-5px 0 9px;padding:0;background:transparent}
-  .usage.usagecards tbody tr.txrow>td,
-  .usage.usagecards tbody tr.txrow:hover>td{
+  .usage.usagecards > table > tbody > tr.txrow{display:block;margin:-5px 0 9px;padding:0;background:transparent}
+  .usage.usagecards > table > tbody > tr.txrow>td,
+  .usage.usagecards > table > tbody > tr.txrow:hover>td{
     display:block;padding:0;border:0;background:transparent}
 
   /* ---- The voucher list, deepest level of the drill-down ----------------- */
+  /* Three nested panels each carry generous side padding. That reads well at
+     desktop width and costs 56px of a 375px screen by the time the voucher list
+     is reached, wrapping a narration at thirty characters a line. The drill-down
+     keeps its indentation on a phone; it just gets a third as much of it. */
+  .mdsd-drop{padding-left:8px;padding-right:8px}
+  .grp-drop{padding-left:6px;padding-right:6px}
   table.txcards{display:block;width:100%;min-width:0}
   table.txcards thead{display:none}
   table.txcards tbody{display:block}
