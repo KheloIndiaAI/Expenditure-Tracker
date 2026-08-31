@@ -1690,10 +1690,10 @@ const SECTCOL={'Recurring':'#2a78d6','Infrastructure':'#eb6834','Non-Recurring':
    rather than a fixed row number: rows get inserted above it, and a hard-coded
    offset would silently read the wrong cells the first time that happened.
 
-   Columns are read positionally, which is what the rest of this file does:
-     A serial no. · B name · C Limit Assigned · D Expenditure · E Limit Unspent
-   A data row is one that carries a serial number in column A; the run ends at
-   the "Total" row, whose figures are kept to check the rows against.
+   A data row is one that carries a serial number in column A and a name in
+   column B; the run ends at the "Total" row, whose figures are kept to check
+   the rows against. The three money columns are NOT assumed to sit at a fixed
+   offset - see mdsdMoneyCols for why, and how they are found.
 
    MONEY IS NEVER ROUNDED INTO SHAPE HERE. Every figure is read as whole rupees
    straight from the cell — no percentage is turned back into an amount, and no
@@ -1706,6 +1706,58 @@ function mdsdTitle(s) {
   return String(s || '').toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); });
 }
 
+/* Which columns carry the money. They used to start at C; a spacer column has
+   since been inserted between the name and the figures and they now start at D.
+   Reading them at a fixed offset broke the moment that happened - the same
+   failure the row search was written to avoid, one axis over - and it broke
+   loudly: every row failed "assigned less expenditure does not equal unspent",
+   which rejects the whole candidate, so the platform stopped updating AT ALL
+   behind a "sync failed" pill until someone read the sheet by hand.
+
+   The header labels cannot be used to find them. Google's endpoint types a
+   column from its data, so the text sitting above a column of numbers comes
+   back empty and "Limit Assigned" is simply not there to match on.
+
+   What the block does carry, on every row and on its Total, is its own
+   arithmetic: assigned - expenditure = unspent. The three columns that satisfy
+   it ARE the money columns, so they are found by that rather than assumed, and
+   a spacer inserted tomorrow costs nothing. The 1-rupee tolerance is the same
+   formatting allowance used everywhere else here.
+
+   EVERY reconciling triple is collected, not just the first, and the block is
+   only read when there is exactly one. A sheet can carry a second self-
+   consistent triple - "Sanction Order Amount / Released / Balance to release"
+   beside the limit figures would be one - and taking the leftmost by array order
+   would publish that instead, quietly, with the platform none the wiser. Where
+   more than one reconciles the block is flagged ambiguous and syncValidate
+   rejects it, because a frozen panel that says so beats a confident wrong total.
+
+   If nothing reconciles, the first three columns carrying figures are used, so a
+   genuinely inconsistent block still reaches syncValidate and is reported there
+   as the keying error it is. Fewer than three columns carry figures only if the
+   block is unrecognisable, and the original C/D/E is then as good a guess as
+   any: the row checks will reject it. */
+function mdsdMoneyCols(body, total) {
+  const NAME = 1, LAST = 12;              // column M, the last the block can reach
+  const val = function (c, i) { return String((c && c[i]) == null ? '' : c[i]).trim(); };
+  const cols = [];
+  for (let i = NAME + 1; i <= LAST; i++) {
+    if (val(total, i) !== '' || body.some(function (c) { return val(c, i) !== ''; })) cols.push(i);
+  }
+  const holds = function (c, a, e, b) { return Math.abs((nnum(c[a]) - nnum(c[e])) - nnum(c[b])) <= 1; };
+  const hit = [];
+  for (let i = 0; i + 2 < cols.length; i++) {
+    const a = cols[i], e = cols[i + 1], b = cols[i + 2];
+    if (nnum(total[a]) > 0 && holds(total, a, e, b) &&
+        body.every(function (c) { return holds(c, a, e, b); })) hit.push({ assign: a, exp: e, bal: b });
+  }
+  if (hit.length === 1) return hit[0];
+  const guess = cols.length >= 3 ? { assign: cols[0], exp: cols[1], bal: cols[2] }
+                                 : { assign: 2, exp: 3, bal: 4 };
+  if (hit.length > 1) guess.ambiguous = true;
+  return guess;
+}
+
 function parseMdsdRows(rows) {
   let start = -1;
   for (let i = 0; i < rows.length; i++) {
@@ -1713,28 +1765,38 @@ function parseMdsdRows(rows) {
   }
   if (start < 0) return null;
 
-  const items = [];
-  let stated = null;
+  /* The rows are collected before a single figure is read: the money columns are
+     found from the block as a whole, which needs every data row and the Total
+     row in hand first. */
+  const body = [];
+  let total = null;
   for (let r = start + 1; r < rows.length; r++) {
     const c = rows[r] || [];
     const name = String(c[1] || '').trim();
-    if (/^total$/i.test(name)) {
-      stated = { assign: Math.round(nnum(c[2])), exp: Math.round(nnum(c[3])), bal: Math.round(nnum(c[4])) };
-      break;
-    }
+    if (/^total$/i.test(name)) { total = c; break; }
     const serial = /^\d+(\.0+)?$/.test(String(c[0] || '').trim());
     if (!name || !serial) {
-      if (items.length) break;   // ran past the block
+      if (body.length) break;    // ran past the block
       continue;                  // header/spacer before it
     }
-    items.push({
-      name: name,
-      assign: Math.round(nnum(c[2])),
-      exp: Math.round(nnum(c[3])),
-      bal: Math.round(nnum(c[4])),
-    });
+    body.push(c);
   }
-  if (!items.length || !stated) return null;
+  if (!body.length || !total) return null;
+
+  const col = mdsdMoneyCols(body, total);
+  const items = body.map(function (c) {
+    return {
+      name: String(c[1]).trim(),
+      assign: Math.round(nnum(c[col.assign])),
+      exp: Math.round(nnum(c[col.exp])),
+      bal: Math.round(nnum(c[col.bal])),
+    };
+  });
+  const stated = {
+    assign: Math.round(nnum(total[col.assign])),
+    exp: Math.round(nnum(total[col.exp])),
+    bal: Math.round(nnum(total[col.bal])),
+  };
 
   /* The sheet carries neither a display name nor the state/institute
      distinction — names arrive shouted ("UTTAR PRADESH") and typeless. Both are
@@ -1755,7 +1817,10 @@ function parseMdsdRows(rows) {
       ? match.type
       : (/IIT|IISER|NIT|INSTITUTE|UNIVERSITY|COLLEGE|ACADEMY/.test(k) ? 'institute' : 'state');
   });
-  return { items: items, stated: stated };
+  /* Carried out to syncValidate rather than resolved here: the parser can see
+     that two column triples both reconcile, but only the gate can refuse to
+     publish over it. */
+  return { items: items, stated: stated, ambiguous: !!col.ambiguous };
 }
 
 /* Derived fields for the KI Infra set. Extracted from the boot-time IIFE so the
@@ -1765,7 +1830,14 @@ function mdsdDerive(m) {
   m.items.forEach(function (x, i) {
     x.bal = x.assign - x.exp;
     x.up = x.assign ? x.exp / x.assign : 0;
-    x.idx = SV.length + i;
+    /* Counted off the FULL sub-vertical list, never the filtered SV binding. At
+       boot the two are the same, but this runs again on every sync - by which
+       point SV is whatever the open panel and the Classification chip have
+       filtered it down to, so reading it here made a row's colour depend on
+       where the user happened to be standing when the sync landed, and shuffle
+       every ten minutes. A fixed origin also keeps these idx values clear of the
+       base sub-verticals' 0..12, which viewTracker uses as row keys. */
+    x.idx = DATA.subverticals.length + i;
     x.mdsd = true;
     SVCOL[x.name] = SERIES[x.idx % SERIES.length];
   });
@@ -3074,15 +3146,17 @@ const RC_CFG={ns:'rctbl',sortField:'rcSort',nameLabel:'Regional Centre',sancLabe
 
    Filter response. All three cards move with the Classification dropdown. All three are
    correctly INERT to the DDO KI chip: "DDO KI · Direct Expenditure" is the workbook's own
-   separate column (col D), money spent centrally that never entered any centre limit, so
+   separate column (col E), money spent centrally that never entered any centre limit, so
    removing it cannot change what was issued to, or drawn by, the centres - deducting it
    here would double-count. That figure is not a KPI on this page; it is reported in the
    DDO KI Direct note above the cards, which does track the chip. The KI Infra chip moves none
    of the three: MDSD State/Institute grants are released direct and carry no centre limit.
 
    Do not confuse the workbook's two "DDO HQ"-ish figures - they are ~44x apart:
-     - cols E/F "DDO HQ" Limit Assigned / Actual Exp. - the centre row counted in these cards;
-     - col D    "DDO KI · Direct Expenditure" (G.ddoki) - outside the centre-limit system. */
+     - cols F/G "DDO HQ" Limit Assigned / Actual Exp. - the centre row counted in these cards;
+     - col E    "DDO KI · Direct Expenditure" (G.ddoki) - outside the centre-limit system.
+   These letters are prose only; the code reads cells[4] for DDO-KI and the centre pairs
+   from SYNC_CEN0 - trust those, and see parseSummaryRows. */
 function ddokiInScope(){
   /* classification-scoped DDO-KI total that deliberately ignores the DDO KI chip, so the
      DDO KI Direct note can state exactly what is being withheld while the chip is unticked.
@@ -5123,6 +5197,10 @@ function syncValidate(b){
      half-edited block never reaches the panel. */
   if(b.mdsd){
     const mi=b.mdsd.items, ms=b.mdsd.stated;
+    /* Two column triples both balance, so which one holds the limit figures is a
+       guess - and a wrong guess here is arithmetically self-consistent, which is
+       exactly the kind every other check below would wave through. */
+    if(b.mdsd.ambiguous) e.push('KI Infra: more than one column triple reconciles - cannot tell which carries the money');
     if(mi.length<5) e.push('KI Infra: only '+mi.length+' States/UTs parsed');
     let sa=0, se=0;
     mi.forEach(function(x){
