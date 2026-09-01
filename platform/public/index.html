@@ -530,9 +530,9 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 .dki-note{display:flex;gap:12px;align-items:center;background:linear-gradient(135deg,rgba(37,106,191,.06),rgba(74,58,167,.04));border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--text-secondary);margin-bottom:16px;box-shadow:var(--elev-1)}
 .dki-note b{color:var(--text-primary)}
 .dki-note .ico{width:30px;height:30px;border-radius:8px;background:var(--primary);color:#fff;display:grid;place-items:center;font-weight:800;font-size:12px;flex:none}
-/* cross-page reconciliation strip: bridges this page's centre-only expenditure to the
-   scheme-wide "Expenditure to date" shown on Financial Overview / Component Tracker, so the
-   two figures can never read as contradictory. */
+/* One-line reconciliation strip. Regional Centres now uses it only to report a break
+   between its centre-only expenditure and the scheme-wide figure on Financial Overview;
+   the KI panel's partition check and the SAI Format basis note are its standing users. */
 .reco{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;background:var(--bg-surface);border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:10px;padding:11px 15px;margin:0 0 16px;font-size:13px;color:var(--text-secondary);box-shadow:var(--elev-1)}
 .reco .rl{font-weight:700;color:var(--text-primary);white-space:nowrap}
 .reco .op{color:var(--text-muted);font-weight:700}
@@ -3242,28 +3242,24 @@ function rcKpis(){
 }
 /* ---- cross-page expenditure reconciliation -----------------------------------------
    This page reports what the centres spent; Financial Overview / Component Tracker report
-   what the SCHEME spent. They differ by DDO KI Direct expenditure, which is real spend
-   that never passed through a centre limit. Both are correct, but seeing ₹60.60 Cr here and
-   ₹99.76 Cr there with no visible bridge reads as a contradiction, so the identity is now
-   stated explicitly and recomputed live from the same filtered bindings:
+   what the SCHEME spent. They differ by DDO KI Direct expenditure, which is real spend that
+   never passed through a centre limit:
 
        centre actual (G.actual) + DDO KI direct (G.ddoki) = ex-MDSD expenditure (G.ex.exp)
 
-   and, when the KI Infra chip is on, + MDSD expenditure = G.exp - mirroring the "Incl. KI
-   Infra" caption the Overview cards already carry. Asserted in both directions rather than
-   hard-coded, so if a future dataset breaks the identity the strip says so instead of
-   silently printing a wrong sum. */
+   That identity used to be printed as a standing "Expenditure bridge" strip at the head of
+   this page. It is no longer: it restated on every visit something that is only worth
+   saying when it stops being true, and the DDO-KI Direct note further down the page already
+   carries the figure the strip existed to explain.
+
+   The CHECK stays, and only the check. The identity is still recomputed live from the same
+   filtered bindings on every render, and if a future dataset ever breaks it the page says so
+   in red rather than letting this page and Financial Overview quietly disagree. Silence here
+   means the two reconcile. */
 function rcReco(){
-  const act=G.actual, dk=G.ddoki, ex=G.ex.exp, mdsdExp=G.mdsdIncluded?MDSD.grand.exp:0, all=ex+mdsdExp;
-  const ok=Math.abs((act+dk)-ex)<1;
-  if(!ok) return `<div class="reco" style="border-left-color:var(--critical)"><span class="rl" style="color:var(--critical)">Reconciliation error</span><span>centre actual ${cr(act)} + DDO KI ${cr(dk)} = ${cr(act+dk)}, but scheme expenditure is ${cr(ex)} (Δ ${cr(ex-act-dk)}). Figures on this page and Financial Overview will not agree - the source dataset is inconsistent.</span></div>`;
-  return `<div class="reco">
-    <span class="rl">Expenditure bridge</span>
-    <span>Centres <span class="rv">${cr(act)}</span></span><span class="op">+</span>
-    <span>DDO KI Direct <span class="rv">${cr(dk)}</span></span><span class="op">=</span>
-    <span>Scheme total <span class="rv" style="color:var(--primary)">${cr(ex)}</span></span>
-    ${mdsdExp?`<span class="op">+</span><span>KI Infra <span class="rv">${cr(mdsdExp)}</span><span class="op"> = </span><span class="rv">${cr(all)}</span></span>`:''}
-  </div>`;
+  const act=G.actual, dk=G.ddoki, ex=G.ex.exp;
+  if(Math.abs((act+dk)-ex)<1) return '';
+  return `<div class="reco" style="border-left-color:var(--critical)"><span class="rl" style="color:var(--critical)">Reconciliation error</span><span>centre actual ${cr(act)} + DDO KI ${cr(dk)} = ${cr(act+dk)}, but scheme expenditure is ${cr(ex)} (Δ ${cr(ex-act-dk)}). Figures on this page and Financial Overview will not agree - the source dataset is inconsistent.</span></div>`;
 }
 /* ---- SAI Format Summary -----------------------------------------------------------------
    Reproduces the finance wing's own "Expenditure Incurred as on <date>" summary sheet, filled
@@ -3548,7 +3544,7 @@ function kiGroupBlock(g){
   const funded=g.subs.filter(s=>s.assign>0);
   const dkShare=g.exp?g.ddoki/g.exp:0;
   const tipA=`<b>${g.tag} · Assignment</b><br>Sum of the Ministry assignment for ${funded.length} funded component${funded.length===1?'':'s'}.<br><span style="opacity:.75">${pct(G.ex.assign?g.assign/G.ex.assign:0,1)} of the ${cr(G.ex.assign)} scheme total (ex-KI Infra).</span>`;
-  const tipE=`<b>${g.tag} · Expenditure</b><br>Centre actual ${cr(g.act)} + DDO KI Direct ${cr(g.ddoki)} = <b>${cr(g.exp)}</b>.<br>DDO KI is ${pct(dkShare,1)} of this block's spend.<br><span style="opacity:.75">Same build-up as every other page - see the expenditure bridge on Regional Centres.</span>`;
+  const tipE=`<b>${g.tag} · Expenditure</b><br>Centre actual ${cr(g.act)} + DDO KI Direct ${cr(g.ddoki)} = <b>${cr(g.exp)}</b>.<br>DDO KI is ${pct(dkShare,1)} of this block's spend.<br><span style="opacity:.75">Same build-up as every other page - DDO KI Direct is spend that never passed through a centre limit.</span>`;
   const tipB=`<b>${g.tag} · Balance</b><br>${cr(g.assign)} assigned − ${cr(g.exp)} spent = <b>${cr(g.bal)}</b> still unspent (${pct(g.assign?g.bal/g.assign:0,1)}).`;
   /* The expenditure build-up rides in the card whose figure it explains - in
      PLACE of that card's utilisation line, not under it.
