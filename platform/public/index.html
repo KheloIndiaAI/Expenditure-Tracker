@@ -760,9 +760,11 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
    and the rest inside the component table one click below. The classes that
    dressed them (.kig-read/.kig-stat/.kig-sk/.kig-sv/.kig-barwrap/.kig-barhd)
    went with the markup rather than being left to rot. */
-.kig-cmp .mdsd-bar{height:20px;border-radius:10px;min-width:88px}
-.kig-cmp .mdsd-bar>span{font-size:9.5px}
-.kig-cmp td.barcell{width:190px;min-width:130px}
+/* The utilisation bar has now gone from this panel's two tables as well, taking
+   with it the only markup that carried .barcell anywhere in the file and the
+   only .mdsd-bar this panel ever held - so the rules that sized both here have
+   gone too. .mdsd-bar itself stays: KI Infra and Regional Centres build their
+   own, from their own segments. */
 /* component cell: name on top, classification as a small pill underneath */
 .kig-cn{display:flex;align-items:center;min-width:0}
 .kig-cp{margin-top:3px;padding-left:17px}
@@ -775,9 +777,6 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 .bal-red{color:var(--critical);font-weight:600}
 .bal-over{color:var(--critical);font-weight:700}
 .bal-over::after{content:' ▲';font-size:9px;vertical-align:1px}
-@media(max-width:720px){
-  .kig-cmp td.barcell{display:none}.kig-cmp th.barcell{display:none}
-}
 .kig-share{display:flex;height:36px;border-radius:9px;overflow:hidden;border:1px solid var(--border);margin:2px 0 10px}
 .kig-share span{display:grid;place-items:center;color:#fff;font-size:12px;font-weight:700;min-width:0;overflow:hidden;white-space:nowrap;transition:flex-grow .2s}
 .kig-cmp{width:100%;border-collapse:collapse;font-size:13px}
@@ -1176,10 +1175,6 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
   /* A title cell that is itself prose stays a title, not a stacked paragraph. */
   .cardify table.dt td:first-child.dt-long{
     font-size:14px;font-weight:600;color:var(--text-primary);padding-top:0}
-
-  /* Utilisation bars read better full width beneath the numbers. */
-  .cardify table.dt td.barcell{display:block;width:auto;text-align:left;padding-top:9px}
-  .cardify table.dt td.barcell::before{display:block;margin-bottom:6px}
 
   /* Prose gets the full width beneath its heading instead of being squeezed
      into a right-hand column a few characters wide. */
@@ -3514,14 +3509,10 @@ function kiUnassigned(){
 /* platform-standard segmented utilisation bar. Identical markup, colours and label
    thresholds to the bar entityUtilTable() renders on Regional Centres, KI Infra and
    Sub-Vertical Analysis, so the same visual carries the same meaning everywhere. */
-function utilBar(up,usedWord,balWord,cls){
-  const u=Math.max(0,Math.min(1,up||0)), upPct=u*100, balPct=100-upPct;
-  const labU = upPct>=20?`${pct(u,0)} ${usedWord||'Utilised'}`:upPct>=10?pct(u,0):'';
-  const labB = balPct>=20?`${pct(1-u,0)} ${balWord||'Balance'}`:balPct>=10?pct(1-u,0):'';
-  return `<div class="mdsd-bar${cls?' '+cls:''}">`
-    +(upPct>0?`<span class="mdsd-seg-u" style="width:${upPct.toFixed(2)}%">${labU}</span>`:'')
-    +(balPct>0?`<span class="mdsd-seg-b" style="width:${balPct.toFixed(2)}%">${labB}</span>`:'')+`</div>`;
-}
+/* utilBar() lived here. Its only two callers were the KI panel's block comparison
+   and component tables, both of which now stop at Balance, so it went with them.
+   KI Infra and Regional Centres are unaffected: they never called it - each
+   builds its own .mdsd-bar from its own segments. */
 function kiCompTable(g){
   const rows=g.subs.slice().sort((a,b)=>b.assign-a.assign);
   if(!rows.length) return '';
@@ -3548,7 +3539,6 @@ function kiCompTable(g){
   </tbody><tfoot><tr><td><b>${g.tag} total</b></td><td class="num tnum"><b>${crShort(g.assign)}</b></td><td class="num tnum"><b>${crShort(g.exp)}</b></td><td class="num tnum${Math.round(g.bal)===0?'':(g.bal<0?' bal-over':' bal-red')}"><b>${crShort(g.bal)}</b></td></tr></tfoot></table></div>`;
 }
 function kiGroupBlock(g){
-  const h=healthOf(g.assign,g.up,g.idle,g.bal);
   const tint=hexToRgba(g.col,.09);
   if(!g.subs.length) return `<div class="kig-sec">
     <div class="kig-band" style="background:linear-gradient(135deg,${tint},var(--bg-surface))"><span class="kig-badge" style="background:${g.col}">${g.tag}</span>
@@ -3560,7 +3550,6 @@ function kiGroupBlock(g){
   const tipA=`<b>${g.tag} · Assignment</b><br>Sum of the Ministry assignment for ${funded.length} funded component${funded.length===1?'':'s'}.<br><span style="opacity:.75">${pct(G.ex.assign?g.assign/G.ex.assign:0,1)} of the ${cr(G.ex.assign)} scheme total (ex-KI Infra).</span>`;
   const tipE=`<b>${g.tag} · Expenditure</b><br>Centre actual ${cr(g.act)} + DDO KI Direct ${cr(g.ddoki)} = <b>${cr(g.exp)}</b>.<br>DDO KI is ${pct(dkShare,1)} of this block's spend.<br><span style="opacity:.75">Same build-up as every other page - see the expenditure bridge on Regional Centres.</span>`;
   const tipB=`<b>${g.tag} · Balance</b><br>${cr(g.assign)} assigned − ${cr(g.exp)} spent = <b>${cr(g.bal)}</b> still unspent (${pct(g.assign?g.bal/g.assign:0,1)}).`;
-  const tipI=`<b>${g.tag} · Unspent by Centre</b><br>${cr(g.lim)} limit released to centres − ${cr(g.act)} drawn = <b>${cr(g.idle)}</b>.<br><span style="opacity:.75">Money already with the centres and still unspent. Excludes DDO KI, which never sat in a centre limit.</span>${idleTipRows(g.subs)}`;
   /* The expenditure build-up rides in the card whose figure it explains - in
      PLACE of that card's utilisation line, not under it.
 
@@ -3589,11 +3578,10 @@ function kiGroupBlock(g){
       <div class="kig-right"><div class="kig-rv" style="color:${g.col}">${pct(g.up,1)}</div><div class="kig-rl">utilised</div></div>
           </div>
     <div class="kig-body">
-      <div class="kpi-grid">
+      <div class="kpi-grid k3">
         <div class="kpi accent"${tattr(tipA)}><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">${g.tag} Assignment</div><div class="val tnum">${cr(g.assign)}</div></div></div><div class="sub">${funded.length} funded component${funded.length===1?'':'s'} · ${pct(G.ex.assign?g.assign/G.ex.assign:0,1)} of scheme</div></div>
         <div class="kpi"${tattr(tipE)}><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">${g.tag} Expenditure</div><div class="val tnum">${cr(g.exp)}</div></div></div><div class="sub">${expSub}</div></div>
         <div class="kpi"${tattr(tipB)}><div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('scale')}</span><div class="kpi-txt"><div class="lbl">${g.tag} Balance</div><div class="val tnum">${cr(g.bal)}</div></div></div><div class="sub">${pct(g.assign?g.bal/g.assign:0,1)} still unspent</div></div>
-        <div class="kpi"${tattr(tipI)}><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('gauge')}</span><div class="kpi-txt"><div class="lbl">${g.tag} Unspent by Centre</div><div class="val tnum neg">${cr(Math.max(0,g.idle))}</div></div></div><div class="sub">of ${crShort(g.lim)} limit released</div></div>
       </div>
       ${kiCompGroup(g)}
     </div></div>`;
@@ -3646,9 +3634,11 @@ function setKiOpen(tag){
 function toggleKiComp(){ state.kiComp=!state.kiComp; render(); }
 function viewKI(){
   const groups=kiGroupAgg(), orphans=kiUnassigned();
-  const T={assign:sum(groups,g=>g.assign),exp:sum(groups,g=>g.exp),bal:sum(groups,g=>g.bal),
-           lim:sum(groups,g=>g.lim),act:sum(groups,g=>g.act),ddoki:sum(groups,g=>g.ddoki)};
-  T.idle=T.lim-T.act; T.up=T.assign?T.exp/T.assign:0;
+  /* Three totals, because three is what the comparison below now shows. The
+     centre limit, the drawn figure, the idle remainder and the utilisation rate
+     were all summed here to feed an Unspent-by-Centre column and a bar that have
+     gone; summing them still would leave four totals with nothing to total. */
+  const T={assign:sum(groups,g=>g.assign),exp:sum(groups,g=>g.exp),bal:sum(groups,g=>g.bal)};
   /* partition guard - the three blocks must reproduce the ex-MDSD grand total exactly. */
   const tie=Math.abs(T.assign-G.ex.assign)<1 && Math.abs(T.exp-G.ex.exp)<1;
   const warn = orphans.length
@@ -3656,12 +3646,18 @@ function viewKI(){
     : (!tie ? `<div class="kig-warn"><b>⚠ Reconciliation error:</b> blocks total ${cr(T.assign)} assignment / ${cr(T.exp)} expenditure against a scheme total of ${cr(G.ex.assign)} / ${cr(G.ex.exp)}.</div>` : '');
   const shown=groups.filter(g=>g.assign>0);
   const share=shown.map(g=>`<span style="flex:${Math.max(g.assign,1)} 1 0;background:${g.col}" title="${esc(g.tag)} ${cr(g.assign)}">${T.assign&&g.assign/T.assign>0.07?`${g.tag} ${pct(g.assign/T.assign,0)}`:''}</span>`).join('');
+  /* The same three money columns the block cards and the component tables carry,
+     asked in the same order: assigned, spent, left. Unspent by Centre and the
+     utilisation bar are gone from here for the reasons they went from the
+     component table - the first answers a centre-level question in a
+     block-level row, the second renders the two columns beside it a third time.
+     Head, body and foot each carry four cells; the foot used to carry a fifth,
+     empty one that no heading stood over. */
   const cmp=`<table class="kig-cmp">
-    <thead><tr><th>Block</th><th>Assignment</th><th>Expenditure</th><th>Balance</th><th>Unspent by Centre</th><th class="barcell" style="text-align:left">Utilisation</th></tr></thead>
+    <thead><tr><th>Block</th><th>Assignment</th><th>Expenditure</th><th>Balance</th></tr></thead>
     <tbody>${groups.map(g=>`<tr><td><span class="kig-dot" style="background:${g.col}"></span><b>${g.tag}</b> <span class="muted" style="font-size:12px">${g.subs.length} comp.</span></td>
-      <td class="tnum">${crShort(g.assign)}</td><td class="tnum">${crShort(g.exp)}</td><td class="tnum${Math.round(g.bal)===0?'':(g.bal<0?' bal-over':' bal-red')}">${crShort(g.bal)}</td><td class="tnum">${crShort(Math.max(0,g.idle))}</td>
-      <td class="barcell">${g.assign?utilBar(g.up,'Used','Bal'):'<span class="muted">–</span>'}</td></tr>`).join('')}</tbody>
-    <tfoot><tr><td>Scheme total <span class="muted" style="font-weight:500;font-size:12px">(ex-KI Infra)</span></td><td class="tnum">${crShort(T.assign)}</td><td class="tnum">${crShort(T.exp)}</td><td class="tnum${Math.round(T.bal)===0?'':(T.bal<0?' bal-over':' bal-red')}">${crShort(T.bal)}</td><td class="tnum">${crShort(Math.max(0,T.idle))}</td><td class="barcell">${utilBar(T.up,'Used','Bal')}</td><td></td></tr></tfoot></table>`;
+      <td class="tnum">${crShort(g.assign)}</td><td class="tnum">${crShort(g.exp)}</td><td class="tnum${Math.round(g.bal)===0?'':(g.bal<0?' bal-over':' bal-red')}">${crShort(g.bal)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td>Scheme total <span class="muted" style="font-weight:500;font-size:12px">(ex-KI Infra)</span></td><td class="tnum">${crShort(T.assign)}</td><td class="tnum">${crShort(T.exp)}</td><td class="tnum${Math.round(T.bal)===0?'':(T.bal<0?' bal-over':' bal-red')}">${crShort(T.bal)}</td></tr></tfoot></table>`;
   return pageHead('SAI KI 1, KI 2 &amp; Infra','')
    + warn
    + `<div class="reco">
