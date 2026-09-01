@@ -57,6 +57,18 @@ button{font-family:inherit}
 .navlogout{margin-top:auto;color:var(--critical);border-top:1px solid var(--border-subtle);border-radius:0;padding-top:12px}
 .navlogout:hover{background:#fbeaea;border-radius:8px}
 .navlogout .ic{opacity:.9}
+/* Account foot. My Profile belongs beside Sign out at the bottom of the menu,
+   not up in the panel list: both are about the person signed in rather than the
+   scheme, and the panel list reads cleaner without a one-item group above it.
+   The separator moves up onto this block so it divides the panels from BOTH
+   foot links instead of sitting between them.
+   :not(:empty) is load-bearing, not decoration. The auto margin must be claimed
+   once: leave it on .navlogout as well and flexbox splits the free space between
+   the two, floating My Profile in the middle of the gap with a second gap under
+   it. The guard also means a sidebar that renders no profile link keeps the old
+   behaviour, with Sign out pinned to the foot on its own. */
+#acctLinks:not(:empty){margin-top:auto;border-top:1px solid var(--border-subtle);padding-top:10px}
+#acctLinks:not(:empty)+.navlogout{margin-top:0;border-top:0;padding-top:6px;border-radius:8px}
 
 .main{min-width:0;display:flex;flex-direction:column}
 .topbar{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.86);backdrop-filter:blur(20px) saturate(1.2);-webkit-backdrop-filter:blur(20px) saturate(1.2);border-bottom:1px solid var(--glass-border);padding:12px 28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;row-gap:10px}
@@ -272,6 +284,20 @@ button{font-family:inherit}
 .ad-search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;
   color:var(--text-muted);pointer-events:none}
 .ad-count{font-size:12px;color:var(--text-muted);margin-left:auto;white-space:nowrap}
+/* The administration switcher. Reuses .ta-seg, the segmented control Trend
+   Analytics already uses, rather than starting a fourth button language - and
+   deliberately NOT .fchip, which two rows below it in User Logs already means
+   "filter this table"; the same pill meaning "change panel" directly above
+   would be genuinely ambiguous. Only the geometry differs from .ta-seg: this
+   one leads the panel instead of trailing a card header, so the auto left
+   margin comes off. On a phone the three share the width and ellipsis rather
+   than pushing the panel sideways. */
+.ad-tabs.ta-seg{margin:14px 0 18px;max-width:100%}
+.ad-tabs.ta-seg button{white-space:nowrap;padding:7px 14px;font-size:12.5px}
+@media(max-width:720px){
+  .ad-tabs.ta-seg{width:100%}
+  .ad-tabs.ta-seg button{min-width:0;padding:7px 6px;font-size:11.5px;overflow:hidden;text-overflow:ellipsis}
+}
 /* A row that opens. Mirrors tr.click elsewhere; the chevron is the same glyph. */
 .ad-tbl tbody tr.ad-row{cursor:pointer}
 .ad-tbl tbody tr.ad-row:hover>td{background:var(--bg-raised)}
@@ -2323,14 +2349,31 @@ const NAV=[{g:'ANALYSIS'},
   {v:'detail',    t:'Transaction Record',      i:'detail'},
   /* Administration. Panels of this dashboard now, not a separate application:
      `adm:1` marks them as gated on the administrator role rather than on the
-     per-user module grants, which is what moduleAllowed() reads. */
+     per-user module grants, which is what moduleAllowed() reads.
+
+     `sub` names the panel that lists this one, and means "reachable, but the
+     sidebar does not carry a row of its own for it". Roles & Access and User
+     Logs are the same job as User Management seen from two other angles, so
+     they are tabs on that panel (see admTabs) rather than three separate
+     destinations in a menu that was getting long. Naming the parent rather than
+     setting a bare flag is what lets the sidebar keep User Management lit while
+     one of its tabs is open - otherwise nothing in the menu would be marked and
+     the reader would lose their place. Only renderNav() filters on the marker:
+     the entries stay in NAV, and must, because the search index, the ?panel=
+     deep link and the server's own /admin/access and /admin/logs redirects all
+     resolve through this array. */
   {g:'ADMINISTRATION', adm:1},
   {v:'admin',     t:'User Management',         i:'users',  adm:1},
-  {v:'access',    t:'Roles & Access',          i:'shield', adm:1},
-  {v:'logs',      t:'User Logs',               i:'clock',  adm:1},
-  /* Own group: this is about the person signed in, not the scheme. */
-  {g:'ACCOUNT'},
-  {v:'profile',   t:'My Profile',              i:'user'}];
+  {v:'access',    t:'Roles & Access',          i:'shield', adm:1, sub:'admin'},
+  {v:'logs',      t:'User Logs',               i:'clock',  adm:1, sub:'admin'},
+  /* `foot:1` is the same idea pointing the other way: kept out of the panel list
+     and painted at the foot of the sidebar beside Sign out, because it is about
+     the person signed in rather than the scheme. It stays LAST in this array on
+     purpose - firstAllowedView() walks NAV in order and moduleAllowed('profile')
+     is always true, so this entry is the last-resort landing for someone denied
+     every other panel. Move it up and they would land here instead of on their
+     first real one. */
+  {v:'profile',   t:'My Profile',              i:'user',   foot:1}];
 /* View keys that only an administrator may open. Kept beside NAV because the
    two must not disagree, and read by moduleAllowed() so every consumer - the
    sidebar, go(), the global search index and applyAccess - is gated by one
@@ -2344,7 +2387,7 @@ const RESTRICTED_VIEWS=['saifmt','yday'];
 function svgIcon(i){ return `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[i]}"/>${i==='rc'?'<circle cx="12" cy="10" r="2.4"/>':''}</svg>`; }
 function renderNav(){
   const n=attentionCount();
-  const items=NAV.filter(it=>it.g||(!viewHidden(it.v)&&moduleAllowed(it.v)))
+  const items=NAV.filter(it=>it.g||(!it.sub&&!it.foot&&!viewHidden(it.v)&&moduleAllowed(it.v)))
     /* Drop a group header with nothing under it. The test is whether an ITEM
        follows immediately - asking whether any item follows anywhere would keep
        an empty ADMINISTRATION heading aloft on the strength of My Profile
@@ -2352,11 +2395,17 @@ function renderNav(){
     .filter((it,i,a)=>!it.g || (!!a[i+1] && !a[i+1].g));
   document.getElementById('nav').innerHTML=items.map(it=>{
     if(it.g) return `<div class="navgroup">${it.g}</div>`;
-    const active=state.view===it.v?' active':'';
+    /* A panel is also "where you are" while one of its own tabs is open, so the
+       menu still marks User Management when the view is Roles & Access. */
+    const active=(state.view===it.v||NAV.some(x=>x.sub===it.v&&x.v===state.view))?' active':'';
     if(it.feat) return `<button class="navitem feat${active}" onclick="go('${it.v}')"><span class="ic-chip">${svgIcon(it.i)}</span>${it.t}</button>`;
     const badge=it.badge&&n>0?`<span class="badge-n">${n}</span>`:'';
     return `<button class="navitem${active}" onclick="go('${it.v}')">${svgIcon(it.i)}${it.t}${badge}</button>`;
   }).join('');
+  /* The foot links are painted from here, not only from their own call sites.
+     renderNav() is the one function that runs on every navigation, so it is the
+     only place the active state can be kept honest. */
+  renderAccountLinks();
 }
 function go(v){ if(viewHidden(v)||!moduleAllowed(v)) return; state.view=v; render(); window.scrollTo(0,0); if(innerWidth<=980) closeSidebar(); }
 function toggleSidebar(){ const sb=document.getElementById('sidebar'),open=sb.classList.toggle('open'); document.getElementById('sbBackdrop').classList.toggle('show',open); }
@@ -6444,6 +6493,24 @@ function admWhen(iso) {
     ' · ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes());
 }
 function admHead(title, sub) { return pageHead(title, sub); }
+/* The three administration panels, offered as one control at the head of each.
+   They used to be three sidebar entries, which read as three destinations when
+   they are really one job - the people on the platform - seen from three sides.
+   As tabs they sit together, and the menu loses a group it did not need.
+
+   Each remains its own view: selecting one is an ordinary go(), so the deep
+   link, the browser-less ?panel= entry point, the server's /admin/* redirects
+   and the global search result for each panel all keep working untouched.
+   Rendered as part of the head, so it is still there to escape with when the
+   panel underneath is showing an error or still loading. */
+var ADM_TABS = [['admin', 'User Management'], ['access', 'Roles & Access'], ['logs', 'User Logs']];
+function admTabs(cur) {
+  return '<div class="ta-seg ad-tabs">' + ADM_TABS.map(function (t) {
+    return '<button class="' + (t[0] === cur ? 'on' : '') + '"' +
+      (t[0] === cur ? ' aria-current="page"' : '') +
+      ' onclick="go(\'' + t[0] + '\')">' + esc(t[1]) + '</button>';
+  }).join('') + '</div>';
+}
 /** Shown when a non-administrator reaches one of these panels by URL. */
 function admDenied() {
   return '<div class="card"><div class="dt-empty"><div class="e-ic">🔒</div>' +
@@ -6477,7 +6544,7 @@ function viewAdminUsers() {
      it first, both are served. Without this the column reads "Never" for
      everyone until the administrator happens to open User Logs. */
   admLoadLogs();
-  var head = admHead('User Management', 'Every login on the platform. Roles decide capability; access decides which panels open.');
+  var head = admHead('User Management', 'Every login on the platform. Roles decide capability; access decides which panels open.') + admTabs('admin');
   if (ADM.err) return head + admError(ADM.err);
   if (!ADM.users) return head + admBusy('users');
 
@@ -6708,7 +6775,7 @@ function viewAdminAccess() {
   if (!isSuperAdmin()) return admDenied();
   admLoadUsers();
   var head = admHead('Roles & Access',
-    'Which panels each user may open. Turning one off removes it on their next request, not merely from their menu.');
+    'Which panels each user may open. Turning one off removes it on their next request, not merely from their menu.') + admTabs('access');
   if (ADM.err) return head + admError(ADM.err);
   if (!ADM.users) return head + admBusy('users');
 
@@ -6803,7 +6870,7 @@ const LOG_EV = {
 function viewAdminLogs() {
   if (!isSuperAdmin()) return admDenied();
   admLoadLogs();
-  var head = admHead('User Logs', 'Who reached the platform, when, and from where. Refused attempts are kept as well as successful ones.');
+  var head = admHead('User Logs', 'Who reached the platform, when, and from where. Refused attempts are kept as well as successful ones.') + admTabs('logs');
   if (ADM.logsErr) return head + admError(ADM.logsErr);
   if (!ADM.logs) return head + admBusy('the sign-in log');
 
@@ -6946,14 +7013,23 @@ function applyAccess() {
   render();
 }
 
-/* Nothing lives here any more. My Profile became a panel of the sidebar, and
-   Administration has followed it: both are reached like every other panel, from
-   the menu above, so a link out to a separate application would be a second way
-   to the same place — and the slower one. The slot is kept because the sidebar
-   markup owns it and a future account-level link would belong in it. */
+/* The foot of the sidebar: everything about the person signed in rather than
+   about the scheme. My Profile lives here now instead of in the panel list, so
+   it sits next to Sign out where someone goes looking for it, and the list above
+   is one group shorter.
+   Driven off the NAV entries marked foot:1 rather than hard-coded markup, so the
+   label, icon and access rule stay defined in exactly one place. Called from
+   renderNav() on every navigation, which is what keeps .active correct. */
 function renderAccountLinks() {
   var slot = document.getElementById('acctLinks');
-  if (slot) slot.innerHTML = '';
+  if (!slot) return;
+  slot.innerHTML = NAV.filter(function (it) {
+    return it.foot && !viewHidden(it.v) && moduleAllowed(it.v);
+  }).map(function (it) {
+    var active = state.view === it.v ? ' active' : '';
+    return '<button class="navitem' + active + '" onclick="go(\'' + it.v + '\')">' +
+      svgIcon(it.i) + it.t + '</button>';
+  }).join('');
 }
 
 function loadMe() {
