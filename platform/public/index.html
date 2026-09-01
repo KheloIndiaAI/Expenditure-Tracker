@@ -3527,15 +3527,25 @@ function kiCompTable(g){
   if(!rows.length) return '';
   /* Classification rides as a small pill directly under the component name rather than
      occupying its own column - it is an attribute of the component, not a measure. */
-  /* No "Used %" column - the utilisation bar already carries that figure, and the block
-     header states it too. Balance is rendered red wherever it is genuinely outstanding;
-     a nil balance stays muted so red always means "money still unspent". */
-  return `<div class="tscroll"><table class="dt"><thead><tr><th>Component</th><th class="num">Assignment</th><th class="num">Expenditure</th><th class="num">Balance</th><th class="num">Unspent</th><th class="barcell">Utilisation</th></tr></thead><tbody>
+  /* Three money columns, asking the same three questions in the same order the block's own
+     cards ask them: what was assigned, what was spent, what is left.
+
+     Unspent and Utilisation are deliberately not among them. Unspent was a centre-level
+     figure (limit released to centres, less what they drew) sitting in a component-level
+     table, so it answered a different question from the three beside it and never summed
+     the way a reader would expect a column to. Utilisation restated the Balance column
+     next to it as a percentage of the Assignment column next to that - a third rendering
+     of two figures already on the row.
+
+     Balance is rendered red wherever it is genuinely outstanding; a nil balance stays
+     muted so red always means "money still unspent", and a negative one - a component
+     that has spent past its assignment - keeps its own marker. Head, body and foot all
+     carry four cells: the foot used to carry a fifth, empty one, which made the browser
+     lay the total row out against a column the header never declared. */
+  return `<div class="tscroll"><table class="dt"><thead><tr><th>Component</th><th class="num">Assignment</th><th class="num">Expenditure</th><th class="num">Balance</th></tr></thead><tbody>
     ${rows.map(s=>`<tr><td><div class="kig-cn"><span class="kig-dot" style="background:${SVCOL[s.name]||g.col}"></span>${esc(s.name)}</div><div class="kig-cp">${secPill(s.section)}</div></td>
-      <td class="num tnum">${crShort(s.assign)}</td><td class="num tnum">${crShort(s.exp)}</td><td class="num tnum${Math.round(s.bal)===0?'':(s.bal<0?' bal-over':' bal-red')}">${crShort(s.bal)}</td>
-      <td class="num tnum">${crShort(Math.max(0,(s.totLim||0)-(s.totAct||0)))}</td>
-      <td class="barcell">${s.assign?utilBar(s.up,'Used','Bal'):'<span class="muted-cell">–</span>'}</td></tr>`).join('')}
-  </tbody><tfoot><tr><td><b>${g.tag} total</b></td><td class="num tnum"><b>${crShort(g.assign)}</b></td><td class="num tnum"><b>${crShort(g.exp)}</b></td><td class="num tnum${Math.round(g.bal)===0?'':(g.bal<0?' bal-over':' bal-red')}"><b>${crShort(g.bal)}</b></td><td class="num tnum"><b>${crShort(Math.max(0,g.idle))}</b></td><td class="barcell">${g.assign?utilBar(g.up,'Used','Bal'):''}</td><td></td></tr></tfoot></table></div>`;
+      <td class="num tnum">${crShort(s.assign)}</td><td class="num tnum">${crShort(s.exp)}</td><td class="num tnum${Math.round(s.bal)===0?'':(s.bal<0?' bal-over':' bal-red')}">${crShort(s.bal)}</td></tr>`).join('')}
+  </tbody><tfoot><tr><td><b>${g.tag} total</b></td><td class="num tnum"><b>${crShort(g.assign)}</b></td><td class="num tnum"><b>${crShort(g.exp)}</b></td><td class="num tnum${Math.round(g.bal)===0?'':(g.bal<0?' bal-over':' bal-red')}"><b>${crShort(g.bal)}</b></td></tr></tfoot></table></div>`;
 }
 function kiGroupBlock(g){
   const h=healthOf(g.assign,g.up,g.idle,g.bal);
