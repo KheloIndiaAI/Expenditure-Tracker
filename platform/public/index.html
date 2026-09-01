@@ -729,6 +729,16 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
   padding:0 6px;border-radius:10px;background:var(--border);color:var(--text-secondary);
   font-size:11px;font-weight:700}
 .kig-comp-hd.on .kig-comp-n{background:var(--primary);color:#fff}
+/* Zero-spend warning, on the control that opens the evidence for it. Sized and
+   shaped like the count beside it so the pair reads as one row of chips, but
+   carrying the critical colour, because an assignment nothing has been drawn
+   against is the one thing on this control worth interrupting for. */
+.kig-comp-z{
+  margin-left:auto;display:inline-flex;align-items:center;gap:5px;height:20px;
+  padding:0 9px;border-radius:10px;background:#fbeaea;
+  color:var(--critical);font-size:11px;font-weight:700;white-space:nowrap}
+.kig-comp-z::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.kig-comp-z+.kig-comp-n{margin-left:9px}
 .kig-comp-body{margin-top:11px;animation:drop .22s ease}
 
 .kig-sec{margin:0 0 24px}
@@ -742,20 +752,14 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 .kig-rl{font-size:11.5px;color:var(--text-muted);margin-top:1px}
 .kig-body{border:1px solid var(--border);border-top:none;border-radius:0 0 12px 12px;background:var(--bg-surface);padding:16px 18px 18px;box-shadow:var(--elev-1)}
 .kig-body .kpi-grid{margin:0 0 16px}
-/* group read-out: three labelled stat tiles rather than one run-on sentence, so each figure
-   has its own heading and the numbers stay scannable at a glance. */
-.kig-read{display:flex;flex-wrap:wrap;margin:0 0 14px;background:var(--bg-app);border:1px solid var(--border);border-radius:10px;overflow:hidden}
-.kig-stat{flex:1 1 190px;min-width:0;padding:9px 14px;border-right:1px solid var(--border)}
-.kig-stat:last-child{border-right:none}
-.kig-sk{font-size:10px;text-transform:uppercase;letter-spacing:.055em;color:var(--text-muted);font-weight:700;margin-bottom:3px}
-.kig-sv{font-size:13px;color:var(--text-primary);font-weight:600;line-height:1.35;overflow-wrap:anywhere}
-.kig-sv .op{color:var(--text-muted);font-weight:600;margin:0 2px}
-.kig-sv .mut{color:var(--text-secondary);font-weight:500}
-.kig-sv .eq{color:var(--primary);font-weight:700}
-/* utilisation bar: same segmented component the RC / KI Infra / Sub-Vertical tables use */
-.kig-barwrap{margin:0 0 14px}
-.kig-barhd{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:11.5px;color:var(--text-muted);margin-bottom:5px}
-.kig-barhd b{color:var(--text-primary);font-weight:600}
+/* The block used to carry a full-width utilisation bar and a three-tile read-out
+   (build-up, largest spender, zero-spend) between the cards and the component
+   fold. Both are gone: the bar restated the percentage already sitting in the
+   band header and the Balance card, and the read-out's own figures live closer
+   to home now - the build-up in the footer of the Expenditure card it explains,
+   and the rest inside the component table one click below. The classes that
+   dressed them (.kig-read/.kig-stat/.kig-sk/.kig-sv/.kig-barwrap/.kig-barhd)
+   went with the markup rather than being left to rot. */
 .kig-cmp .mdsd-bar{height:20px;border-radius:10px;min-width:88px}
 .kig-cmp .mdsd-bar>span{font-size:9.5px}
 .kig-cmp td.barcell{width:190px;min-width:130px}
@@ -772,8 +776,6 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 .bal-over{color:var(--critical);font-weight:700}
 .bal-over::after{content:' ▲';font-size:9px;vertical-align:1px}
 @media(max-width:720px){
-  .kig-stat{flex:1 1 100%;border-right:none;border-bottom:1px solid var(--border)}
-  .kig-stat:last-child{border-bottom:none}
   .kig-cmp td.barcell{display:none}.kig-cmp th.barcell{display:none}
 }
 .kig-share{display:flex;height:36px;border-radius:9px;overflow:hidden;border:1px solid var(--border);margin:2px 0 10px}
@@ -3543,13 +3545,33 @@ function kiGroupBlock(g){
       <div class="kig-id"><div class="kig-name">${g.name}</div><div class="kig-tag">${g.note}</div></div></div>
     <div class="kig-body"><div class="dt-empty"><div class="e-ic">🔍</div><div class="e-t">No components under the current Classification</div>
       <div class="e-s">Every ${g.tag} component sits outside <b>${esc(state.filt)}</b>. Switch Classification to <b>All</b> to see this block.</div></div></div></div>`;
-  const zero=g.subs.filter(s=>s.assign>0&&s.exp===0), funded=g.subs.filter(s=>s.assign>0);
-  const top=funded.slice().sort((a,b)=>b.exp-a.exp)[0];
+  const funded=g.subs.filter(s=>s.assign>0);
   const dkShare=g.exp?g.ddoki/g.exp:0;
   const tipA=`<b>${g.tag} · Assignment</b><br>Sum of the Ministry assignment for ${funded.length} funded component${funded.length===1?'':'s'}.<br><span style="opacity:.75">${pct(G.ex.assign?g.assign/G.ex.assign:0,1)} of the ${cr(G.ex.assign)} scheme total (ex-KI Infra).</span>`;
   const tipE=`<b>${g.tag} · Expenditure</b><br>Centre actual ${cr(g.act)} + DDO KI Direct ${cr(g.ddoki)} = <b>${cr(g.exp)}</b>.<br>DDO KI is ${pct(dkShare,1)} of this block's spend.<br><span style="opacity:.75">Same build-up as every other page - see the expenditure bridge on Regional Centres.</span>`;
   const tipB=`<b>${g.tag} · Balance</b><br>${cr(g.assign)} assigned − ${cr(g.exp)} spent = <b>${cr(g.bal)}</b> still unspent (${pct(g.assign?g.bal/g.assign:0,1)}).`;
   const tipI=`<b>${g.tag} · Unspent by Centre</b><br>${cr(g.lim)} limit released to centres − ${cr(g.act)} drawn = <b>${cr(g.idle)}</b>.<br><span style="opacity:.75">Money already with the centres and still unspent. Excludes DDO KI, which never sat in a centre limit.</span>${idleTipRows(g.subs)}`;
+  /* The expenditure build-up rides in the card whose figure it explains - in
+     PLACE of that card's utilisation line, not under it.
+
+     Nothing is lost by replacing it: the rate was already on the screen twice
+     over, once in this block's own band header and once as its complement on
+     the Balance card beside it, so the block stated a figure three times and
+     the build-up not at all. And a fourth line on one card of four is not free.
+     The grid stretches every card to the tallest, so an extra line here leaves
+     the three cards beside it holding framed empty space - 30px of it at desk
+     widths, and enough at 375px to read as a card that failed to load. That is
+     the raggedness the .kpi-foot rule warns about, arriving from the other end.
+
+     The card's headline IS the total this sums to, so the total is not repeated
+     eight pixels under itself. Every figure is rounded for display on its own,
+     as every figure here is, so in a few block-and-Classification combinations
+     the two shown parts land 0.01 Cr either side of the shown total. The only
+     way to make the line tie would be to move a lakh of real money, which this
+     platform does not do; tipE carries the build-up exactly. */
+  const expSub = g.exp > 0
+    ? `<b class="tnum">${crShort(g.act)}</b> centres + <b class="tnum">${crShort(g.ddoki)}</b> DDO KI Direct`
+    : `${pct(g.up,1)} of assignment used`;
   return `<div class="kig-sec">
     <div class="kig-band" style="background:linear-gradient(135deg,${tint},var(--bg-surface))">
       <span class="kig-badge" style="background:${g.col}">${g.tag}</span>
@@ -3559,18 +3581,9 @@ function kiGroupBlock(g){
     <div class="kig-body">
       <div class="kpi-grid">
         <div class="kpi accent"${tattr(tipA)}><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">${g.tag} Assignment</div><div class="val tnum">${cr(g.assign)}</div></div></div><div class="sub">${funded.length} funded component${funded.length===1?'':'s'} · ${pct(G.ex.assign?g.assign/G.ex.assign:0,1)} of scheme</div></div>
-        <div class="kpi"${tattr(tipE)}><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">${g.tag} Expenditure</div><div class="val tnum">${cr(g.exp)}</div></div></div><div class="sub" style="color:var(--serious)">${pct(g.up,1)} of assignment used</div></div>
+        <div class="kpi"${tattr(tipE)}><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">${g.tag} Expenditure</div><div class="val tnum">${cr(g.exp)}</div></div></div><div class="sub">${expSub}</div></div>
         <div class="kpi"${tattr(tipB)}><div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('scale')}</span><div class="kpi-txt"><div class="lbl">${g.tag} Balance</div><div class="val tnum">${cr(g.bal)}</div></div></div><div class="sub">${pct(g.assign?g.bal/g.assign:0,1)} still unspent</div></div>
         <div class="kpi"${tattr(tipI)}><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('gauge')}</span><div class="kpi-txt"><div class="lbl">${g.tag} Unspent by Centre</div><div class="val tnum neg">${cr(Math.max(0,g.idle))}</div></div></div><div class="sub">of ${crShort(g.lim)} limit released</div></div>
-      </div>
-      <div class="kig-barwrap">
-        <div class="kig-barhd"><span>Utilisation of the <b>${cr(g.assign)}</b> ${g.tag} assignment</span><span><b>${crShort(g.exp)}</b> spent · <b>${crShort(g.bal)}</b> balance</span></div>
-        ${utilBar(g.up,'Utilised','Balance')}
-      </div>
-      <div class="kig-read">
-        <div class="kig-stat"><div class="kig-sk">Expenditure build-up</div><div class="kig-sv">${crShort(g.act)} <span class="mut">centres</span><span class="op">+</span>${crShort(g.ddoki)} <span class="mut">DDO KI</span><span class="op">=</span><span class="eq">${crShort(g.exp)}</span></div></div>
-        ${top&&top.exp>0?`<div class="kig-stat"><div class="kig-sk">Largest spender</div><div class="kig-sv">${esc(top.name)} <span class="mut">· ${crShort(top.exp)}</span></div></div>`:''}
-        <div class="kig-stat"><div class="kig-sk">Zero-spend components</div><div class="kig-sv"><span style="color:${zero.length?'var(--critical)':'var(--good)'}">${zero.length}</span> <span class="mut">of ${funded.length} funded${zero.length?' · '+esc(zero[0].name)+(zero.length>1?' +'+(zero.length-1)+' more':''):''}</span></div></div>
       </div>
       ${kiCompGroup(g)}
     </div></div>`;
@@ -3586,10 +3599,25 @@ function kiGroupBlock(g){
 --------------------------------------------------------------------------- */
 function kiCompGroup(g){
   const on=!!state.kiComp;
+  /* The block used to carry a red "Zero-spend components" tile in its read-out
+     strip. The strip is gone, but the warning it carried could not simply go
+     with it: a component holding an assignment it has drawn nothing against is
+     flagged NOWHERE else on this platform. The Attention Centre reasons from
+     release rows and these components have none, Sub-Vertical Analysis is a
+     hidden view, and the component table below prints every non-nil balance in
+     red, so red there no longer singles anything out.
+     So the count rides on the control that opens the evidence for it, as one
+     more chip beside the component count, and only when there is something to
+     say. No strip, nothing added to the cards. */
+  const zero=g.subs.filter(s=>s.assign>0&&s.exp===0);
+  const zchip=zero.length
+    ? `<span class="kig-comp-z" title="${esc(zero.map(s=>s.name).join(' · '))}">${zero.length} with no spend</span>`
+    : '';
   return `<div class="kig-comp">
     <button class="kig-comp-hd${on?' on':''}" onclick="toggleKiComp()" aria-expanded="${on?'true':'false'}">
       <span class="kig-comp-c"></span>
       <span>Components of ${esc(g.tag)}</span>
+      ${zchip}
       <span class="kig-comp-n">${g.subs.length}</span>
     </button>
     ${on?`<div class="kig-comp-body">${kiCompTable(g)}</div>`:''}
