@@ -765,6 +765,15 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
    only .mdsd-bar this panel ever held - so the rules that sized both here have
    gone too. .mdsd-bar itself stays: KI Infra and Regional Centres build their
    own, from their own segments. */
+/* Daily Expenditure: the type a claim was booked under, as a dot and a word
+   rather than a coloured pill - the amount beside it is what the eye should land
+   on, and three saturated pills a row would compete with it. */
+.dsc-chipv{margin-left:7px;opacity:.72;font-weight:700}
+.fchip.on .dsc-chipv{opacity:.85}
+.dsc-t{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;white-space:nowrap}
+.dsc-t i{width:7px;height:7px;border-radius:50%;flex:none}
+.dsc-mv{font-size:11px;color:var(--text-muted);margin-top:2px;font-variant-numeric:tabular-nums}
+.dsc-mv b{color:var(--text-secondary);font-weight:700}
 /* component cell: name on top, classification as a small pill underneath */
 .kig-cn{display:flex;align-items:center;min-width:0}
 .kig-cp{margin-top:3px;padding-left:17px}
@@ -824,50 +833,9 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
    alert, and the sync time in the footer. Nothing else earns a line; a tooltip
    that has to be read twice is not doing its job. #tip drops its own padding
    for this one so the card can run its sections full-bleed. */
-/* ---- Yesterday's movement panel ------------------------------------------
-   A summary strip that opens onto a centre table. The strip carries the two
-   figures at KPI weight because they are the panel's whole answer; the table
-   below reuses the .usage / .txmini idiom the component drop-downs already
-   use, so a row that expands looks the same here as everywhere else. */
-/* Three columns, the outer two equal, so the pair of figures sits on the tile's
-   true centre line - not merely after the chevron. Flex with an auto margin
-   would centre them in the space LEFT OVER, which drifts as the hint on the
-   right changes length ("6 entries" vs "Reading the sheet…"). */
-.yd-sum{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;
-  padding:13px 18px 15px;cursor:pointer;
-  border-top:1px solid var(--border-subtle);transition:background .12s}
-.yd-sum:hover{background:var(--bg-app)}
-.yd-sum.open{background:var(--bg-app);border-bottom:1px solid var(--border-subtle)}
-.yd-sum>.chev{justify-self:start}
-/* On its own page there is nothing to disclose, so the strip stops behaving like
-   a control: no pointer, no hover, and the figures take the full width. */
-.yd-sum.flat{grid-template-columns:1fr;cursor:default;background:var(--bg-app);
-  border-bottom:1px solid var(--border-subtle);padding:16px 18px 18px}
-.yd-sum.flat:hover{background:var(--bg-app)}
-.yd-figs{display:flex;justify-content:center;gap:40px;min-width:0}
-.yd-fig{min-width:0;text-align:center}
-.yd-fig .k{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}
-.yd-fig .v{font-size:21px;font-weight:700;letter-spacing:-.01em;color:var(--text-primary);
-  font-variant-numeric:tabular-nums;margin-top:2px}
-.yd-fig.used .v{color:var(--good)}
-.yd-hint{font-size:11.5px;color:var(--text-muted);text-align:right}
-.yd-empty{padding:16px 18px 20px;font-size:12.5px;color:var(--text-muted);text-align:center}
-/* Group band - separates Regional Centres from States/UTs when both moved. */
-.usage tr.yd-band>td{background:rgba(37,106,191,.06);font-weight:700;color:var(--primary-hover);
-  font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;
-  border-bottom:1px solid var(--border)}
-/* Which column an edit landed in. Money moved reads green-neutral; a label
-   change reads as the quieter thing it is. */
-.yd-tag{display:inline-block;padding:1px 7px;border-radius:999px;background:#e9f6ef;color:#1b7a4b;
-  font-size:10.5px;font-weight:700;white-space:nowrap}
-.yd-tag.asg{background:var(--primary-subtle);color:var(--primary-hover)}
-/* Too narrow for three columns: the chevron keeps the left, the figures take
-   the width and stay centred, and the hint drops beneath them. */
-@media(max-width:720px){
-  .yd-sum{grid-template-columns:auto 1fr;gap:10px 12px}
-  .yd-figs{gap:22px}
-  .yd-hint{grid-column:1/-1;text-align:center}
-}
+/* The Yesterday's-movement strip and its centre table are gone; Daily
+   Expenditure is built from the platform's ordinary card, chip and table
+   idioms instead, so the .yd-* rules that dressed them went too. */
 /* ---- Trend Analytics ---- */
 .ta-top{align-items:center;gap:8px;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:9px 12px;box-shadow:var(--elev-1);margin-bottom:14px}
 .ta-cap{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-right:2px}
@@ -2277,8 +2245,9 @@ let state={view:'command', tr:{}, trSub:null, hsOpen:null, svOpen:null, filt:'Al
   mdsdSort:{key:'bal',dir:-1}, rcSort:{key:'bal',dir:-1}, sectSort:{key:'assign',dir:-1}, svSort:{key:'assign',dir:-1},
   dsort:{key:'act',dir:-1}, dfilt:{sv:'',rc:'',scat:'',q:''}, dmode:'alloc', cdOpen:null, sfOpen:null, tg:{}, _filtView:null, txRange:'all', txType:'',
   rcOnly:false,
-  /* Yesterday's Expenditure: one centre's vouchers open at a time. */
-  ydCentre:null,
+  /* Daily Expenditure: which day the panel is reading. Null opens on the most
+     recent day the book records, which is not always yesterday. */
+  ydDay:null,
   /* Voucher comments: which row's editor is open, and its unsaved text. The
      draft is mirrored on every keystroke so a background sync that repaints the
      page cannot throw away what someone is halfway through typing. */
@@ -2345,7 +2314,7 @@ const NAV=[{g:'ANALYSIS'},
   {v:'command',   t:'Financial Overview',      i:'command', feat:1},
   /* Sits under the Overview it used to be a strip inside, so anyone who knew it
      there finds it in the first place they look. */
-  {v:'yday',      t:"Yesterday's Expenditure", i:'clock'},
+  {v:'yday',      t:'Daily Expenditure',        i:'clock'},
   {v:'tracker',   t:'Component Tracker',       i:'tracker'},
   {v:'kigroups',  t:'SAI KI 1, KI 2 & Infra',  i:'kig'},
   {v:'saifmt',    t:'SAI Format Summary',      i:'saif'},
@@ -2494,7 +2463,7 @@ function trSubToggle(k){
 }
 function hsToggle(k){ tipHide(); state.hsOpen = state.hsOpen===k?null:k; render(); }
 function svToggle(k){ state.svOpen = state.svOpen===k?null:k; render(); }
-function ydCentreToggle(k){ tipHide(); state.ydCentre = state.ydCentre===k?null:k; render(); }
+function ydPick(d){ tipHide(); state.ydDay=d; render(); }
 function sortDetail(k){ const s=state.dsort; if(s.key===k)s.dir*=-1; else state.dsort={key:k,dir:-1}; render(); }
 function setUtilSort(field,key,dir){ state[field]={key,dir}; render(); }
 function utilSorted(items,sortObj){
@@ -2953,129 +2922,15 @@ function viewCommand(){
    + `<div class="card" style="padding:0;overflow:hidden"><div class="card-hd" style="padding:16px 18px 0"><h3>Expenditure vs balance by section</h3></div>${sectionUtilTable()}</div>`;
 }
 
-/* ============================================================================
-   YESTERDAY'S EXPENDITURE AND ASSIGNMENTS
-   ============================================================================
-   What moved in the workbook yesterday, read from its own EditHistory log
-   rather than inferred from the figures.
 
-   Why the log and not the figures. A voucher's row carries a running balance,
-   not a diary: "Utilization by RC = 18,35,993" says what the total is now and
-   nothing about when any of it was booked. The Payment Date column dates the
-   VOUCHER, not the data entry - a voucher paid in June can be keyed in
-   yesterday. Only the edit log knows when a figure actually changed, so only
-   the edit log can answer this panel's question.
-
-   What a day's movement is. The INCREMENT, New - Old, never the new balance.
-   GANDHINAGAR TSA/185 went 8,36,000 -> 18,35,993 yesterday; 9,99,993 was booked
-   yesterday and the 8,36,000 beneath it was booked on some earlier day. Summing
-   balances would have counted that older money again and put a figure in a
-   panel labelled "Yesterday" that reconciles against nothing else on screen.
-
-   Double counting, the other way. One cell edited three times in a day writes
-   three log rows - (empty)->5L, 5L->7L, 7L->7.5L - and adding those deltas is
-   right while adding those balances is not. Edits are therefore collapsed per
-   cell first: earliest Old, latest New, one movement. The collapse key carries
-   the sheet name because a voucher number is only unique WITHIN a centre's tab
-   - TSA/388 exists in both IMPHAL and GUWAHATI as two unrelated transactions,
-   and keying on the voucher alone would silently merge them.
-
-   Where the detail comes from. The log names a centre and a voucher and stops
-   there; the component, sanction, grantee and narration live in the main
-   workbook. (rc, voucher) is unique within a centre tab - checked against every
-   tab - so the join is 1:1 and needs no disambiguation. The log's own Sub
-   Vertical column wins when the tracker starts filling it. */
-const YD_GROUP={centre:'SAI Regional Centres', infra:'KI Infra (States/UTs)', other:'Other'};
-/* The log's "Sheet Name (State)" is a tab name. A centre tab is one thing, a
-   State/UT grant is another, and anything we cannot place is shown as itself
-   rather than quietly dropped or filed under a centre it is not. */
-function ydayBucket(rc){
-  if((DATA.centres||[]).indexOf(rc)>=0) return 'centre';
-  const n=String(rc||'').trim().toLowerCase();
-  for(let i=0;i<(MDSD.items||[]).length;i++){
-    if(String(MDSD.items[i].name).trim().toLowerCase()===n) return 'infra';
-  }
-  return 'other';
-}
-function ydayMovement(){
-  const day=istDateStr(1), win=istDayWindow(1);
-  const out={day:day, label:sheetDMY(day), places:[], assigned:0, spent:0, n:0,
-             ready:!!SYNC.editLog};
-  if(!SYNC.editLog) return out;
-  /* One movement per cell: earliest Old, latest New, however many edits landed. */
-  const cell={}, order=[];
-  SYNC.editLog.forEach(function(e){
-    if(!e||!e.kind||!isFinite(e.ts)||e.ts<win.start||e.ts>win.end) return;
-    const k=e.rc+'|'+e.voucher+'|'+e.col;
-    let p=cell[k];
-    if(!p){ p=cell[k]={rc:e.rc, voucher:e.voucher, col:e.col, kind:e.kind, sv:e.sv||'',
-                       firstTs:e.ts, lastTs:e.ts, open:e.oldV, close:e.newV, edits:0};
-            order.push(p); }
-    p.edits++;
-    if(e.ts<p.firstTs){ p.firstTs=e.ts; p.open=e.oldV; }
-    if(e.ts>=p.lastTs){ p.lastTs=e.ts; p.close=e.newV; }
-    if(!p.sv&&e.sv) p.sv=e.sv;
-  });
-  const byPlace={};
-  order.forEach(function(p){
-    /* A label column has no arithmetic. It is a real edit and is listed as one,
-       but it moves no money and must not be summed into a rupee total. */
-    p.delta=(p.open==null||p.close==null)?null:(p.close-p.open);
-    let tx=null; const tl=DATA.txns||[];
-    for(let i=0;i<tl.length;i++){
-      if(tl[i]&&tl[i].rc===p.rc&&tl[i].voucher===p.voucher){ tx=tl[i]; break; }
-    }
-    p.sv=p.sv||(tx?tx.sv:'');
-    p.scat=tx?tx.scat:''; p.nar=tx?tx.nar:''; p.sanction=tx?tx.sanction:'';
-    p.date=tx?tx.date:null; p.matched=!!tx;
-    const b=byPlace[p.rc]||(byPlace[p.rc]={name:p.rc, group:ydayBucket(p.rc), rel:0, util:0, n:0, rows:[]});
-    b.rows.push(p); b.n++; out.n++;
-    if(p.delta!=null){ b[p.kind]+=p.delta; out[p.kind==='rel'?'assigned':'spent']+=p.delta; }
-  });
-  const GRANK={centre:0, infra:1, other:2};
-  out.places=Object.keys(byPlace).map(function(k){ return byPlace[k]; })
-    .sort(function(a,b){
-      return (GRANK[a.group]-GRANK[b.group])
-          || ((b.util+b.rel)-(a.util+a.rel))
-          || a.name.localeCompare(b.name);
-    });
-  out.places.forEach(function(b){
-    b.rows.sort(function(x,y){ return (y.delta||0)-(x.delta||0) || String(x.voucher).localeCompare(String(y.voucher)); });
-  });
-  return out;
-}
-/** Voucher-level detail for one centre - what changed, and on which component. */
-function ydayTxns(b){
-  const body=b.rows.map(function(p){
-    const asg=p.kind==='rel';
-    const head='<b>'+esc(p.voucher||'—')+'</b>'
-      + (p.sanction?' <span class="muted">· '+esc(p.sanction)+'</span>':'')
-      + (p.date?' <span class="muted">· '+esc(fmtD(p.date))+'</span>':'')
-      + (p.edits>1?' <span class="muted">· '+p.edits+' edits merged</span>':'')
-      + (p.nar?'<div class="txnar">'+esc(p.nar)+'</div>':'');
-    const comp=p.sv
-      ? esc(p.sv)+(p.scat?'<div class="muted" style="font-size:10.5px">'+esc(p.scat)+'</div>':'')
-      : '<span class="muted">Not found in the main sheet</span>';
-    /* crShort rounds to two decimals of a lakh, so 9,99,993 prints as ₹10.00 L.
-       That is the platform's convention and stays, but this table is where the
-       exact movement is checked, so every figure carries its rupees on hover. */
-    const amt=function(v){
-      return v==null ? '<span class="muted">—</span>'
-        : '<span title="₹'+esc(grpIN(v))+'">'+esc(crShort(v))+'</span>';
-    };
-    return '<tr'+(p.nar?' title="'+esc(p.nar)+'"':'')+'>'
-      + '<td>'+head+'</td>'
-      + '<td>'+comp+'</td>'
-      + '<td><span class="yd-tag'+(asg?' asg':'')+'">'+(asg?'Assignment':'Expenditure')+'</span></td>'
-      + '<td class="num tnum">'+amt(p.open)+'</td>'
-      + '<td class="num tnum">'+amt(p.close)+'</td>'
-      + '<td class="num tnum" style="color:'+(p.delta>0?'var(--good)':p.delta<0?'var(--serious)':'var(--text-muted)')+'">'
-        + (p.delta==null?'<span class="muted">label only</span>':amt(p.delta))+'</td></tr>';
-  }).join('');
-  return '<table class="txmini"><thead><tr><th>Voucher · Sanction · Payment date</th>'
-    + '<th>Component</th><th>Field</th><th class="num">Previous</th><th class="num">Updated</th>'
-    + '<th class="num">Booked yesterday</th></tr></thead><tbody>'+body+'</tbody></table>';
-}
+/* The panel that reads what moved yesterday is now driven by the DSC_Details day
+   book rather than by the workbook's EditHistory log - see viewYday and
+   parseDscRows. The log inferred a day's movement from New minus Old across every
+   edited cell, which was the only way to date a figure while the day book did not
+   exist; the book records each claim on the day it is booked, with its type and
+   its component, so nothing has to be inferred. ydayMovement, ydayTxns,
+   ydayBucket and YD_GROUP went with it, and so did the .yd-* rules that dressed
+   them. The log itself stays: it still names the last edit on the sync card. */
 /* A panel of its own, reached from the sidebar.
 
    It began as a strip inside Financial Overview and outgrew it: what moved
@@ -3087,58 +2942,137 @@ function ydayTxns(b){
    `yday` is a RESTRICTED module (see @efip/shared): unlike every other panel it
    is withheld until an administrator turns it on in Roles & Access. Nothing here
    enforces that - moduleAllowed decides, and the sidebar obeys. */
+/* ---- Daily Expenditure -------------------------------------------------------
+   Read straight from the DSC_Details day book: every claim as it was booked, on
+   the day it was booked. Three components carry the money and the panel keeps
+   them apart at every level - the cards, the day table and the download - because
+   they are the same three the rest of the platform reports separately and a
+   reader comparing panels should never have to unpick a blended figure.
+
+   The panel opens on the most recent day the book actually records rather than
+   on yesterday's date. A day book has gaps - weekends, holidays, a day nobody
+   filed - and opening on an empty page to prove that yesterday was quiet is a
+   worse answer than showing the last day that had something to say. Which day is
+   on screen is stated, and every other day is one click away. */
+function ydDayLabel(iso){ return sheetDMY(iso); }
 function viewYday(){
-  const y=ydayMovement();
-  const has=y.n>0;
-  const hint = !y.ready ? 'Reading the sheet…'
-    : has ? y.n+' entr'+(y.n===1?'y':'ies')+' · '+y.places.length+' location'+(y.places.length===1?'':'s')
-    : 'Nothing recorded';
-  const fig=function(k,v,cls){
-    return '<div class="yd-fig'+(cls?' '+cls:'')+'" title="₹'+esc(grpIN(v))+'"><div class="k">'+k+'</div>'
-         + '<div class="v">'+esc(crShort(v))+'</div></div>';
+  const days=dscDays();
+  if(!SYNC.dsc) return pageHead('Daily Expenditure','Read from the DSC_Details day book on every sync.')
+    + '<div class="card"><div class="dt-empty"><div class="e-ic">⏳</div>'
+    + '<div class="e-t">The day book has not been read yet</div>'
+    + '<div class="e-s">DSC_Details is pulled on every sync, just after the figures.</div></div></div>';
+  if(!days.length) return pageHead('Daily Expenditure','Read from the DSC_Details day book on every sync.')
+    + '<div class="card"><div class="dt-empty"><div class="e-ic">🗓</div>'
+    + '<div class="e-t">No claims are recorded in the day book</div>'
+    + '<div class="e-s">Nothing has been booked in DSC_Details yet, so there is nothing to report.</div></div></div>';
+
+  const pick=days.filter(function(d){ return d.date===state.ydDay; })[0]||days[0];
+  const isLatest=pick.date===days[0].date;
+  const yday=istDateStr(1);
+
+  /* Recent days only. The book grows by a row a day and a chip row that grows
+     with it would, by the second month, push the figures off the screen it
+     exists to introduce. Every day stays one click away in the table below,
+     which is the right place to reach back weeks anyway - and the day being
+     read is always shown, even when it is older than the window. */
+  const CHIPS=14;
+  const shownDays=days.slice(0,CHIPS);
+  if(!shownDays.some(function(d){ return d.date===pick.date; })) shownDays.push(pick);
+  const chips=shownDays.map(function(d){
+    return '<button class="fchip'+(d.date===pick.date?' on':'')+'" onclick="ydPick('+jstr(d.date)+')">'
+      + esc(ydDayLabel(d.date))+'<span class="dsc-chipv">'+esc(crShort(d.total))+'</span></button>';
+  }).join('')
+  + (days.length>shownDays.length
+      ? '<span class="small muted">+'+(days.length-shownDays.length)+' earlier · pick one in the table below</span>'
+      : '');
+
+  /* Four cards: the day's total, then the three components that make it up.
+     The total leads because it is the question the panel is opened to answer;
+     the three behind it are the same split the download carries. */
+  const card=function(lbl,val,ic,icon,accent,sub,tip){
+    return '<div class="kpi'+(accent?' accent':'')+'"'+tattr(tip)+'>'
+      + '<div class="kpi-top"><span class="kpi-ic '+ic+'">'+kpiIcon(icon)+'</span>'
+      + '<div class="kpi-txt"><div class="lbl">'+esc(lbl)+'</div>'
+      + '<div class="val tnum">'+esc(crShort(val))+'</div></div></div>'
+      + '<div class="sub">'+sub+'</div></div>';
   };
-  let drop='';
-  {
-    if(!y.ready){
-      drop='<div class="yd-empty">The sheet\'s edit log has not been read yet. It is pulled on every sync.</div>';
-    } else if(!has){
-      drop='<div class="yd-empty">No entries were recorded in the sheet on '+esc(y.label)+'.</div>';
-    } else {
-      let band=null, trs='';
-      y.places.forEach(function(b){
-        if(b.group!==band){
-          band=b.group;
-          trs+='<tr class="yd-band"><td colspan="4">'+esc(YD_GROUP[b.group]||'Other')+'</td></tr>';
-        }
-        const k='Y|'+b.name, o=state.ydCentre===k;
-        trs+='<tr class="click" style="cursor:pointer'+(o?';background:rgba(37,106,191,.10)':'')+'"'
-           + ' onclick="event.stopPropagation();ydCentreToggle('+jstr(k)+')">'
-          + '<td class="subc"><span class="chev'+(o?' open':'')+'" style="margin-right:6px">'+(o?'▾':'▸')+'</span>'
-            + '<b>'+esc(b.name)+'</b> <span class="muted" style="font-weight:400;font-size:10.5px">· '
-            + b.n+' entr'+(b.n===1?'y':'ies')+'</span></td>'
-          + '<td class="num tnum">'+(b.rel?'<span title="₹'+esc(grpIN(b.rel))+'">'+esc(crShort(b.rel))+'</span>':'<span class="muted">—</span>')+'</td>'
-          + '<td class="num tnum" style="color:'+(b.util>0?'var(--good)':'var(--text-muted)')+'"'
-            + ' title="₹'+esc(grpIN(b.util))+'">'+esc(crShort(b.util))+'</td>'
-          + '<td class="num tnum">'+b.n+'</td></tr>';
-        if(o) trs+='<tr class="txrow"><td colspan="4" onclick="event.stopPropagation()">'+ydayTxns(b)+'</td></tr>';
-      });
-      drop='<div class="usage"><table><thead><tr><th>Centre / State</th>'
-         + '<th class="num">Assigned</th><th class="num">Expenditure</th><th class="num">Entries</th>'
-         + '</tr></thead><tbody>'+trs+'</tbody></table></div>';
-    }
-  }
-  /* No chevron and nothing to open: on its own page the figures and the centres
-     are the page. The strip needed a disclosure only because it was a guest
-     inside Financial Overview and could not take the room unasked. */
-  return pageHead("Yesterday's Expenditure and Assignments",
-      'What changed in the sheet on ' + esc(y.label) + ' — the movement booked that day, not the balance standing in the cell.')
-    + '<div class="card" style="padding:0;overflow:hidden">'
-    + '<div class="card-hd" style="padding:16px 18px 0"><h3>Booked on ' + esc(y.label) + '</h3>'
-      + '<span class="small muted">' + esc(hint) + '</span></div>'
-    + '<div class="yd-sum flat">'
-      + '<div class="yd-figs">'+fig('Total Assigned', y.assigned)
-        + fig('Total Expenditure', y.spent, 'used')+'</div></div>'
-    + drop
+  const share=function(v){ return pick.total?pct(v/pick.total,1)+' of the day':'—'; };
+  const ent=function(n){ return n+' entr'+(n===1?'y':'ies'); };
+  const nOf=function(k){ return pick.rows.filter(function(r){ return r.type===k; }).length; };
+  const cards='<div class="kpi-grid">'
+    + card('Booked on '+ydDayLabel(pick.date), pick.total, 'ic-blue', 'coins', 1,
+        ent(pick.n)+' · '+(pick.date===yday?'yesterday':(isLatest?'most recent day booked':'an earlier day')),
+        '<b>Total booked on '+esc(ydDayLabel(pick.date))+'</b><br>₹'+esc(grpIN(pick.total))+'<br><span style="opacity:.75">Every claim the day book records for this date, whatever its type.</span>')
+    + card('Regional Centres', pick.rc, 'ic-green', 'bank', 0, share(pick.rc)+' · '+ent(nOf('rc')),
+        '<b>Regional Centres</b><br>₹'+esc(grpIN(pick.rc))+'<br><span style="opacity:.75">Claims booked by a centre, the DDO Head Office among them.</span>')
+    + card('DDO KI Direct', pick.ddoki, 'ic-purple', 'receipt', 0, share(pick.ddoki)+' · '+ent(nOf('ddoki')),
+        '<b>DDO KI Direct</b><br>₹'+esc(grpIN(pick.ddoki))+'<br><span style="opacity:.75">Spent centrally, outside any centre limit.</span>')
+    + card('Infra MDSD (States/UTs)', pick.mdsd, 'ic-orange', 'wallet', 0, share(pick.mdsd)+' · '+ent(nOf('mdsd')),
+        '<b>Infra MDSD (States/UTs)</b><br>₹'+esc(grpIN(pick.mdsd))+'<br><span style="opacity:.75">Grants released direct to a State, UT or institute.</span>')
+    + '</div>';
+
+  /* The day's own entries, in the book's own terms. Old -> New rides under the
+     component where the tab records it, because for a DDO KI line that pair is
+     the claim's whole story and reading it beside the amount is the point. */
+  const TL={rc:'Regional Centre', ddoki:'DDO KI Direct', mdsd:'Infra MDSD', other:'Other'};
+  const TC={rc:'var(--good)', ddoki:'#4a3aa7', mdsd:'var(--serious)', other:'var(--text-muted)'};
+  const entries='<div class="tscroll"><table class="dt"><thead><tr>'
+    + '<th>Booked to</th><th>Type</th><th>Component</th><th class="num">Time</th><th class="num">Amount</th>'
+    + '</tr></thead><tbody>'
+    + pick.rows.map(function(e){
+        const mv=(e.oldV&&e.newV)?'<div class="dsc-mv">'+esc(e.oldV)+' → <b>'+esc(e.newV)+'</b></div>':'';
+        return '<tr><td><b>'+esc(e.name)+'</b></td>'
+          + '<td><span class="dsc-t" style="color:'+TC[e.type]+'"><i style="background:'+TC[e.type]+'"></i>'+esc(TL[e.type]||e.typeRaw)+'</span></td>'
+          + '<td>'+(e.comp?esc(e.comp):'<span class="muted">—</span>')+mv+'</td>'
+          + '<td class="num muted">'+esc(e.time||'—')+'</td>'
+          + '<td class="num tnum" title="₹'+esc(grpIN(e.amt))+'">'+esc(crShort(e.amt))+'</td></tr>';
+      }).join('')
+    + '</tbody><tfoot><tr><td colspan="4"><b>'+esc(ydDayLabel(pick.date))+' total</b></td>'
+    + '<td class="num tnum"><b>'+esc(crShort(pick.total))+'</b></td></tr></tfoot></table></div>';
+
+  /* Every day the book holds, in the shape the download carries - so what the
+     reader analyses in Excel is what they were just looking at. */
+  const gt=days.reduce(function(a,d){ return {rc:a.rc+d.rc, ddoki:a.ddoki+d.ddoki, mdsd:a.mdsd+d.mdsd,
+                                              other:a.other+d.other, total:a.total+d.total, n:a.n+d.n}; },
+                       {rc:0,ddoki:0,mdsd:0,other:0,total:0,n:0});
+  const anyOther=gt.other!==0;
+  const trend='<div class="tscroll"><table class="dt"><thead><tr><th>Date</th>'
+    + '<th class="num">Regional Centres</th><th class="num">DDO KI Direct</th><th class="num">Infra MDSD</th>'
+    + (anyOther?'<th class="num">Other</th>':'')
+    + '<th class="num">Total</th><th class="num">Entries</th></tr></thead><tbody>'
+    + days.map(function(d){
+        const on=d.date===pick.date;
+        return '<tr class="click"'+(on?' style="background:var(--primary-subtle)"':'')+' onclick="ydPick('+jstr(d.date)+')">'
+          + '<td><b>'+esc(ydDayLabel(d.date))+'</b></td>'
+          + '<td class="num tnum">'+esc(crShort(d.rc))+'</td>'
+          + '<td class="num tnum">'+esc(crShort(d.ddoki))+'</td>'
+          + '<td class="num tnum">'+esc(crShort(d.mdsd))+'</td>'
+          + (anyOther?'<td class="num tnum">'+esc(crShort(d.other))+'</td>':'')
+          + '<td class="num tnum"><b>'+esc(crShort(d.total))+'</b></td>'
+          + '<td class="num tnum">'+d.n+'</td></tr>';
+      }).join('')
+    + '</tbody><tfoot><tr><td><b>All '+days.length+' days</b></td>'
+    + '<td class="num tnum"><b>'+esc(crShort(gt.rc))+'</b></td>'
+    + '<td class="num tnum"><b>'+esc(crShort(gt.ddoki))+'</b></td>'
+    + '<td class="num tnum"><b>'+esc(crShort(gt.mdsd))+'</b></td>'
+    + (anyOther?'<td class="num tnum"><b>'+esc(crShort(gt.other))+'</b></td>':'')
+    + '<td class="num tnum"><b>'+esc(crShort(gt.total))+'</b></td>'
+    + '<td class="num tnum"><b>'+gt.n+'</b></td></tr></tfoot></table></div>';
+
+  return pageHead('Daily Expenditure',
+      'Every claim booked in the day book, by the day it was booked — the movement recorded that day, not the balance standing in the cell.')
+    + '<div class="filterbar" style="margin-bottom:14px">'
+      + '<span class="small muted" style="font-weight:600">Day</span>'+chips+'</div>'
+    + cards
+    + '<div class="card"><div class="card-hd"><h3>Booked on '+esc(ydDayLabel(pick.date))+'</h3>'
+      + '<span class="small muted">'+pick.n+' entr'+(pick.n===1?'y':'ies')+'</span></div>'+entries+'</div>'
+    + '<div class="card"><div class="card-hd"><h3>Day by day</h3>'
+      + '<span class="small muted">'+days.length+' day'+(days.length===1?'':'s')+' recorded · '
+      + esc(ydDayLabel(days[days.length-1].date))+' to '+esc(ydDayLabel(days[0].date))+'</span>'
+      + '<div class="tools"><button class="btn" onclick="dscDownload()">Download Excel</button></div></div>'
+      + trend
+      + '<div class="qh" style="margin:10px 2px 0">The download carries exactly this table — one row per day, the three '
+      + 'components and their total — so it opens ready to chart. Centre-by-centre detail stays on this page.</div>'
     + '</div>';
 }
 /* A sub-vertical opens onto the same centre breakdown the Component Tracker
@@ -5196,6 +5130,10 @@ const SYNC={
      main workbook grows its own EditHistory tab. */
   historyTab:'EditHistory',
   historyId:'1dlHnw6Y63GiV24wMC9y0cny22mSIx_VZtBtWv4V6cOc',
+  /* The day book behind Daily Expenditure. Same workbook as the figures,
+     so no historyId twin is needed here. Read alongside the edit log, after the
+     figures, and like it never gates a sync. */
+  dscTab:'DSC_Details', dsc:null,
   intervalMs:10*60*1000,
   status:'idle', last:null, lastTry:null, err:null, timer:null, applied:0,
   lastTxn:null, editLog:null, lastEdit:null, notes:[]
@@ -5425,7 +5363,7 @@ function syncNow(manual){
     SYNC.status='error';
     SYNC.err=(''+(err&&err.message||err)).slice(0,180);
   /* After the figures, pass or fail, and never able to reject - see syncHistory. */
-  }).then(syncHistory).then(function(){
+  }).then(syncHistory).then(syncDsc).then(function(){
     SYNC.lastTry=new Date();
     /* A sync lands every ten minutes and render() replaces the whole page. That
        was harmless while nothing held unsaved input; a half-written comment is
@@ -5669,6 +5607,253 @@ function syncHistory(){
   }).then(function(){
     SYNC.lastEdit=editBrief();
   });
+}
+
+/* ---- DSC_Details: the day book -----------------------------------------------
+   A tab in the same workbook, one row per claim as it is booked:
+
+     A date · B time · C type · D child agency · E amount · F component
+     G old value · H new value
+
+   Three types carry the money, and they are the three the platform reports
+   separately everywhere else: a Regional Centre claim, a DDO KI direct
+   expenditure, and an Infra MDSD grant to a State or UT. Anything else is kept
+   as "Other" rather than dropped - a row nobody counted is worse than a row
+   nobody expected, and the daily total has to be the sum of what is actually
+   there.
+
+   Read like the edit log and for the same reason: AFTER the figures, on its own
+   request, and never gating a sync. The panel it feeds is a reading of the day,
+   not a source of the platform's totals, so a missing tab costs that panel its
+   detail and nothing else. */
+const DSC_TYPES=[
+  {k:'rc',    t:'Regional Centres',        m:/regional\s*centre/i},
+  {k:'ddoki', t:'DDO KI Direct',           m:/ddo\s*ki/i},
+  {k:'mdsd',  t:'Infra MDSD (States/UTs)', m:/mdsd|infra\s*mdsd/i}
+];
+function dscType(s){
+  const v=String(s||'');
+  for(let i=0;i<DSC_TYPES.length;i++) if(DSC_TYPES[i].m.test(v)) return DSC_TYPES[i].k;
+  return 'other';
+}
+/* dd-mm-yyyy or dd/mm/yyyy - the tab carries both, the same two the release tabs
+   carry - to the ISO the rest of the platform sorts and groups on. */
+function dscDate(s){
+  const m=/^(\d{2})[-/](\d{2})[-/](\d{4})$/.exec(String(s||'').trim());
+  if(m) return m[3]+'-'+m[2]+'-'+m[1];
+  return /^\d{4}-\d{2}-\d{2}/.test(String(s||''))?String(s).slice(0,10):null;
+}
+function parseDscRows(rows){
+  const out=[];
+  for(let r=0;r<rows.length;r++){
+    const c=rows[r]||[];
+    const iso=dscDate(c[0]);
+    if(!iso) continue;                       // header, spacer, or a date we cannot read
+    const name=String(c[3]||'').trim();
+    if(!name) continue;
+    /* nnum carries the "₹ ,93,825.00" the tab prints for figures under a lakh -
+       its own format leaves that stray comma - because it strips every comma
+       before parsing. The amount is still the amount. */
+    const amt=Math.round(nnum(c[4]));
+    const dash=function(v){ const s=String(v==null?'':v).trim(); return (!s||s==='-')?'':s; };
+    out.push({date:iso, time:String(c[1]||'').trim(), type:dscType(c[2]),
+              typeRaw:String(c[2]||'').trim(), name:name, amt:amt,
+              comp:dash(c[5]), oldV:dash(c[6]), newV:dash(c[7])});
+  }
+  out.sort(function(a,b){ return a.date.localeCompare(b.date)||a.name.localeCompare(b.name); });
+  return out;
+}
+function syncDsc(){
+  return jsonpTab(SYNC.dscTab,2).then(function(rows){
+    SYNC.dsc=parseDscRows(rows);
+  }).catch(function(){
+    /* leave the last good day book in place */
+  });
+}
+/* One entry per calendar day: the three type totals, whatever else turned up,
+   and the rows themselves for the day the reader opens. Built fresh from
+   SYNC.dsc so it can never disagree with it. */
+function dscDays(){
+  const by={}, order=[];
+  (SYNC.dsc||[]).forEach(function(e){
+    let d=by[e.date];
+    if(!d){ d=by[e.date]={date:e.date, rc:0, ddoki:0, mdsd:0, other:0, total:0, n:0, rows:[]};
+            order.push(d); }
+    d[e.type]+=e.amt; d.total+=e.amt; d.n++; d.rows.push(e);
+  });
+  order.sort(function(a,b){ return b.date.localeCompare(a.date); });   // newest first
+  order.forEach(function(d){ d.rows.sort(function(x,y){ return y.amt-x.amt; }); });
+  return order;
+}
+
+/* ---- The daily workbook ------------------------------------------------------
+   A real .xlsx, not a CSV wearing the extension. This file exists to be opened,
+   sorted, filtered and charted months from now, and a CSV arrives with no
+   currency format, no column widths, every date a string and the header
+   scrolling away on the first flick of the wheel.
+
+   It is written by hand because this platform is one file with no build step and
+   no third-party script may load. An .xlsx is a ZIP of a few small XML parts;
+   the entries are STORED rather than deflated, which costs a few kilobytes and
+   saves carrying a compressor. The only real work is the CRC32 every ZIP entry
+   must declare. */
+const XL_CRC=(function(){
+  const t=new Int32Array(256);
+  for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1); t[n]=c; }
+  return t;
+})();
+function xlCrc32(u8){ let c=-1; for(let i=0;i<u8.length;i++) c=(c>>>8)^XL_CRC[(c^u8[i])&255]; return (c^-1)>>>0; }
+function xlB(s){ return new TextEncoder().encode(s); }
+function xlEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+/* Excel counts days from 1899-12-30. Built in UTC so the serial is the calendar
+   date the sheet booked, never the reader's timezone shifted off it. */
+function xlSerial(iso){
+  const p=String(iso).split('-');
+  return Math.round((Date.UTC(+p[0],+p[1]-1,+p[2])-Date.UTC(1899,11,30))/86400000);
+}
+function xlZip(files){
+  const d=new Date();
+  const dosT=((d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1))&0xFFFF;
+  const dosD=(((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate())&0xFFFF;
+  const local=[], central=[]; let off=0;
+  files.forEach(function(f){
+    const nm=xlB(f.name), crc=xlCrc32(f.data), n=f.data.length;
+    const lh=new Uint8Array(30+nm.length), lv=new DataView(lh.buffer);
+    lv.setUint32(0,0x04034b50,true); lv.setUint16(4,20,true); lv.setUint16(6,0,true);
+    lv.setUint16(8,0,true); lv.setUint16(10,dosT,true); lv.setUint16(12,dosD,true);
+    lv.setUint32(14,crc,true); lv.setUint32(18,n,true); lv.setUint32(22,n,true);
+    lv.setUint16(26,nm.length,true); lv.setUint16(28,0,true); lh.set(nm,30);
+    const ch=new Uint8Array(46+nm.length), cv=new DataView(ch.buffer);
+    cv.setUint32(0,0x02014b50,true); cv.setUint16(4,20,true); cv.setUint16(6,20,true);
+    cv.setUint16(8,0,true); cv.setUint16(10,0,true); cv.setUint16(12,dosT,true); cv.setUint16(14,dosD,true);
+    cv.setUint32(16,crc,true); cv.setUint32(20,n,true); cv.setUint32(24,n,true);
+    cv.setUint16(28,nm.length,true); cv.setUint32(42,off,true); ch.set(nm,46);
+    local.push(lh,f.data); central.push(ch); off+=lh.length+n;
+  });
+  let cLen=0; central.forEach(function(c){ cLen+=c.length; });
+  const eo=new Uint8Array(22), ev=new DataView(eo.buffer);
+  ev.setUint32(0,0x06054b50,true);
+  ev.setUint16(8,files.length,true); ev.setUint16(10,files.length,true);
+  ev.setUint32(12,cLen,true); ev.setUint32(16,off,true);
+  const all=local.concat(central,[eo]);
+  let total=0; all.forEach(function(b){ total+=b.length; });
+  const out=new Uint8Array(total); let p=0;
+  all.forEach(function(b){ out.set(b,p); p+=b.length; });
+  return out;
+}
+/* Style slots, referenced by index from the cells below:
+   1 title · 3 header · 4 date · 5 money · 6 count · 7/8/9 the total row. */
+const XL_STYLES='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
++'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
++'<numFmts count="2">'
++'<numFmt numFmtId="164" formatCode="[&gt;9999999]&quot;₹ &quot;##,##,##,##0;[&gt;99999]&quot;₹ &quot;##,##,##0;&quot;₹ &quot;##,##0"/>'
++'<numFmt numFmtId="165" formatCode="dd\\-mm\\-yyyy"/></numFmts>'
++'<fonts count="4">'
++'<font><sz val="11"/><name val="Calibri"/></font>'
++'<font><b/><sz val="11"/><name val="Calibri"/></font>'
++'<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>'
++'<font><b/><sz val="14"/><color rgb="FF1F3864"/><name val="Calibri"/></font></fonts>'
++'<fills count="3"><fill><patternFill patternType="none"/></fill>'
++'<fill><patternFill patternType="gray125"/></fill>'
++'<fill><patternFill patternType="solid"><fgColor rgb="FF1F3864"/><bgColor indexed="64"/></patternFill></fill></fills>'
++'<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>'
++'<border><left/><right/><top style="thin"><color rgb="FF808080"/></top><bottom/><diagonal/></border></borders>'
++'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
++'<cellXfs count="10">'
++'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
++'<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
++'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
++'<xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>'
++'<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
++'<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
++'<xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
++'<xf numFmtId="164" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1"/>'
++'<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"/>'
++'<xf numFmtId="3" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1"/>'
++'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+function xlCol(i){ let s='', n=i; while(n>=0){ s=String.fromCharCode(65+(n%26))+s; n=Math.floor(n/26)-1; } return s; }
+function xlCell(col,row,style,value,isText){
+  const ref=xlCol(col)+row, st=style?' s="'+style+'"':'';
+  if(value==null||value==='') return '<c r="'+ref+'"'+st+'/>';
+  if(isText) return '<c r="'+ref+'"'+st+' t="inlineStr"><is><t>'+xlEsc(value)+'</t></is></c>';
+  return '<c r="'+ref+'"'+st+'><v>'+value+'</v></c>';
+}
+/* The download itself. One row per day, the three components and their total -
+   deliberately NOT the centre-by-centre detail, which belongs on the panel and
+   would make the file something to wade through rather than read. An "Other"
+   column appears only if the tab ever books a type outside the three, so the
+   Total is always the sum of the columns beside it and never quietly short. */
+function dscWorkbook(){
+  const days=dscDays();
+  const anyOther=days.some(function(d){ return d.other!==0; });
+  const cols=[{k:'rc',t:'Regional Centres'},{k:'ddoki',t:'DDO KI Direct'},{k:'mdsd',t:'Infra MDSD (States/UTs)'}]
+    .concat(anyOther?[{k:'other',t:'Other'}]:[]);
+  const asc=days.slice().sort(function(a,b){ return a.date.localeCompare(b.date); });
+  const HDR=5, first=HDR+1, last=HDR+asc.length, totalRow=last+1;
+  const ncol=1+cols.length+2;                       // date + components + total + entries
+  let sd='';
+  sd+='<row r="1"><c r="A1" s="1" t="inlineStr"><is><t>Khelo India · Daily Expenditure</t></is></c></row>';
+  sd+='<row r="2">'+xlCell(0,2,0,'Source: SAI Expenditure SYNC · DSC_Details tab',1)+'</row>';
+  sd+='<row r="3">'+xlCell(0,3,0,'Generated '+fmtDMY(new Date())+' · figures in rupees',1)+'</row>';
+  sd+='<row r="'+HDR+'">'+xlCell(0,HDR,3,'Date',1)
+     + cols.map(function(c,i){ return xlCell(1+i,HDR,3,c.t,1); }).join('')
+     + xlCell(1+cols.length,HDR,3,'Total',1)
+     + xlCell(2+cols.length,HDR,3,'Entries',1)+'</row>';
+  asc.forEach(function(d,i){
+    const r=first+i;
+    sd+='<row r="'+r+'">'+xlCell(0,r,4,xlSerial(d.date))
+      + cols.map(function(c,j){ return xlCell(1+j,r,5,d[c.k]); }).join('')
+      + xlCell(1+cols.length,r,5,d.total)
+      + xlCell(2+cols.length,r,6,d.n)+'</row>';
+  });
+  const sum=function(k){ return asc.reduce(function(a,d){ return a+d[k]; },0); };
+  sd+='<row r="'+totalRow+'">'+xlCell(0,totalRow,8,'Total',1)
+    + cols.map(function(c,j){ return xlCell(1+j,totalRow,7,sum(c.k)); }).join('')
+    + xlCell(1+cols.length,totalRow,7,sum('total'))
+    + xlCell(2+cols.length,totalRow,9,sum('n'))+'</row>';
+  const sheet='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    +'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    +'<sheetViews><sheetView showGridLines="0" workbookViewId="0">'
+    +'<pane ySplit="'+HDR+'" topLeftCell="A'+first+'" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
+    +'<sheetFormatPr defaultRowHeight="15"/>'
+    +'<cols><col min="1" max="1" width="13" customWidth="1"/>'
+    +'<col min="2" max="'+(1+cols.length+1)+'" width="24" customWidth="1"/>'
+    +'<col min="'+ncol+'" max="'+ncol+'" width="10" customWidth="1"/></cols>'
+    +'<sheetData>'+sd+'</sheetData>'
+    +(asc.length?'<autoFilter ref="A'+HDR+':'+xlCol(ncol-1)+last+'"/>':'')
+    +'</worksheet>';
+  return xlZip([
+    {name:'[Content_Types].xml', data:xlB('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      +'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+      +'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+      +'<Default Extension="xml" ContentType="application/xml"/>'
+      +'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+      +'<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+      +'<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+      +'</Types>')},
+    {name:'_rels/.rels', data:xlB('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      +'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      +'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+      +'</Relationships>')},
+    {name:'xl/workbook.xml', data:xlB('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      +'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+      +' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+      +'<sheets><sheet name="Daily Expenditure" sheetId="1" r:id="rId1"/></sheets></workbook>')},
+    {name:'xl/_rels/workbook.xml.rels', data:xlB('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      +'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      +'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+      +'<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+      +'</Relationships>')},
+    {name:'xl/styles.xml', data:xlB(XL_STYLES)},
+    {name:'xl/worksheets/sheet1.xml', data:xlB(sheet)}
+  ]);
+}
+function dscDownload(){
+  if(!(SYNC.dsc||[]).length) return;
+  const blob=new Blob([dscWorkbook()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url; a.download='khelo-india-daily-expenditure-'+istDateStr(0)+'.xlsx';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
 
 /* ---- Data-integrity audit (non-blocking) ------------------------------------
@@ -6565,7 +6750,7 @@ function admRcOpts(){
     withdrawn — so the toggle can say which way round it is. */
 const ADM_MODULES = [
   { k:'command',    t:'Financial Overview' },
-  { k:'yday',       t:"Yesterday's Expenditure", r:1 },
+  { k:'yday',       t:'Daily Expenditure', r:1 },
   { k:'tracker',    t:'Component Tracker' },
   { k:'kigroups',   t:'SAI KI 1, KI 2 & Infra' },
   { k:'saifmt',     t:'SAI Format Summary', r:1 },
