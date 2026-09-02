@@ -1755,11 +1755,22 @@ function mdsdTitle(s) {
    more than one reconciles the block is flagged ambiguous and syncValidate
    rejects it, because a frozen panel that says so beats a confident wrong total.
 
-   If nothing reconciles, the first three columns carrying figures are used, so a
-   genuinely inconsistent block still reaches syncValidate and is reported there
-   as the keying error it is. Fewer than three columns carry figures only if the
-   block is unrecognisable, and the original C/D/E is then as good a guess as
-   any: the row checks will reject it. */
+   TWO columns, no triple. The tab has since stopped printing Limit Assigned for
+   this block and now shows Expenditure and Limit Unspent only, in that order -
+   the same order they sat in when the assignment column was still in front of
+   them. Nothing is lost: the two still add up to the assignment row by row, and
+   their totals still add up to the ₹52.80 Cr the block was assigned. So the
+   assignment is DERIVED here rather than read, and assign:-1 is what says so.
+   Be aware of what that costs: the assigned-less-expenditure-equals-unspent
+   check downstream becomes true by construction, so this shape leans on the
+   remaining checks - no negatives, expenditure not exceeding the assignment, and
+   the rows summing to the totals the tab still prints.
+
+   If nothing reconciles and the shape is neither of those, the first three
+   columns carrying figures are used, so a genuinely inconsistent block still
+   reaches syncValidate and is reported there as the keying error it is. Fewer
+   than two columns carry figures only if the block is unrecognisable, and the
+   original C/D/E is then as good a guess as any: the row checks will reject it. */
 function mdsdMoneyCols(body, total) {
   const NAME = 1, LAST = 12;              // column M, the last the block can reach
   const val = function (c, i) { return String((c && c[i]) == null ? '' : c[i]).trim(); };
@@ -1775,6 +1786,8 @@ function mdsdMoneyCols(body, total) {
         body.every(function (c) { return holds(c, a, e, b); })) hit.push({ assign: a, exp: e, bal: b });
   }
   if (hit.length === 1) return hit[0];
+  if (!hit.length && cols.length === 2 && (nnum(total[cols[0]]) > 0 || nnum(total[cols[1]]) > 0))
+    return { assign: -1, exp: cols[0], bal: cols[1] };
   const guess = cols.length >= 3 ? { assign: cols[0], exp: cols[1], bal: cols[2] }
                                  : { assign: 2, exp: 3, bal: 4 };
   if (hit.length > 1) guess.ambiguous = true;
@@ -1807,19 +1820,17 @@ function parseMdsdRows(rows) {
   if (!body.length || !total) return null;
 
   const col = mdsdMoneyCols(body, total);
-  const items = body.map(function (c) {
-    return {
-      name: String(c[1]).trim(),
-      assign: Math.round(nnum(c[col.assign])),
-      exp: Math.round(nnum(c[col.exp])),
-      bal: Math.round(nnum(c[col.bal])),
-    };
-  });
-  const stated = {
-    assign: Math.round(nnum(total[col.assign])),
-    exp: Math.round(nnum(total[col.exp])),
-    bal: Math.round(nnum(total[col.bal])),
+  /* col.assign of -1 means the tab no longer prints the assignment and it is the
+     two figures either side of it added together - see mdsdMoneyCols. */
+  const rd = function (c, i) { return Math.round(nnum(c[i])); };
+  const money = function (c) {
+    const exp = rd(c, col.exp), bal = rd(c, col.bal);
+    return { assign: col.assign < 0 ? exp + bal : rd(c, col.assign), exp: exp, bal: bal };
   };
+  const items = body.map(function (c) {
+    return Object.assign({ name: String(c[1]).trim() }, money(c));
+  });
+  const stated = money(total);
 
   /* The sheet carries neither a display name nor the state/institute
      distinction — names arrive shouted ("UTTAR PRADESH") and typeless. Both are
@@ -3201,8 +3212,9 @@ const RC_CFG={ns:'rctbl',sortField:'rcSort',nameLabel:'Regional Centre',sancLabe
    Do not confuse the workbook's two "DDO HQ"-ish figures - they are ~44x apart:
      - cols F/G "DDO HQ" Limit Assigned / Actual Exp. - the centre row counted in these cards;
      - col E    "DDO KI · Direct Expenditure" (G.ddoki) - outside the centre-limit system.
-   These letters are prose only; the code reads cells[4] for DDO-KI and the centre pairs
-   from SYNC_CEN0 - trust those, and see parseSummaryRows. */
+   These letters are prose only, and the tab has already moved them once. The code does not
+   read either figure at a fixed column: summaryBase() locates the money from the tab's own
+   arithmetic on every sync. Trust that, and see parseSummaryRows. */
 function ddokiInScope(){
   /* classification-scoped DDO-KI total that deliberately ignores the DDO KI chip, so the
      DDO KI Direct note can state exactly what is being withheld while the chip is unticked.
@@ -4992,21 +5004,88 @@ const SYNC_SVMAP={
  'sports for women':'Sports for Women',
  'new sports infrastructure projects':'New Sports Infrastructure Projects',
  'khelo india centres nr':'Khelo India Centres (N-Rec)',
- 'sports academies':'Sports Academies'
+ /* Sports Academies runs in both sections, and the tab now says which is which.
+    It used to carry one row, labelled "Sports Academies", holding the
+    NON-recurring money - so that label mapped to the non-recurring component.
+    A recurring row has since been added under Khelo India Centres and Sports
+    Academies, and the older row renamed to "Sports Academies NR", following the
+    same NR suffix Khelo India Centres already uses.
+    Both labels are therefore mapped, and the bare one now means the recurring
+    component. Mapping only the bare label would be quietly expensive: the
+    recurring row's figures would land on the non-recurring component, and the
+    renamed row would match nothing and be skipped, taking its expenditure off
+    the platform without failing a single check - every remaining total would
+    still reconcile with itself. */
+ 'sports academies nr':'Sports Academies',
+ 'sports academies':'Sports Academies (Rec)'
 };
 /* transaction-tab Subvertical label -> platform name (head decides the KI Centres split) */
 function syncTxSv(label,head){
   const k=nkey(label);
   if(k==='khelo india centres') return head==='Non-Recurring'?'Khelo India Centres (N-Rec)':'Khelo India Centres';
-  if(k==='support to academies') return 'Sports Academies';
+  /* Academies split the same way the centres above do. Every release carrying this
+     label is Non-Recurring today, so this decides nothing yet - but the summary tab
+     now names a recurring Sports Academies component as well, and without the split
+     the first recurring release would be filed against the non-recurring one and
+     reconcile against itself all the way up. */
+  if(k==='support to academies') return head==='Recurring'?'Sports Academies (Rec)':'Sports Academies';
   if(k==='fit india') return 'Fit India Movement';
   if(k==='talent identification and development') return 'Talent Identification & Development';
   return SYNC_SVMAP[k]||null;
 }
-/* Sheet3 fixed column geometry: 4 = DDO-KI direct, then 14 centre lim/act pairs from 5. */
-const SYNC_CEN0=5;
+/* Where the money starts on the summary tab.
+   The geometry itself has never changed: one DDO-KI Direct column, then one
+   limit/actual pair per centre in DATA.centres order, then the row's own three
+   totals - limit, actual, expenditure. Only the offset moves, and it does move:
+   the tab used to carry a TARGET/ALLOCATION pair in front of DDO-KI and no
+   longer does, which slid every figure two columns left and left the parser
+   reading a centre's actual as the DDO-KI figure and a utilisation percentage
+   as a row total. That surfaced as "sheet limit total disagrees with its own
+   columns" on every component, which rejects the candidate - so the platform
+   stopped updating entirely rather than showing anything wrong. Twice now a
+   column change has done that, here and in the KI Infra block below.
+
+   The header row cannot settle it: Google's endpoint types a column from its
+   data, so the centre names sitting above columns of numbers come back empty.
+   What the tab does carry is its own arithmetic, on every component row -
+
+       sum of the centre limits  = the row's stated limit total
+       sum of the centre actuals = the row's stated actual total
+       DDO-KI + centre actuals   = the row's stated expenditure total
+
+   - and only the true offset satisfies all three on every row at once. So the
+   offset is found rather than assumed, and a column inserted or dropped in
+   front of the money costs nothing.
+
+   Nothing is guessed: if no offset reconciles, or more than one does, the sync
+   fails loudly here rather than publishing figures read from the wrong columns.
+   A row with no money at all is skipped when deciding - it reconciles trivially
+   at every offset and so proves nothing. */
+function summaryBase(rows,n){
+  const FIRST=2, LAST=8;
+  const hit=[];
+  for(let base=FIRST;base<=LAST;base++){
+    const tl=base+1+2*n;
+    let checked=0, ok=true;
+    for(let r=0;r<rows.length&&ok;r++){
+      const c=rows[r]||[];
+      if(!SYNC_SVMAP[nkey(c[1])]) continue;
+      let l=0,a=0;
+      for(let i=0;i<n;i++){ l+=nnum(c[base+1+i*2]); a+=nnum(c[base+2+i*2]); }
+      const dk=nnum(c[base]);
+      if(!l&&!a&&!dk) continue;
+      checked++;
+      if(Math.abs(l-nnum(c[tl]))>1||Math.abs(a-nnum(c[tl+1]))>1||Math.abs((dk+a)-nnum(c[tl+2]))>1) ok=false;
+    }
+    if(ok&&checked>=2) hit.push(base);
+  }
+  return hit.length===1?hit[0]:-1;
+}
 function parseSummary(csv,centres){ return parseSummaryRows(csvParse(csv),centres); }
 function parseSummaryRows(rows,centres){
+  const base=summaryBase(rows,centres.length);
+  if(base<0) throw new Error('summary tab: could not tell which columns carry the money');
+  const cen0=base+1, tl=base+1+2*centres.length;
   const out={};
   for(let r=0;r<rows.length;r++){
     const name=SYNC_SVMAP[nkey(rows[r][1])];
@@ -5015,12 +5094,12 @@ function parseSummaryRows(rows,centres){
     // a component row always carries a numeric DDO-KI cell or centre figures
     const bc={}; let lim=0,act=0;
     for(let i=0;i<centres.length;i++){
-      const l=nnum(cells[SYNC_CEN0+i*2]), a=nnum(cells[SYNC_CEN0+i*2+1]);
+      const l=nnum(cells[cen0+i*2]), a=nnum(cells[cen0+i*2+1]);
       bc[centres[i]]={lim:Math.round(l),act:Math.round(a)}; lim+=l; act+=a;
     }
-    out[name]={ddoki:Math.round(nnum(cells[4])),totLim:Math.round(lim),totAct:Math.round(act),
-      byCentre:bc, shLim:Math.round(nnum(cells[33])), shAct:Math.round(nnum(cells[34])),
-      shExp:Math.round(nnum(cells[35]))};
+    out[name]={ddoki:Math.round(nnum(cells[base])),totLim:Math.round(lim),totAct:Math.round(act),
+      byCentre:bc, shLim:Math.round(nnum(cells[tl])), shAct:Math.round(nnum(cells[tl+1])),
+      shExp:Math.round(nnum(cells[tl+2]))};
   }
   return out;
 }
