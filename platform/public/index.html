@@ -3092,9 +3092,7 @@ function autoRun(){
 const AUTO_DOCS=[
   {f:'report',      t:'Expenditure Summary', ext:'Word',  c:'var(--primary)', needs:'report'},
   {f:'pdf',         t:'Expenditure Summary', ext:'PDF',   c:'var(--primary)', needs:'html'},
-  {f:'weekly-pdf',  t:'Weekly Leaderboard',  ext:'PDF',   c:'var(--serious)', needs:'weekly-html'},
-  {f:'html',        t:'Expenditure Summary', ext:'Web page', c:'var(--primary)', needs:'html'},
-  {f:'weekly-html', t:'Weekly Leaderboard',  ext:'Web page', c:'var(--serious)', needs:'weekly-html'}
+  {f:'weekly-pdf',  t:'Weekly Leaderboard',  ext:'PDF',   c:'var(--serious)', needs:'weekly-html'}
 ];
 function autoBytes(b){
   if(!b&&b!==0) return '';
@@ -3291,8 +3289,7 @@ function autoOvCard(){
 
 function viewReports(){
   autoLoad();
-  const head=pageHead('Report Automation',
-    'The Expenditure Summary, laid out by the report pipeline from its own reading of the sheet. It is produced when you press Process now, and at no other time.');
+  const head=pageHead('Report Automation');
 
   if(!AUTO.status){
     const busy=AUTO.loading;
@@ -3323,12 +3320,6 @@ function viewReports(){
      Download button, because a PDF is not made until it is asked for. */
   const offered=last?AUTO_DOCS.filter(function(d){ return has(d.needs); }):[];
 
-  const warns=(last&&last.warnings)||[];
-  const warnBlock=warns.length
-    ? '<div class="kig-warn" style="margin-bottom:16px"><b>The latest run reported '+warns.length+' note'+(warns.length===1?'':'s')+':</b>'
-      + '<ul style="margin:6px 0 0;padding-left:18px">'
-      + warns.map(function(w){ return '<li style="margin:3px 0">'+esc(w)+'</li>'; }).join('')+'</ul></div>'
-    : '';
   const failBlock=(last===null&&(st.runs||[]).length&&(st.runs[0].status==='failed'))
     ? '<div class="kig-warn" style="margin-bottom:16px;border-left-color:var(--critical)">'
       + '<b style="color:var(--critical)">The last run failed:</b> '+esc(st.runs[0].error||'')+'</div>'
@@ -3350,15 +3341,13 @@ function viewReports(){
 
   const pdfNote=st.pdf&&st.pdf.available===false
     ? '<div class="qh" style="margin:10px 2px 0;color:var(--serious)">This server has no browser installed, so PDFs cannot be '
-      + 'rendered. The Word and web-page copies are unaffected.</div>'
-    : '<div class="qh" style="margin:10px 2px 0">Produced on the server by the report pipeline. A PDF is rendered the first '
-      + 'time it is asked for, from the very page that run stored — so it is that run\'s report, not a fresh reading of the sheet.</div>';
+      + 'rendered. The Word copy is unaffected.</div>'
+    : '';
 
-  return head+bar+failBlock+warnBlock+autoOvCard()
+  return head+bar+failBlock+autoOvCard()
     + '<div class="card"><div class="card-hd"><h3>Latest documents</h3>'
       + '<span class="small muted">'+(last?esc(sheetDMY(last.stamp||'')):'—')+'</span>'
       + '<div class="tools">'
-        + '<a class="btn" href="/api/reports/daily-log">Day-by-day log</a> '
         + '<button class="btn ov-go" onclick="autoRun()"'+((AUTO.busy||st.running)?' disabled':'')+'>'
         + (AUTO.busy==='run'?'Processing…':(st.running?'A run is in progress…':'Process now'))+'</button></div></div>'
       + docTable + pdfNote + '</div>';
