@@ -3147,9 +3147,18 @@ function autoOvSeed(o){
   AUTO.ov={exp:autoOvStr(o.totalExpenditure), bal:autoOvStr(o.balance),
            day:autoOvStr(o.dayTotal), assigned:autoOvStr(o.totalAssigned),
            fixed:!!o.totalAssignedFixed};
-  /* A stored value is one somebody typed, so auto-fill must not touch it. */
+  /* A stored value is one somebody typed, so auto-fill must not touch it -
+     except Expenditure and Balance, which are deliberately left OUT of this.
+     Both stored figures are themselves last time's OWN auto-derivation
+     (baseline-plus-day, and assigned-minus-expenditure) unless a person
+     overrode them, and the whole point of this card is that both keep moving
+     together on the next visit without an extra step first. Marking either
+     touched here would freeze it at whatever was last saved the moment the
+     page loads, which is exactly the staleness this exists to prevent: type a
+     new day's figure and Expenditure moves, but a Balance struck against the
+     stale figure would sit there quietly wrong until someone noticed. */
   AUTO.ovTouched={};
-  ['exp','bal','day'].forEach(function(k){ if(AUTO.ov[k]!=='') AUTO.ovTouched[k]=1; });
+  ['day'].forEach(function(k){ if(AUTO.ov[k]!=='') AUTO.ovTouched[k]=1; });
   /* Anything actually in force should be visible without opening the card. */
   if(!AUTO.ovSeen){
     AUTO.ovSeen=true;
@@ -3164,18 +3173,32 @@ function autoOvAssigned(){
   return o.computedAssigned==null?null:o.computedAssigned;
 }
 /*
- * Yesterday's spend implies the new cumulative total, which implies the
- * balance. Both are suggestions and either can be typed over - which is what
- * ovTouched is for. Without it, correcting yesterday's figure after entering an
- * expenditure would silently throw the expenditure away.
+ * Typing a NEW figure into Yesterday's Total is the instruction "move
+ * Expenditure forward by this" - so it always wins, overwriting whatever
+ * Expenditure currently shows, loaded or typed, the moment Yesterday's Total
+ * changes. This is the one figure ovTouched does NOT protect: a touched-guard
+ * here would mean a Fixed Expenditure loaded from the last save could never be
+ * moved forward again without first clicking Unfix and Fix, which is exactly
+ * the extra step this whole card exists to remove. Called only from Yesterday's
+ * Total's own input handler, so editing Balance or Total Assigned never has
+ * this side effect - only Yesterday's Total does.
+ */
+function autoOvDayToExp(){
+  const o=(AUTO.status&&AUTO.status.overrides)||{};
+  const day=autoOvNum(AUTO.ov.day), base=o.baselineExpenditure;
+  if(day==null||base==null) return;
+  AUTO.ov.exp=autoOvStr(base+day);
+}
+/*
+ * Expenditure implies the balance, which is a suggestion and can be typed
+ * over - which is what ovTouched.bal is for. Without it, moving Expenditure
+ * forward with a new day figure would silently throw away a Balance someone
+ * had deliberately corrected by hand.
  *
  * Written straight into the DOM rather than through render(): a repaint on
  * every keystroke would take the caret with it.
  */
 function autoOvRecalc(){
-  const o=(AUTO.status&&AUTO.status.overrides)||{};
-  const day=autoOvNum(AUTO.ov.day), base=o.baselineExpenditure;
-  if(day!=null&&base!=null&&!AUTO.ovTouched.exp) AUTO.ov.exp=autoOvStr(base+day);
   const exp=autoOvNum(AUTO.ov.exp), assigned=autoOvAssigned();
   if(exp!=null&&assigned!=null&&!AUTO.ovTouched.bal) AUTO.ov.bal=autoOvStr(assigned-exp);
 
@@ -3201,6 +3224,7 @@ function autoOvIn(k,el){
   AUTO.ov[k]=el.value;
   AUTO.ovDirty=true; AUTO.ovMsg=null;
   if(el.value.trim()==='') delete AUTO.ovTouched[k]; else AUTO.ovTouched[k]=1;
+  if(k==='day') autoOvDayToExp();
   autoOvRecalc();
 }
 function autoOvFix(){
@@ -3211,13 +3235,13 @@ function autoOvFix(){
 /*
  * Total Expenditure's Fix/Unfix. There is no separate on/off flag behind this
  * one the way Total Assigned has - a typed figure is always applied once
- * saved, so "fixed" here just means the box holds one. Unfix clears it, and
- * Yesterday's Total and Balance with it: Yesterday's Total exists only to
- * build the figure above it, and Balance was struck against that figure,
- * whether it arrived by typing or by the day-figure arithmetic - autoOvSeed
- * marks a loaded value as "touched" either way, so there is no telling those
- * two apart here, and a balance struck against a since-cleared expenditure is
- * not a real balance regardless of which one this was.
+ * saved, so "fixed" here just means the box holds one. Unfix clears Yesterday's
+ * Total and Balance along with it, UNCONDITIONALLY, regardless of whether
+ * either was independently touched: Yesterday's Total exists only to build the
+ * figure above it, and Balance means "Assigned minus Expenditure" even when a
+ * person typed it by hand rather than letting autoOvRecalc derive it (see
+ * autoOvSeed), so a Balance struck against a since-cleared Expenditure is
+ * stale no matter how it got into the box.
  *
  * Fix on an EMPTY box does not leave it empty: it offers back the running
  * total this platform already remembers - the same baselineExpenditure the
@@ -3254,7 +3278,7 @@ function autoOvExplain(){
     .map(function(f){ return AUTO_OV_LBL[f.k]; });
   const parts=[];
   if(assignedFixed) parts.push('<b>Total Assigned</b> is fixed at <b>'+esc(autoOvStr(AUTO.ov.assigned))+' Cr</b> for every report.');
-  if(expFixed) parts.push('<b>Total Expenditure</b> is fixed at <b>'+esc(autoOvStr(AUTO.ov.exp))+' Cr</b> — add a day\'s figure below and press Save to move it forward.');
+  if(expFixed) parts.push('<b>Total Expenditure</b> is fixed at <b>'+esc(autoOvStr(AUTO.ov.exp))+' Cr</b> — type Yesterday\'s Total below and it moves forward on its own; press Save to fix the new figure.');
   if(rest.length) parts.push('<b>'+esc(rest.join(', '))+'</b> will be taken from what you typed, '
     + 'on every report until cleared.');
   if(!parts.length) parts.push('Nothing entered — every figure is worked out from the sheet.');
@@ -3309,7 +3333,8 @@ function autoOvCard(){
      THIS box's figure comes from, and Yesterday's Total is what feeds it. */
   const expHint=o.baselineExpenditure==null ? ''
     : '<div class="pf-hint">Counted up from <b>₹'+esc(o.baselineExpenditure.toFixed(2))+' Cr</b> as on '
-      + esc(o.baselineAsOn||'—')+' — add Yesterday\'s Total below and press Save to carry it forward.</div>';
+      + esc(o.baselineAsOn||'—')+' — type Yesterday\'s Total below and this box updates on its own; '
+      + 'press Save to fix the new total.</div>';
   const expBox=
     '<div><label class="pf-lb" for="ov_exp">Total Expenditure (Cr)</label>'
     + '<div class="ov-fixrow">'
