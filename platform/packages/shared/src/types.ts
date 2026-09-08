@@ -530,7 +530,13 @@ export const MODULES = [
   { key: 'mdsd', label: 'KI Infra (States/UTs)' },
   { key: 'rc', label: 'Regional Centres' },
   { key: 'exceptions', label: 'Attention Centre' },
-  { key: 'yday', label: "Yesterday's Expenditure" },
+  { key: 'yday', label: 'Daily Expenditure' },
+  /* Not a panel over the synced figures like the rest, but the hand-over point
+     for the documents the daily report automation produces on the server. It is
+     listed here for the same reason as the others: so an administrator can
+     grant it, and so it appears in Roles & Access rather than being an
+     ungoverned panel that simply exists. */
+  { key: 'reports', label: 'Report Automation' },
 ] as const;
 
 export type ModuleKey = (typeof MODULES)[number]['key'];
@@ -551,7 +557,14 @@ export const MODULE_KEYS: readonly ModuleKey[] = MODULES.map((m) => m.key);
  * Both halves matter and both live in users.ts — getModuleAccess must not grant
  * it by default, and setModuleAccess must not read a missing key as a grant.
  */
-export const RESTRICTED_MODULES = ['saifmt', 'yday'] as const satisfies readonly ModuleKey[];
+/* 'reports' is restricted for a reason particular to it. The panel hands over
+   the Expenditure Summary as it is actually circulated — a formal document,
+   carrying the report pipeline's own figures and whatever manual overrides are
+   in force, which may not match what this platform shows on the same morning.
+   Handing that out is a narrower permission than reading the dashboard, and its
+   Process now button spends real work on the server, so it is given to the
+   desks that own the report rather than to everyone who can sign in. */
+export const RESTRICTED_MODULES = ['saifmt', 'yday', 'reports'] as const satisfies readonly ModuleKey[];
 
 export function isRestrictedModule(key: ModuleKey): boolean {
   return (RESTRICTED_MODULES as readonly string[]).includes(key);

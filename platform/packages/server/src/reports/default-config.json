@@ -1,0 +1,171 @@
+{
+  "_comment": "SAI Khelo India — daily expenditure automation. Edit paths and the division mapping here; no code changes needed.",
+  "paths": {
+    "inputDir": "input",
+    "outputDir": "output",
+    "logsDir": "logs",
+    "testSheet2": null,
+    "dailyLog": "logs/daily-expenditure-log.xlsx"
+  },
+  "googleSheets": {
+    "_note": "Pulls SAI Expenditure SYNC live before every run, no credentials needed — the sheet is shared 'anyone with the link can view', which is enough to fetch its Excel export directly. When enabled, this REPLACES paths.testSheet2 with a freshly-downloaded copy on every run; if the fetch fails (no internet, sheet unshared), the last successfully cached copy is used instead and a warning is added, so a network hiccup never stops a run outright. Set enabled to false to go back to only reading the manually-placed file at paths.testSheet2.",
+    "enabled": true,
+    "sheetId": "1crNcEBnf_h6n_ZhT-WfODXNoT0zD1tX-aNvnie3Bb7Q",
+    "cachePath": "input/_live/SAI Expenditure SYNC.xlsx",
+    "assignmentTab": "Assignment",
+    "timeoutMs": 20000
+  },
+  "testSheet2": {
+    "masterTab": "Sheet3",
+    "dscTab": "DSC_Details",
+    "snapshotPrefix": "Snap_",
+    "rcTabs": [
+      "DDO HQ",
+      "PATIALA",
+      "BANGALORE",
+      "BHOPAL",
+      "CHANDIGARH",
+      "GANDHINAGAR",
+      "KOLKATA",
+      "GUWAHATI",
+      "IMPHAL",
+      "LUCKNOW",
+      "MUMBAI",
+      "SONEPAT",
+      "TRIVANDRUM"
+    ],
+    "rcDisplayOrder": [
+      "GANDHINAGAR",
+      "BHOPAL",
+      "SONEPAT",
+      "TRIVANDRUM",
+      "KOLKATA",
+      "BANGALORE",
+      "PATIALA",
+      "LUCKNOW",
+      "IMPHAL",
+      "CHANDIGARH",
+      "GUWAHATI",
+      "MUMBAI"
+    ],
+    "rcColumnAliasesNote": "The live sheet's own per-RC column header for Lucknow is misspelled 'LUCNOW' (missing the K) — normalised-string matching can't catch a dropped letter, so it needs an explicit correction here.",
+    "rcColumnAliases": {
+      "LUCNOW": "LUCKNOW"
+    }
+  },
+  "_divisionsNote": "The KI-1 / KI-2 split and componentTargets below were taken from the 'Components of KI 1 / KI 2' panels in the 02.09.2026 Expenditure Summary Report PDF, then verified against live data: this split reproduces the Assignment tab's own expenditure figures exactly (KI-1 48.3636 Cr, KI-2 97.4687 Cr), and each division's targets sum exactly to its assignment. The live cross-check in src/pipeline.js re-verifies this on every run.",
+  "divisions": [
+    {
+      "key": "KI-1",
+      "label": "KI-1",
+      "assigned": 1008600000,
+      "components": [
+        "Khelo India Games",
+        "Sports for Women",
+        "Fit India Movement",
+        "Sports for Peace and Development",
+        "Sports for rural/indigenous/tribal",
+        "Sports for disabled sportspersons"
+      ],
+      "reportHeading": "KI 1",
+      "cardPrefix": "KI 1",
+      "tagline": "Games, mass participation & inclusiveness"
+    },
+    {
+      "key": "KI-2",
+      "label": "KI-2",
+      "assigned": 1608000000,
+      "components": [
+        "Khelo India Centres",
+        "Talent Identification & Development",
+        "Khelo India Centres NR",
+        "Sports Academies NR",
+        "Sports Academies",
+        "Community Coaching & Development"
+      ],
+      "reportHeading": "KI 2",
+      "cardPrefix": "KI 2",
+      "tagline": "Talent pathway, coaching, centres & academies"
+    },
+    {
+      "key": "SAI-INFRA",
+      "label": "SAI-INFRA",
+      "assigned": 795500000,
+      "components": [
+        "New Sports Infrastructure Projects"
+      ],
+      "reportHeading": "SAI – INFRA",
+      "cardPrefix": "INFRA"
+    },
+    {
+      "key": "MSD-INFRA",
+      "label": "MSD-INFRA (State)",
+      "assigned": 528000000,
+      "source": "kiInfraStates"
+    }
+  ],
+  "_componentLabelsNote": "Maps the long Sheet3 component names to the short labels used in the Word file.",
+  "componentLabels": {
+    "Khelo India Games": "KIG",
+    "Talent Identification & Development": "TID",
+    "Community Coaching & Development": "Coaching & Dev",
+    "Khelo India Centres": "KIC (Rec)",
+    "Fit India Movement": "FIM",
+    "Sports for Peace and Development": "SPANDAN",
+    "Sports for rural/indigenous/tribal": "Rural/Indig/Tribal",
+    "Sports for disabled sportspersons": "Sports for specially abled",
+    "Sports for Women": "Sports for Women",
+    "New Sports Infrastructure Projects": "New Infra Projects",
+    "Khelo India Centres NR": "KIC (N-Rec)",
+    "Sports Academies": "Sports Academies (Rec)",
+    "Sports Academies NR": "Sports Academies (N-Rec)"
+  },
+  "_componentTargetsNote": "Per-component assignment/target figures in rupees, sourced from the PDF report's component panels. These are NOT in any Google Sheet tab (checked) — they are maintained in the dashboard app. Edit them on the Divisions page or here; each division's targets should sum to its assignment.",
+  "componentTargets": {
+    "Khelo India Games": 433800000,
+    "Sports for Women": 253300000,
+    "Fit India Movement": 224900000,
+    "Sports for Peace and Development": 81700000,
+    "Sports for rural/indigenous/tribal": 14900000,
+    "Sports for disabled sportspersons": 0,
+    "Khelo India Centres": 601300000,
+    "Talent Identification & Development": 517400000,
+    "Khelo India Centres NR": 245800000,
+    "Sports Academies NR": 193700000,
+    "Sports Academies": 49800000,
+    "Community Coaching & Development": 0,
+    "New Sports Infrastructure Projects": 795500000
+  },
+  "_agencyAliasNote": "Maps the Child Agency Name as written in the RBI report to the Test sheet 2 tab name. Matching is case-insensitive and ignores the SAI/RC/NSNIS prefixes, so most names resolve without an entry here.",
+  "agencyAliases": {
+    "SAI NSNIS PATIALA": "PATIALA",
+    "DDO KI": "DDO HQ",
+    "DDO Head Office": "DDO HQ"
+  },
+  "output": {
+    "formats": [
+      "report"
+    ],
+    "filenamePattern": "EXPENDITURE SUMMARY {format} {date}.docx",
+    "_note": "Only the 'report' layout is produced — it reproduces the Expenditure Summary Report PDF. The older 'division' and 'balance' layouts still exist in src/docgen.js and can be re-added here if ever wanted."
+  },
+  "weeklyLeaderboard": {
+    "_note": "Extra page: last week (Mon-Sun) Regional Centre spend from DSC_Details. DDO desks are always excluded. Set onlyOnMonday false to put it on every report.",
+    "enabled": true,
+    "onlyOnMonday": true
+  },
+  "manualOverrides": {
+    "_note": "Hand-entered figures for the page-1 summary table, in RUPEES. Any value set here is used on every report until cleared; the dashboard flags on its status card whenever any are in force. null = compute from the sheet.",
+    "totalExpenditure": 2091160000.0000002,
+    "balance": 1848910000,
+    "dayTotal": 15500000,
+    "totalAssigned": 3940075000,
+    "totalAssignedFixed": true
+  },
+  "expenditureBaseline": {
+    "_note": "Known-good cumulative expenditure as at asOn, in RUPEES. When only yesterday-s figure is entered, Total Expenditure is derived as baseline + that figure.",
+    "asOn": "03.09.2026",
+    "amount": 2075662322
+  },
+  "_seedNote": "Seed copy of the automation config, used the first time the platform boots with an empty report_state. After that the live copy is the one in Postgres (report_state.key=config), which is what the manual-figures endpoint writes to. Editing this file changes nothing on a database that already has a row. The upstream 'automation' block is deliberately absent: it configured the desktop tool's morning cron, and on the platform a report is produced only when somebody presses Process now."
+}

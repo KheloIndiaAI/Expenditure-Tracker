@@ -28,6 +28,7 @@ import { COOKIE_NAME, currentUser, stripHash } from './session.ts';
 import { recordLogin } from './logins.ts';
 import { registerAdminRoutes } from './routes/admin.ts';
 import { registerCommentRoutes } from './routes/comments.ts';
+import { registerReportRoutes } from './reports/routes.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -201,6 +202,13 @@ async function start(): Promise<void> {
   /* Voucher comments. Read is open to any signed-in user; writing is restricted
      to the centre the caller is assigned to — see comments.ts. */
   registerCommentRoutes(app);
+  /* Report Automation. This is the one place the server does touch the
+     financial data: it runs the vendored daily-report pipeline, which reads the
+     same Google Sheet the dashboard does and lays out the Expenditure Summary.
+     Nothing here runs on a schedule — a report is produced only when somebody
+     presses Process now, and only by somebody holding the 'reports' grant,
+     which every route re-checks for itself. See reports/routes.ts. */
+  registerReportRoutes(app);
 
   // Public liveness probe — no user count or other internal detail is exposed.
   app.get('/api/health', async () => ({ ok: true }));

@@ -819,6 +819,52 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 .tools{display:flex;gap:10px;align-items:center;margin-left:auto}
 .btn{border:1px solid var(--border);background:var(--bg-surface);border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;font-weight:500;color:var(--text-secondary)}
 .btn:hover{border-color:var(--primary);color:var(--primary)}
+/* Report Automation downloads through an ordinary link rather than a fetch, so
+   the file streams from the server straight to disk and never passes through
+   this page - the report is a document to keep, not something to render here.
+   That makes the download control an <a>, which needs the two properties a
+   <button> already carries. */
+a.btn{display:inline-block;text-decoration:none;line-height:1.35}
+.btn[disabled]{opacity:.55;cursor:default}
+.btn[disabled]:hover{border-color:var(--border);color:var(--text-secondary)}
+
+/* ---- Report Automation: the manual figures card ----------------------------
+   Reuses the profile form's controls (.pf-lb / .pf-in / .pf-btn / .pf-msg) so
+   the platform keeps one input style. Only what is particular to this card is
+   below: the disclosure header, the Fix toggle beside its box, and the running
+   plain-English summary of what has been entered. */
+.ov-hd{cursor:pointer;user-select:none}
+.ov-hd:hover h3{color:var(--primary)}
+.ov-live{font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--serious);
+  background:rgba(212,98,42,.10);border:1px solid rgba(212,98,42,.25);border-radius:999px;padding:2px 8px}
+.ov-chev{display:inline-flex;color:var(--text-muted);transition:transform .15s}
+.ov-chev svg{width:18px;height:18px}
+.ov-chev.up{transform:rotate(180deg)}
+.ov-body{padding:2px 2px 4px}
+.ov-assigned{margin-bottom:14px}
+/* Only the box is narrow. The sentence under it explains how the two figures
+   below get filled in, and reads badly broken over four short lines. */
+.ov-fixrow{display:flex;gap:8px;align-items:stretch;max-width:420px}
+.ov-fixrow .pf-in{flex:1;min-width:0}
+.ov-assigned .pf-hint{max-width:860px}
+.ov-fix{white-space:nowrap;padding:0 16px;font-weight:600}
+/* Fixed is a state, not an action, so it stops looking like a button to press. */
+.ov-fix.on{border-color:rgba(27,158,99,.45);background:rgba(27,158,99,.09);color:var(--good)}
+.ov-fix.on:hover{border-color:rgba(27,158,99,.45);color:var(--good)}
+/* Three across, so no box is orphaned on a row of its own. Below the profile
+   form's own breakpoint they stack, which is what a phone wants anyway. */
+.ov-grid{max-width:1000px}
+@media(min-width:621px){.ov-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.ov-explain{margin-top:14px;background:var(--primary-subtle);border-radius:8px;padding:11px 13px;
+  font-size:12.5px;line-height:1.5;color:var(--text-secondary)}
+.ov-explain b{color:var(--primary)}
+.ov-btns{display:flex;gap:9px;align-items:center;margin-top:14px}
+/* The one control that produces a report, so it is the one that looks like it. */
+.ov-go{border-color:var(--primary);background:var(--primary);color:#fff;font-weight:600}
+.ov-go:hover{border-color:var(--primary-hover);background:var(--primary-hover);color:#fff}
+.ov-go[disabled]:hover{border-color:var(--primary);background:var(--primary);color:#fff}
+@media(max-width:620px){.ov-btns{flex-direction:column;align-items:stretch}
+  .ov-btns .pf-btn,.ov-btns .btn{width:100%}}
 .dt-empty{text-align:center;padding:40px 20px;color:var(--text-muted)}
 .dt-empty .e-ic{font-size:26px;margin-bottom:8px;opacity:.6}
 .dt-empty .e-t{font-weight:600;color:var(--text-secondary);margin-bottom:3px;font-size:14px}
@@ -2339,6 +2385,13 @@ const NAV=[{g:'ANALYSIS'},
      the entries stay in NAV, and must, because the search index, the ?panel=
      deep link and the server's own /admin/access and /admin/logs redirects all
      resolve through this array. */
+  /* Its own group, because it is its own kind of thing. Every panel above reads
+     the synced sheet and shows this platform's own figures; this one hands over
+     documents the report pipeline produced from its own, separate reading of
+     the same sheet. Filing it among the analysis panels would imply it was
+     another cut of the same figures, and the two are allowed to differ. */
+  {g:'REPORTS'},
+  {v:'reports',   t:'Report Automation',       i:'saif'},
   {g:'ADMINISTRATION', adm:1},
   {v:'admin',     t:'User Management',         i:'users',  adm:1},
   {v:'access',    t:'Roles & Access',          i:'shield', adm:1, sub:'admin'},
@@ -2360,7 +2413,7 @@ const ADMIN_VIEWS=['admin','access','logs'];
    RESTRICTED_MODULES in @efip/shared. Every other panel is open unless a stored
    decision closes it; these are closed unless a stored decision opens them, and
    moduleAllowed() below is where the difference is applied. */
-const RESTRICTED_VIEWS=['saifmt','yday'];
+const RESTRICTED_VIEWS=['saifmt','yday','reports'];
 function svgIcon(i){ return `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[i]}"/>${i==='rc'?'<circle cx="12" cy="10" r="2.4"/>':''}</svg>`; }
 function renderNav(){
   const n=attentionCount();
@@ -2942,6 +2995,425 @@ function viewCommand(){
    `yday` is a RESTRICTED module (see @efip/shared): unlike every other panel it
    is withheld until an administrator turns it on in Roles & Access. Nothing here
    enforces that - moduleAllowed decides, and the sidebar obeys. */
+/* ---- Report Automation -------------------------------------------------------
+   The Expenditure Summary, laid out by the report pipeline.
+
+   The pipeline behind it is the standalone daily-report application, vendored
+   into the server whole and run unmodified — see packages/server/src/reports.
+   Every figure in every document is still computed by that code, from its own
+   reading of the same Google Sheet.
+
+   NOTHING HERE HAPPENS ON A TIMER. A report exists only because somebody
+   pressed Process now, which is the whole point: the Summary goes out over
+   somebody's name, and the figures on page 1 are routinely corrected by hand
+   before it does. A report that appeared unattended at 07:30 would be a report
+   nobody had looked at.
+
+   This panel is therefore a plain reader of /api/reports/*, with one exception:
+   the manual figures below are written back. It holds no financial logic of its
+   own and deliberately restates none of the platform's figures as the report's,
+   or the report's as the platform's — the report reaches the sheet by a
+   different route (a whole-workbook export rather than per-tab CSV) and applies
+   those manual figures, so on a given morning the two can legitimately differ.
+   Where a figure is shown it is labelled as that run's own.
+
+   The PDF is rendered when somebody asks for it rather than on every run — it
+   costs a headless browser per document — and is printed from the HTML that run
+   already stored, so it is that run's report and not a fresh reading. The first
+   ask takes a few seconds; every one after is instant. */
+const AUTO={status:null, err:null, denied:false, loading:false, at:null, busy:'', gen:0, tried:false,
+  /* The manual-figures form. `ov` holds what is in the boxes as typed, so a
+     repaint - the ten-minute sync repaints the whole page - restores the form
+     rather than wiping half-finished input. `dirty` stops a status refresh from
+     overwriting it with the stored values while somebody is still typing. */
+  ov:{exp:'',bal:'',day:'',assigned:'',fixed:false}, ovTouched:{}, ovDirty:false,
+  ovOpen:false, ovSeen:false, ovBusy:false, ovMsg:null};
+
+/* Every request carries its own timeout: a report run reads the whole workbook
+   and lays out two documents, so it is allowed minutes, while merely asking how
+   things stand is allowed seconds. */
+function autoFetch(pathname,opts){
+  const c=new AbortController();
+  const t=setTimeout(function(){ c.abort(); }, (opts&&opts.timeoutMs)||15000);
+  return fetch(pathname, Object.assign({signal:c.signal, cache:'no-store', credentials:'same-origin'}, opts||{}))
+    .then(function(r){
+      return r.text().then(function(txt){
+        let body=null; try{ body=txt?JSON.parse(txt):null; }catch(e){ body=null; }
+        if(!r.ok){
+          const e=new Error((body&&(body.message||body.error))||('Request failed ('+r.status+')'));
+          e.status=r.status; throw e;
+        }
+        return body;
+      });
+    })
+    .finally(function(){ clearTimeout(t); });
+}
+/* One load at a time, newest wins, and one attempt per visit.
+   render() asks for a load on every paint and the sync repaints the page every
+   ten minutes, so an unforced call while one is in flight has to be ignored;
+   and guarding on success alone would spin, because a failure repaints to say
+   why and that repaint would ask again. Refresh is how a second attempt is
+   asked for, deliberately. */
+function autoLoad(force){
+  if(AUTO.loading&&!force) return;
+  if(AUTO.tried&&!force) return;
+  const gen=++AUTO.gen;
+  AUTO.loading=true; AUTO.tried=true; AUTO.err=null;
+  autoFetch('/api/reports/status').then(function(s){
+    if(gen!==AUTO.gen) return;
+    AUTO.status=s; AUTO.denied=false; AUTO.at=new Date();
+    autoOvSeed(s.overrides);
+  }).catch(function(err){
+    if(gen!==AUTO.gen) return;
+    AUTO.status=null;
+    AUTO.denied=(err&&err.status===403);
+    AUTO.err=(err&&err.name==='AbortError')?'The server did not answer in time.':((err&&err.message)||'Could not load.');
+  }).then(function(){
+    if(gen!==AUTO.gen) return;
+    AUTO.loading=false;
+    if(state.view==='reports') render();
+  });
+}
+function autoRefresh(){ AUTO.tried=false; autoLoad(true); render(); }
+/* Produce the documents now. This is the only thing that ever produces one:
+   there is no schedule behind it, on this server or anywhere else. The work
+   happens in the vendored pipeline, from its own reading of the sheet. */
+function autoRun(){
+  if(AUTO.busy) return;
+  AUTO.busy='run'; AUTO.ovMsg=null; render();
+  autoFetch('/api/reports/run',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',timeoutMs:300000})
+    .then(function(){ AUTO.busy=''; AUTO.tried=false; autoLoad(true); render(); })
+    .catch(function(err){ AUTO.busy=''; AUTO.err=(err&&err.message)||'The run failed.'; render(); });
+}
+/* Which documents a run can hand over. DOCX and HTML are written by the run
+   itself; the two PDFs are rendered on the first request from the HTML beside
+   them, so they are offered whenever that HTML exists rather than only when a
+   PDF has already been made. */
+const AUTO_DOCS=[
+  {f:'report',      t:'Expenditure Summary', ext:'Word',  c:'var(--primary)', needs:'report'},
+  {f:'pdf',         t:'Expenditure Summary', ext:'PDF',   c:'var(--primary)', needs:'html'},
+  {f:'weekly-pdf',  t:'Weekly Leaderboard',  ext:'PDF',   c:'var(--serious)', needs:'weekly-html'},
+  {f:'html',        t:'Expenditure Summary', ext:'Web page', c:'var(--primary)', needs:'html'},
+  {f:'weekly-html', t:'Weekly Leaderboard',  ext:'Web page', c:'var(--serious)', needs:'weekly-html'}
+];
+function autoBytes(b){
+  if(!b&&b!==0) return '';
+  return b>=1048576 ? (b/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(b/1024))+' KB';
+}
+function autoWhen(iso){
+  if(!iso) return '';
+  const d=new Date(iso); if(isNaN(d)) return '';
+  const now=new Date(), sameDay=d.toDateString()===now.toDateString();
+  const t=d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+  return sameDay ? 'Today '+t : d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})+' '+t;
+}
+
+/* ---- the figures somebody types instead of computing ------------------------
+   Four cells of the Summary's page-1 table can be entered by hand. This is not
+   a convenience feature: the sheet lags, and the report goes out on a morning
+   when the operator already knows the correct number. The pipeline has always
+   supported it; the boxes below are the same four the desktop tool has, in the
+   same order, doing the same arithmetic.
+
+   Everything here is in CRORE, because that is the unit the figures are quoted
+   and argued about in. The server converts to rupees at the boundary, so the
+   word "rupee" appears nowhere in this panel.
+
+   Nothing is applied by saving. The values sit in the config until the next
+   Process now reads them, which is why the button says so. */
+const AUTO_OV=[
+  {k:'exp',      f:'totalExpenditure', t:'Total Expenditure (Cr)'},
+  {k:'bal',      f:'balance',          t:'Balance (Cr)'},
+  {k:'day',      f:'dayTotal',         t:"Yesterday's Total (Cr)"}
+];
+const AUTO_OV_LBL={exp:'Total Expenditure', bal:'Balance', day:"Yesterday's Total"};
+
+/* Crore carries up to seven decimals exactly (a rupee is 1e-7 Cr), and a float
+   division leaves noise past that - 209.11600000000001. Round there and trim
+   the padding, so the box shows the figure that was entered. */
+function autoOvStr(v){
+  if(v==null||v==='') return '';
+  const n=Number(v);
+  if(!isFinite(n)) return '';
+  return n.toFixed(7).replace(/0+$/,'').replace(/\.$/,'');
+}
+function autoOvNum(v){
+  const s=String(v==null?'':v).trim();
+  if(s==='') return null;
+  const n=Number(s);
+  return isFinite(n)?n:null;
+}
+/* Take the stored figures, unless somebody is part-way through changing them. */
+function autoOvSeed(o){
+  if(!o||AUTO.ovDirty) return;
+  AUTO.ov={exp:autoOvStr(o.totalExpenditure), bal:autoOvStr(o.balance),
+           day:autoOvStr(o.dayTotal), assigned:autoOvStr(o.totalAssigned),
+           fixed:!!o.totalAssignedFixed};
+  /* A stored value is one somebody typed, so auto-fill must not touch it. */
+  AUTO.ovTouched={};
+  ['exp','bal','day'].forEach(function(k){ if(AUTO.ov[k]!=='') AUTO.ovTouched[k]=1; });
+  /* Anything actually in force should be visible without opening the card. */
+  if(!AUTO.ovSeen){
+    AUTO.ovSeen=true;
+    AUTO.ovOpen=!!(AUTO.ov.exp||AUTO.ov.bal||AUTO.ov.day||AUTO.ov.fixed);
+  }
+}
+/** Assigned as it stands right now: the fixed figure if fixed, else computed. */
+function autoOvAssigned(){
+  const typed=autoOvNum(AUTO.ov.assigned);
+  if(AUTO.ov.fixed&&typed!=null) return typed;
+  const o=(AUTO.status&&AUTO.status.overrides)||{};
+  return o.computedAssigned==null?null:o.computedAssigned;
+}
+/*
+ * Yesterday's spend implies the new cumulative total, which implies the
+ * balance. Both are suggestions and either can be typed over - which is what
+ * ovTouched is for. Without it, correcting yesterday's figure after entering an
+ * expenditure would silently throw the expenditure away.
+ *
+ * Written straight into the DOM rather than through render(): a repaint on
+ * every keystroke would take the caret with it.
+ */
+function autoOvRecalc(){
+  const o=(AUTO.status&&AUTO.status.overrides)||{};
+  const day=autoOvNum(AUTO.ov.day), base=o.baselineExpenditure;
+  if(day!=null&&base!=null&&!AUTO.ovTouched.exp) AUTO.ov.exp=autoOvStr(base+day);
+  const exp=autoOvNum(AUTO.ov.exp), assigned=autoOvAssigned();
+  if(exp!=null&&assigned!=null&&!AUTO.ovTouched.bal) AUTO.ov.bal=autoOvStr(assigned-exp);
+
+  AUTO_OV.forEach(function(f){
+    const el=document.getElementById('ov_'+f.k);
+    if(el&&el.value!==AUTO.ov[f.k]&&document.activeElement!==el) el.value=AUTO.ov[f.k];
+  });
+  const ex=document.getElementById('ovExplain');
+  if(ex) ex.innerHTML=autoOvExplain();
+  const fx=document.getElementById('ovFix');
+  if(fx){
+    fx.textContent=AUTO.ov.fixed?'Fixed':'Fix';
+    fx.className='btn ov-fix'+(AUTO.ov.fixed?' on':'');
+  }
+}
+function autoOvIn(k,el){
+  AUTO.ov[k]=el.value;
+  AUTO.ovDirty=true; AUTO.ovMsg=null;
+  if(el.value.trim()==='') delete AUTO.ovTouched[k]; else AUTO.ovTouched[k]=1;
+  autoOvRecalc();
+}
+function autoOvFix(){
+  AUTO.ov.fixed=!AUTO.ov.fixed;
+  AUTO.ovDirty=true; AUTO.ovMsg=null;
+  autoOvRecalc();
+}
+/** Which figures are in force, named. */
+function autoOvSet(){
+  return AUTO_OV.filter(function(f){ return String(AUTO.ov[f.k]).trim()!==''; })
+    .map(function(f){ return AUTO_OV_LBL[f.k]; });
+}
+function autoOvExplain(){
+  const set=autoOvSet(), fixed=AUTO.ov.fixed&&autoOvNum(AUTO.ov.assigned)!=null;
+  const parts=[];
+  if(fixed) parts.push('<b>Total Assigned</b> is fixed at <b>'+esc(autoOvStr(AUTO.ov.assigned))+' Cr</b> for every report.');
+  if(set.length) parts.push('<b>'+esc(set.join(', '))+'</b> will be taken from what you typed, '
+    + 'on every report until you press Clear.');
+  if(!parts.length) parts.push('Nothing entered — every figure is worked out from the sheet.');
+  return parts.join(' ');
+}
+function autoOvToggle(){ AUTO.ovOpen=!AUTO.ovOpen; render(); }
+function autoOvSave(clear){
+  if(AUTO.ovBusy) return;
+  AUTO.ovBusy=true; AUTO.ovMsg=null; render();
+  const body=clear
+    ? {totalExpenditure:null, balance:null, dayTotal:null, totalAssigned:null, totalAssignedFixed:false}
+    : {totalExpenditure:AUTO.ov.exp.trim()||null, balance:AUTO.ov.bal.trim()||null,
+       dayTotal:AUTO.ov.day.trim()||null, totalAssigned:AUTO.ov.assigned.trim()||null,
+       totalAssignedFixed:AUTO.ov.fixed};
+  autoFetch('/api/reports/overrides',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body),timeoutMs:20000})
+    .then(function(r){
+      AUTO.ovBusy=false; AUTO.ovDirty=false;
+      const applied=(r&&r.applied)||[];
+      AUTO.ovMsg={ok:true, text:applied.length
+        ? 'Saved. Press Process now to rebuild the report with '+applied.join(', ')+'.'
+        : 'Cleared. Every figure will be worked out from the sheet.'};
+      /* Re-read rather than trusting the echo: the stored figures are what the
+         next report will use, and they are what the boxes must show. */
+      AUTO.tried=false; autoLoad(true); render();
+    })
+    .catch(function(err){
+      AUTO.ovBusy=false;
+      AUTO.ovMsg={ok:false, text:(err&&err.message)||'Could not save.'};
+      render();
+    });
+}
+function autoOvCard(){
+  const o=(AUTO.status&&AUTO.status.overrides)||{};
+  const set=autoOvSet(), fixed=AUTO.ov.fixed&&autoOvNum(AUTO.ov.assigned)!=null;
+  const inForce=set.length+(fixed?1:0);
+  const hd='<div class="card-hd ov-hd" onclick="autoOvToggle()"><h3>Enter figures manually</h3>'
+    + (inForce?'<span class="ov-live">'+inForce+' in force</span>':'')
+    + '<div class="tools"><span class="ov-chev'+(AUTO.ovOpen?' up':'')+'">'
+    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
+    + 'stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span></div></div>';
+  if(!AUTO.ovOpen) return '<div class="card">'+hd+'</div>';
+
+  const dis=AUTO.ovBusy?' disabled':'';
+  const box=function(k,label){
+    return '<div><label class="pf-lb" for="ov_'+k+'">'+esc(label)+'</label>'
+      + '<input class="pf-in" id="ov_'+k+'" type="number" step="0.0001" min="0" placeholder="auto" '
+      + 'autocomplete="off" value="'+esc(AUTO.ov[k])+'" oninput="autoOvIn(\''+k+'\',this)"'+dis+'></div>';
+  };
+  const hint=o.baselineExpenditure==null ? ''
+    : '<div class="pf-hint">Expenditure is counted up from <b>₹'+esc(o.baselineExpenditure.toFixed(2))+' Cr</b> as on '
+      + esc(o.baselineAsOn||'—')+', so entering yesterday\'s figure fills in the two boxes below.</div>';
+
+  return '<div class="card">'+hd
+    + '<div class="ov-body">'
+    + '<div class="qh" style="margin:0 0 14px">Leave a box blank to use the figure the report works out for itself. '
+      + 'Anything you type here replaces only that box on page 1 — all amounts in <b>crore</b>.</div>'
+    + '<div class="ov-assigned">'
+      + '<label class="pf-lb" for="ov_assigned">Total Assigned (Cr)</label>'
+      + '<div class="ov-fixrow">'
+        + '<input class="pf-in" id="ov_assigned" type="number" step="0.0001" min="0" placeholder="auto" '
+        + 'autocomplete="off" value="'+esc(AUTO.ov.assigned)+'" oninput="autoOvIn(\'assigned\',this)"'+dis+'>'
+        + '<button type="button" id="ovFix" class="btn ov-fix'+(AUTO.ov.fixed?' on':'')+'" '
+        + 'onclick="autoOvFix()" aria-pressed="'+(AUTO.ov.fixed?'true':'false')+'"'+dis+'>'
+        + (AUTO.ov.fixed?'Fixed':'Fix')+'</button>'
+      + '</div>' + hint
+    + '</div>'
+    + '<div class="pf-f ov-grid">'+AUTO_OV.map(function(f){ return box(f.k,f.t); }).join('')+'</div>'
+    + '<div class="ov-explain" id="ovExplain">'+autoOvExplain()+'</div>'
+    + (AUTO.ovMsg?'<div class="pf-msg '+(AUTO.ovMsg.ok?'ok':'err')+'">'+esc(AUTO.ovMsg.text)+'</div>':'')
+    + '<div class="ov-btns">'
+      + '<button class="pf-btn" onclick="autoOvSave(false)"'+dis+'>'+(AUTO.ovBusy?'Saving…':'Save figures')+'</button> '
+      + '<button class="btn" onclick="autoOvSave(true)"'+dis+'>Clear</button>'
+    + '</div></div></div>';
+}
+
+function viewReports(){
+  autoLoad();
+  const head=pageHead('Report Automation',
+    'The Expenditure Summary, laid out by the report pipeline from its own reading of the sheet. It is produced when you press Process now, and at no other time.');
+
+  if(!AUTO.status){
+    const busy=AUTO.loading;
+    if(AUTO.denied) return head
+      + '<div class="card"><div class="dt-empty"><div class="e-ic">🔒</div>'
+      + '<div class="e-t">You do not have access to Report Automation</div>'
+      + '<div class="e-s">An administrator can grant it in Roles &amp; Access.</div></div></div>';
+    return head
+      + '<div class="filterbar" style="margin-bottom:14px"><button class="btn" onclick="autoRefresh()">'
+      + (busy?'Checking…':'Try again')+'</button></div>'
+      + '<div class="card"><div class="dt-empty"><div class="e-ic">'+(busy?'⏳':'⚠')+'</div>'
+      + '<div class="e-t">'+(busy?'Reading the report status':'Could not read the report status')+'</div>'
+      + '<div class="e-s">'+esc(busy?'One moment.':(AUTO.err||'Unknown error.'))+'</div></div></div>';
+  }
+
+  const st=AUTO.status, last=st.latest||null;
+  const docs=(last&&last.docs)||[];
+  const has=function(f){ return docs.some(function(d){ return d.format===f; }); };
+  const bytesOf=function(f){ const d=docs.filter(function(x){ return x.format===f; })[0]; return d?d.bytes:null; };
+  const totals=(last&&last.totals)||null;
+
+  const bar='<div class="filterbar" style="margin-bottom:14px">'
+    + '<button class="btn" onclick="autoRefresh()">'+(AUTO.loading?'Checking…':'Refresh')+'</button>'
+    + '<span class="small muted" style="margin-left:auto">'
+      + (st.running?'A run is in progress…':(AUTO.at?'Checked '+autoWhen(AUTO.at.toISOString()):''))+'</span></div>';
+
+  const card=function(lbl,val,ic,icon,sub,tip){
+    return '<div class="kpi"'+tattr(tip)+'><div class="kpi-top"><span class="kpi-ic '+ic+'">'+kpiIcon(icon)+'</span>'
+      + '<div class="kpi-txt"><div class="lbl">'+esc(lbl)+'</div><div class="val tnum">'+val+'</div></div></div>'
+      + '<div class="sub">'+sub+'</div></div>';
+  };
+  /* What is set in the form right now, which is NOT the same question as what
+     the latest report used - figures can be saved and not yet processed. The
+     warning block below answers the second question, from the run itself. */
+  const ovSet=autoOvSet(), ovFixed=AUTO.ov.fixed&&autoOvNum(AUTO.ov.assigned)!=null;
+  const ovBits=(ovFixed?['Total Assigned']:[]).concat(ovSet);
+  /* What the reader can actually download, which is the table's own count.
+     Counting stored documents instead would say two while three rows offer a
+     Download button, because a PDF is not made until it is asked for. */
+  const offered=last?AUTO_DOCS.filter(function(d){ return has(d.needs); }):[];
+
+  const cards='<div class="kpi-grid">'
+    + card('Latest report', last?esc(sheetDMY(last.stamp||'')):'—', last?'ic-blue':'ic-orange', 'coins',
+        last?(esc(autoWhen(last.at))+' · '+esc(last.trigger||'')):'Nothing produced yet',
+        last?('<b>Latest report</b><br>Produced '+esc(autoWhen(last.at))+'<br><span style="opacity:.75">Started by: '+esc(last.triggeredBy||last.trigger||'—')+'</span>')
+            :'<b>Nothing produced yet</b><br>Press Process now to lay out the report.')
+    + card('That report\'s expenditure', totals?cr(totals.expenditure):'—', 'ic-purple', 'receipt',
+        totals?('of '+esc(cr(totals.assigned))+' assigned'):'No figures yet',
+        '<b>As the latest report states it</b><br>'
+        +(totals?('Assigned '+esc(cr(totals.assigned))+'<br>Expenditure '+esc(cr(totals.expenditure))+'<br>Balance '+esc(cr(totals.balance))):'—')
+        +'<br><span style="opacity:.75">Computed by the report pipeline from its own reading of the sheet. Not this platform\'s figure.</span>')
+    + card('Documents', String(offered.length||0), offered.length?'ic-green':'ic-orange', 'wallet',
+        offered.length?'ready to download':'none for the latest run',
+        '<b>Held for the latest run</b><br>'+(docs.length?docs.map(function(d){ return esc(d.format)+' · '+esc(autoBytes(d.bytes)); }).join('<br>'):'None.')
+        +'<br><span style="opacity:.75">A PDF is counted here too, and rendered the first time it is asked for.</span>')
+    + card('Manual figures', String(ovBits.length||0), ovBits.length?'ic-orange':'ic-green', 'gauge',
+        ovBits.length?'entered, not computed':'every figure computed',
+        ovBits.length
+          ? ('<b>Entered by hand</b><br>'+esc(ovBits.join('<br>'))
+             +'<br><span style="opacity:.75">These are what the NEXT report will use. Whether the latest one used them is in its own notes.</span>')
+          : '<b>Nothing entered by hand</b><br>Every figure on page 1 is worked out from the sheet.')
+    + '</div>';
+
+  const warns=(last&&last.warnings)||[];
+  const warnBlock=warns.length
+    ? '<div class="kig-warn" style="margin-bottom:16px"><b>The latest run reported '+warns.length+' note'+(warns.length===1?'':'s')+':</b>'
+      + '<ul style="margin:6px 0 0;padding-left:18px">'
+      + warns.map(function(w){ return '<li style="margin:3px 0">'+esc(w)+'</li>'; }).join('')+'</ul></div>'
+    : '';
+  const failBlock=(last===null&&(st.runs||[]).length&&(st.runs[0].status==='failed'))
+    ? '<div class="kig-warn" style="margin-bottom:16px;border-left-color:var(--critical)">'
+      + '<b style="color:var(--critical)">The last run failed:</b> '+esc(st.runs[0].error||'')+'</div>'
+    : '';
+
+  const rows=offered.map(function(d){
+      const pdf=d.f==='pdf'||d.f==='weekly-pdf';
+      const size=bytesOf(d.f);
+      return '<tr><td><div class="dsc-t" style="color:'+d.c+'"><i style="background:'+d.c+'"></i>'+esc(d.t)+'</div></td>'
+        + '<td>'+esc(d.ext)+'</td>'
+        + '<td class="num muted">'+(size?esc(autoBytes(size)):(pdf?'rendered on request':'—'))+'</td>'
+        + '<td class="num"><a class="btn" href="'+esc('/api/reports/'+last.id+'/'+d.f)+'">Download</a></td></tr>';
+    }).join('');
+  const docTable=rows
+    ? '<div class="tscroll"><table class="dt"><thead><tr><th>Document</th><th>Format</th>'
+      + '<th class="num">Size</th><th class="num">Download</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    : '<div class="dt-empty"><div class="e-ic">📄</div><div class="e-t">No documents yet</div>'
+      + '<div class="e-s">Nothing is produced until you press Process now.</div></div>';
+
+  const runs=st.runs||[];
+  const runsTable=runs.length
+    ? '<div class="tscroll"><table class="dt"><thead><tr><th>When</th><th>Outcome</th><th>Started by</th>'
+      + '<th class="num">Claims</th><th class="num">Expenditure</th></tr></thead><tbody>'
+      + runs.map(function(r){
+          const col=r.status==='success'?'var(--good)':(r.status==='running'?'var(--serious)':'var(--critical)');
+          return '<tr><td>'+esc(autoWhen(r.at))+'</td>'
+            + '<td><span class="dsc-t" style="color:'+col+'"><i style="background:'+col+'"></i>'+esc(r.status||'—')+'</span>'
+              + (r.error?'<div class="muted" style="font-size:11px;margin-top:2px">'+esc(String(r.error).slice(0,90))+'</div>':'')+'</td>'
+            + '<td class="muted">'+esc(r.triggeredBy||r.trigger||'—')+'</td>'
+            + '<td class="num tnum">'+(r.claims!=null?r.claims:'—')+'</td>'
+            + '<td class="num tnum">'+(r.totals?esc(crShort(r.totals.expenditure)):'—')+'</td></tr>';
+        }).join('')+'</tbody></table></div>'
+    : '<div class="dt-empty"><div class="e-ic">🗒</div><div class="e-t">No runs recorded yet</div></div>';
+
+  const pdfNote=st.pdf&&st.pdf.available===false
+    ? '<div class="qh" style="margin:10px 2px 0;color:var(--serious)">This server has no browser installed, so PDFs cannot be '
+      + 'rendered. The Word and web-page copies are unaffected.</div>'
+    : '<div class="qh" style="margin:10px 2px 0">Produced on the server by the report pipeline. A PDF is rendered the first '
+      + 'time it is asked for, from the very page that run stored — so it is that run\'s report, not a fresh reading of the sheet.</div>';
+
+  return head+bar+failBlock+cards+warnBlock+autoOvCard()
+    + '<div class="card"><div class="card-hd"><h3>Latest documents</h3>'
+      + '<span class="small muted">'+(last?esc(sheetDMY(last.stamp||'')):'—')+'</span>'
+      + '<div class="tools">'
+        + '<a class="btn" href="/api/reports/daily-log">Day-by-day log</a> '
+        + '<button class="btn ov-go" onclick="autoRun()"'+((AUTO.busy||st.running)?' disabled':'')+'>'
+        + (AUTO.busy==='run'?'Processing…':(st.running?'A run is in progress…':'Process now'))+'</button></div></div>'
+      + docTable + pdfNote + '</div>'
+    + '<div class="card"><div class="card-hd"><h3>Recent runs</h3>'
+      + '<span class="small muted">newest first</span></div>'+runsTable+'</div>';
+}
+
 /* ---- Daily Expenditure -------------------------------------------------------
    Read straight from the DSC_Details day book: every claim as it was booked, on
    the day it was booked. Three components carry the money and the panel keeps
@@ -4627,7 +5099,7 @@ function applyViewFilterDefaults(){
 }
 
 function render(){ applyViewFilterDefaults(); applyFilter(); renderNav(); renderTopFilters(); renderSyncPill(); const v=state.view;
-  const html = v==='command'?viewCommand():v==='rc'?viewRC():v==='sv'?viewSV():v==='mdsd'?viewMDSD():v==='kigroups'?viewKI():v==='saifmt'?viewSAIFmt():v==='trend'?viewTrend():v==='exceptions'?viewExc():v==='detail'?viewDetail():v==='profile'?viewProfile():v==='yday'?viewYday():v==='admin'?viewAdminUsers():v==='access'?viewAdminAccess():v==='logs'?viewAdminLogs():viewTracker();
+  const html = v==='command'?viewCommand():v==='rc'?viewRC():v==='sv'?viewSV():v==='mdsd'?viewMDSD():v==='kigroups'?viewKI():v==='saifmt'?viewSAIFmt():v==='trend'?viewTrend():v==='exceptions'?viewExc():v==='detail'?viewDetail():v==='profile'?viewProfile():v==='yday'?viewYday():v==='reports'?viewReports():v==='admin'?viewAdminUsers():v==='access'?viewAdminAccess():v==='logs'?viewAdminLogs():viewTracker();
   document.getElementById('content').innerHTML=html;
   labelTableCells();
   groupTreeSections();
@@ -6757,6 +7229,7 @@ const ADM_MODULES = [
   { k:'mdsd',       t:'KI Infra (States/UTs)' },
   { k:'rc',         t:'Regional Centres' },
   { k:'exceptions', t:'Attention Centre' },
+  { k:'reports',    t:'Report Automation', r:1 },
 ];
 function admIsAdminRole(r) { return r === 'admin' || r === 'super_admin'; }
 function admSelect(id, value, opts, o) {
