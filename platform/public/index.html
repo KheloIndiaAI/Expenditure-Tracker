@@ -3190,6 +3190,12 @@ function autoOvRecalc(){
     fx.textContent=AUTO.ov.fixed?'Fixed':'Fix';
     fx.className='btn ov-fix'+(AUTO.ov.fixed?' on':'');
   }
+  const efx=document.getElementById('ovExpFix');
+  if(efx){
+    const on=autoOvNum(AUTO.ov.exp)!=null;
+    efx.textContent=on?'Fixed':'Fix';
+    efx.className='btn ov-fix'+(on?' on':'');
+  }
 }
 function autoOvIn(k,el){
   AUTO.ov[k]=el.value;
@@ -3202,17 +3208,55 @@ function autoOvFix(){
   AUTO.ovDirty=true; AUTO.ovMsg=null;
   autoOvRecalc();
 }
+/*
+ * Total Expenditure's Fix/Unfix. There is no separate on/off flag behind this
+ * one the way Total Assigned has - a typed figure is always applied once
+ * saved, so "fixed" here just means the box holds one. Unfix clears it, and
+ * Yesterday's Total and Balance with it: Yesterday's Total exists only to
+ * build the figure above it, and Balance was struck against that figure,
+ * whether it arrived by typing or by the day-figure arithmetic - autoOvSeed
+ * marks a loaded value as "touched" either way, so there is no telling those
+ * two apart here, and a balance struck against a since-cleared expenditure is
+ * not a real balance regardless of which one this was.
+ *
+ * Fix on an EMPTY box does not leave it empty: it offers back the running
+ * total this platform already remembers - the same baselineExpenditure the
+ * hint below quotes - so re-fixing after an Unfix never means retyping a
+ * cumulative figure from memory.
+ */
+function autoOvExpToggle(){
+  const has=autoOvNum(AUTO.ov.exp)!=null;
+  AUTO.ovDirty=true; AUTO.ovMsg=null;
+  if(has){
+    AUTO.ov.exp=''; delete AUTO.ovTouched.exp;
+    AUTO.ov.day=''; delete AUTO.ovTouched.day;
+    AUTO.ov.bal=''; delete AUTO.ovTouched.bal;
+  }else{
+    /* Restored, but deliberately left OUT of ovTouched: Yesterday's Total was
+       just cleared alongside Expenditure, so there is nothing yet for the
+       day-triggered autofill above to clash with, and leaving this untouched
+       is what lets typing a NEW day figure recompute Expenditure again rather
+       than being permanently pinned at the restored number. */
+    const o=(AUTO.status&&AUTO.status.overrides)||{};
+    if(o.baselineExpenditure!=null) AUTO.ov.exp=autoOvStr(o.baselineExpenditure);
+  }
+  autoOvRecalc();
+}
 /** Which figures are in force, named. */
 function autoOvSet(){
   return AUTO_OV.filter(function(f){ return String(AUTO.ov[f.k]).trim()!==''; })
     .map(function(f){ return AUTO_OV_LBL[f.k]; });
 }
 function autoOvExplain(){
-  const set=autoOvSet(), fixed=AUTO.ov.fixed&&autoOvNum(AUTO.ov.assigned)!=null;
+  const assignedFixed=AUTO.ov.fixed&&autoOvNum(AUTO.ov.assigned)!=null;
+  const expFixed=autoOvNum(AUTO.ov.exp)!=null;
+  const rest=AUTO_OV.filter(function(f){ return f.k!=='exp'&&String(AUTO.ov[f.k]).trim()!==''; })
+    .map(function(f){ return AUTO_OV_LBL[f.k]; });
   const parts=[];
-  if(fixed) parts.push('<b>Total Assigned</b> is fixed at <b>'+esc(autoOvStr(AUTO.ov.assigned))+' Cr</b> for every report.');
-  if(set.length) parts.push('<b>'+esc(set.join(', '))+'</b> will be taken from what you typed, '
-    + 'on every report until you press Clear.');
+  if(assignedFixed) parts.push('<b>Total Assigned</b> is fixed at <b>'+esc(autoOvStr(AUTO.ov.assigned))+' Cr</b> for every report.');
+  if(expFixed) parts.push('<b>Total Expenditure</b> is fixed at <b>'+esc(autoOvStr(AUTO.ov.exp))+' Cr</b> — add a day\'s figure below and press Save to move it forward.');
+  if(rest.length) parts.push('<b>'+esc(rest.join(', '))+'</b> will be taken from what you typed, '
+    + 'on every report until cleared.');
   if(!parts.length) parts.push('Nothing entered — every figure is worked out from the sheet.');
   return parts.join(' ');
 }
@@ -3260,9 +3304,21 @@ function autoOvCard(){
       + '<input class="pf-in" id="ov_'+k+'" type="number" step="0.0001" min="0" placeholder="auto" '
       + 'autocomplete="off" value="'+esc(AUTO.ov[k])+'" oninput="autoOvIn(\''+k+'\',this)"'+dis+'></div>';
   };
-  const hint=o.baselineExpenditure==null ? ''
-    : '<div class="pf-hint">Expenditure is counted up from <b>₹'+esc(o.baselineExpenditure.toFixed(2))+' Cr</b> as on '
-      + esc(o.baselineAsOn||'—')+', so entering yesterday\'s figure fills in the two boxes below.</div>';
+  const expFixed=autoOvNum(AUTO.ov.exp)!=null;
+  /* The hint lives under Expenditure now, not Assigned — it explains where
+     THIS box's figure comes from, and Yesterday's Total is what feeds it. */
+  const expHint=o.baselineExpenditure==null ? ''
+    : '<div class="pf-hint">Counted up from <b>₹'+esc(o.baselineExpenditure.toFixed(2))+' Cr</b> as on '
+      + esc(o.baselineAsOn||'—')+' — add Yesterday\'s Total below and press Save to carry it forward.</div>';
+  const expBox=
+    '<div><label class="pf-lb" for="ov_exp">Total Expenditure (Cr)</label>'
+    + '<div class="ov-fixrow">'
+      + '<input class="pf-in" id="ov_exp" type="number" step="0.0001" min="0" placeholder="auto" '
+      + 'autocomplete="off" value="'+esc(AUTO.ov.exp)+'" oninput="autoOvIn(\'exp\',this)"'+dis+'>'
+      + '<button type="button" id="ovExpFix" class="btn ov-fix'+(expFixed?' on':'')+'" '
+      + 'onclick="autoOvExpToggle()" aria-pressed="'+(expFixed?'true':'false')+'"'+dis+'>'
+      + (expFixed?'Fixed':'Fix')+'</button>'
+    + '</div>' + expHint + '</div>';
 
   return '<div class="card">'+hd
     + '<div class="ov-body">'
@@ -3276,9 +3332,9 @@ function autoOvCard(){
         + '<button type="button" id="ovFix" class="btn ov-fix'+(AUTO.ov.fixed?' on':'')+'" '
         + 'onclick="autoOvFix()" aria-pressed="'+(AUTO.ov.fixed?'true':'false')+'"'+dis+'>'
         + (AUTO.ov.fixed?'Fixed':'Fix')+'</button>'
-      + '</div>' + hint
+      + '</div>'
     + '</div>'
-    + '<div class="pf-f ov-grid">'+AUTO_OV.map(function(f){ return box(f.k,f.t); }).join('')+'</div>'
+    + '<div class="pf-f ov-grid">'+expBox+AUTO_OV.filter(function(f){ return f.k!=='exp'; }).map(function(f){ return box(f.k,f.t); }).join('')+'</div>'
     + '<div class="ov-explain" id="ovExplain">'+autoOvExplain()+'</div>'
     + (AUTO.ovMsg?'<div class="pf-msg '+(AUTO.ovMsg.ok?'ok':'err')+'">'+esc(AUTO.ovMsg.text)+'</div>':'')
     + '<div class="ov-btns">'

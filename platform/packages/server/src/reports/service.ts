@@ -188,6 +188,14 @@ const CR = 1e7;
 const toCrore = (v: unknown): number | null =>
   v === null || v === undefined || v === '' ? null : Number(v) / CR;
 
+/** IST, because the sheet's own dates are. dd.mm.yyyy to match how the report
+ *  and the sheet both write one (e.g. a run's own "asOn": "08.09.2026"). */
+const IST_OFFSET_MIN = 330;
+function istDMY(d = new Date(Date.now() + IST_OFFSET_MIN * 60000)): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getUTCDate())}.${p(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`;
+}
+
 export interface OverrideView {
   totalExpenditure: number | null;
   balance: number | null;
@@ -250,14 +258,20 @@ export async function saveOverrides(input: OverrideInput): Promise<{
     const n = Number(v);
     if (!Number.isFinite(n)) throw new Error(`"${FIELD_LABEL[key]}" must be a number in crore, or left blank.`);
     if (n < 0) throw new Error(`"${FIELD_LABEL[key]}" cannot be negative.`);
-    return n * CR;
+    /* Rounded to the rupee: crore-to-rupee is a multiply by 1e7, and a plain
+       float multiply leaves noise past that (209.116 * 1e7 = 2091160000.0000002,
+       which is exactly the drift already sitting in the seed config). Money
+       does not carry fractions of a rupee, so there is nothing lost in rounding
+       and nothing gained in keeping the noise. */
+    return Math.round(n * CR);
   };
 
   const assigned = clean('totalAssigned');
   const config = await store.getConfig();
+  const totalExpenditure = clean('totalExpenditure');
   const next = {
     ...((config.manualOverrides ?? {}) as Record<string, unknown>),
-    totalExpenditure: clean('totalExpenditure'),
+    totalExpenditure,
     balance: clean('balance'),
     dayTotal: clean('dayTotal'),
     totalAssigned: assigned,
@@ -267,6 +281,32 @@ export async function saveOverrides(input: OverrideInput): Promise<{
     totalAssignedFixed: assigned != null && !!input.totalAssignedFixed,
   };
   config.manualOverrides = next;
+
+  /*
+   * Total Expenditure is a running total, not a one-off correction: whatever
+   * figure is in force after this save becomes tomorrow's starting point, the
+   * way the operator actually works — "yesterday's total" is added to the LAST
+   * figure that was fixed, not to a number left over from whenever the config
+   * was first seeded. Advancing the baseline here, on every save that leaves an
+   * expenditure figure in force, is what makes that automatic: the next time a
+   * day's figure is entered, autoOvRecalc on the panel adds it to this value,
+   * because that is what /api/reports/status will now report back as
+   * baselineExpenditure.
+   *
+   * Only forward, and only while there is a figure. A save that CLEARS Total
+   * Expenditure (going back to the sheet's own figure) leaves the baseline
+   * exactly where it stood — clearing means "this report doesn't need an
+   * override," not "forget what the running total was," and the next manual
+   * entry should still be able to pick up where the last one left off.
+   */
+  if (totalExpenditure != null) {
+    config.expenditureBaseline = {
+      ...((config.expenditureBaseline ?? {}) as Record<string, unknown>),
+      asOn: istDMY(),
+      amount: totalExpenditure,
+    };
+  }
+
   await store.saveConfig(config);
 
   const applied = (['totalAssigned', 'totalExpenditure', 'balance', 'dayTotal'] as const)
