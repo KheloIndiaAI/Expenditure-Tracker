@@ -44,8 +44,13 @@ ENV HOST=0.0.0.0
 # container's /dev/shm is 64MB and Chromium will die part-way through a full page
 # without it. Both are passed via CHROME_FLAGS so the vendored code stays
 # unchanged and still runs sandboxed on a desktop.
+# fonts-liberation alone is metric-compatible with Arial/Times but predates the
+# Indian Rupee sign (U+20B9, added to Unicode in 2010) — every ₹ in the report
+# printed as a missing-glyph box. fonts-noto-core adds Noto Sans, which does
+# have that glyph; Chromium falls back to it per-character automatically, so
+# nothing in the report's own font-family list has to change.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends chromium fonts-liberation \
+ && apt-get install -y --no-install-recommends chromium fonts-liberation fonts-noto-core \
  && rm -rf /var/lib/apt/lists/*
 ENV CHROME_PATH=/usr/bin/chromium
 ENV CHROME_FLAGS="--no-sandbox --disable-dev-shm-usage"

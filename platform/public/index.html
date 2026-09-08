@@ -3312,49 +3312,16 @@ function viewReports(){
   const docs=(last&&last.docs)||[];
   const has=function(f){ return docs.some(function(d){ return d.format===f; }); };
   const bytesOf=function(f){ const d=docs.filter(function(x){ return x.format===f; })[0]; return d?d.bytes:null; };
-  const totals=(last&&last.totals)||null;
 
   const bar='<div class="filterbar" style="margin-bottom:14px">'
     + '<button class="btn" onclick="autoRefresh()">'+(AUTO.loading?'Checking…':'Refresh')+'</button>'
     + '<span class="small muted" style="margin-left:auto">'
       + (st.running?'A run is in progress…':(AUTO.at?'Checked '+autoWhen(AUTO.at.toISOString()):''))+'</span></div>';
 
-  const card=function(lbl,val,ic,icon,sub,tip){
-    return '<div class="kpi"'+tattr(tip)+'><div class="kpi-top"><span class="kpi-ic '+ic+'">'+kpiIcon(icon)+'</span>'
-      + '<div class="kpi-txt"><div class="lbl">'+esc(lbl)+'</div><div class="val tnum">'+val+'</div></div></div>'
-      + '<div class="sub">'+sub+'</div></div>';
-  };
-  /* What is set in the form right now, which is NOT the same question as what
-     the latest report used - figures can be saved and not yet processed. The
-     warning block below answers the second question, from the run itself. */
-  const ovSet=autoOvSet(), ovFixed=AUTO.ov.fixed&&autoOvNum(AUTO.ov.assigned)!=null;
-  const ovBits=(ovFixed?['Total Assigned']:[]).concat(ovSet);
   /* What the reader can actually download, which is the table's own count.
      Counting stored documents instead would say two while three rows offer a
      Download button, because a PDF is not made until it is asked for. */
   const offered=last?AUTO_DOCS.filter(function(d){ return has(d.needs); }):[];
-
-  const cards='<div class="kpi-grid">'
-    + card('Latest report', last?esc(sheetDMY(last.stamp||'')):'—', last?'ic-blue':'ic-orange', 'coins',
-        last?(esc(autoWhen(last.at))+' · '+esc(last.trigger||'')):'Nothing produced yet',
-        last?('<b>Latest report</b><br>Produced '+esc(autoWhen(last.at))+'<br><span style="opacity:.75">Started by: '+esc(last.triggeredBy||last.trigger||'—')+'</span>')
-            :'<b>Nothing produced yet</b><br>Press Process now to lay out the report.')
-    + card('That report\'s expenditure', totals?cr(totals.expenditure):'—', 'ic-purple', 'receipt',
-        totals?('of '+esc(cr(totals.assigned))+' assigned'):'No figures yet',
-        '<b>As the latest report states it</b><br>'
-        +(totals?('Assigned '+esc(cr(totals.assigned))+'<br>Expenditure '+esc(cr(totals.expenditure))+'<br>Balance '+esc(cr(totals.balance))):'—')
-        +'<br><span style="opacity:.75">Computed by the report pipeline from its own reading of the sheet. Not this platform\'s figure.</span>')
-    + card('Documents', String(offered.length||0), offered.length?'ic-green':'ic-orange', 'wallet',
-        offered.length?'ready to download':'none for the latest run',
-        '<b>Held for the latest run</b><br>'+(docs.length?docs.map(function(d){ return esc(d.format)+' · '+esc(autoBytes(d.bytes)); }).join('<br>'):'None.')
-        +'<br><span style="opacity:.75">A PDF is counted here too, and rendered the first time it is asked for.</span>')
-    + card('Manual figures', String(ovBits.length||0), ovBits.length?'ic-orange':'ic-green', 'gauge',
-        ovBits.length?'entered, not computed':'every figure computed',
-        ovBits.length
-          ? ('<b>Entered by hand</b><br>'+esc(ovBits.join('<br>'))
-             +'<br><span style="opacity:.75">These are what the NEXT report will use. Whether the latest one used them is in its own notes.</span>')
-          : '<b>Nothing entered by hand</b><br>Every figure on page 1 is worked out from the sheet.')
-    + '</div>';
 
   const warns=(last&&last.warnings)||[];
   const warnBlock=warns.length
@@ -3381,37 +3348,20 @@ function viewReports(){
     : '<div class="dt-empty"><div class="e-ic">📄</div><div class="e-t">No documents yet</div>'
       + '<div class="e-s">Nothing is produced until you press Process now.</div></div>';
 
-  const runs=st.runs||[];
-  const runsTable=runs.length
-    ? '<div class="tscroll"><table class="dt"><thead><tr><th>When</th><th>Outcome</th><th>Started by</th>'
-      + '<th class="num">Claims</th><th class="num">Expenditure</th></tr></thead><tbody>'
-      + runs.map(function(r){
-          const col=r.status==='success'?'var(--good)':(r.status==='running'?'var(--serious)':'var(--critical)');
-          return '<tr><td>'+esc(autoWhen(r.at))+'</td>'
-            + '<td><span class="dsc-t" style="color:'+col+'"><i style="background:'+col+'"></i>'+esc(r.status||'—')+'</span>'
-              + (r.error?'<div class="muted" style="font-size:11px;margin-top:2px">'+esc(String(r.error).slice(0,90))+'</div>':'')+'</td>'
-            + '<td class="muted">'+esc(r.triggeredBy||r.trigger||'—')+'</td>'
-            + '<td class="num tnum">'+(r.claims!=null?r.claims:'—')+'</td>'
-            + '<td class="num tnum">'+(r.totals?esc(crShort(r.totals.expenditure)):'—')+'</td></tr>';
-        }).join('')+'</tbody></table></div>'
-    : '<div class="dt-empty"><div class="e-ic">🗒</div><div class="e-t">No runs recorded yet</div></div>';
-
   const pdfNote=st.pdf&&st.pdf.available===false
     ? '<div class="qh" style="margin:10px 2px 0;color:var(--serious)">This server has no browser installed, so PDFs cannot be '
       + 'rendered. The Word and web-page copies are unaffected.</div>'
     : '<div class="qh" style="margin:10px 2px 0">Produced on the server by the report pipeline. A PDF is rendered the first '
       + 'time it is asked for, from the very page that run stored — so it is that run\'s report, not a fresh reading of the sheet.</div>';
 
-  return head+bar+failBlock+cards+warnBlock+autoOvCard()
+  return head+bar+failBlock+warnBlock+autoOvCard()
     + '<div class="card"><div class="card-hd"><h3>Latest documents</h3>'
       + '<span class="small muted">'+(last?esc(sheetDMY(last.stamp||'')):'—')+'</span>'
       + '<div class="tools">'
         + '<a class="btn" href="/api/reports/daily-log">Day-by-day log</a> '
         + '<button class="btn ov-go" onclick="autoRun()"'+((AUTO.busy||st.running)?' disabled':'')+'>'
         + (AUTO.busy==='run'?'Processing…':(st.running?'A run is in progress…':'Process now'))+'</button></div></div>'
-      + docTable + pdfNote + '</div>'
-    + '<div class="card"><div class="card-hd"><h3>Recent runs</h3>'
-      + '<span class="small muted">newest first</span></div>'+runsTable+'</div>';
+      + docTable + pdfNote + '</div>';
 }
 
 /* ---- Daily Expenditure -------------------------------------------------------
