@@ -549,6 +549,12 @@ table.dt .minibar>span{display:block;height:100%;border-radius:4px}
 .wlb-bar-wrap{flex:1;height:20px;border-radius:10px;background:var(--bg-page);overflow:hidden;display:flex;box-shadow:inset 0 0 0 1px rgba(11,11,11,.05);min-width:40px}
 .wlb-bar{background:linear-gradient(180deg,rgba(255,255,255,.20),rgba(255,255,255,0)),var(--good);color:#fff;font-size:9.5px;font-weight:800;display:flex;align-items:center;justify-content:flex-end;padding-right:7px;height:100%;min-width:3px;white-space:nowrap;text-shadow:0 1px 1.5px rgba(0,0,0,.18);animation:growW .6s cubic-bezier(.2,.7,.3,1)}
 .wlb-total-row td{font-weight:700;border-top:2px solid var(--border);background:var(--bg-page)}
+/* A section marker between the live "this week" table and the completed-week
+   KPI row beneath it, in the same uppercase-label voice table.dt already uses
+   for its own column headings - light enough that it reads as one continuous
+   module, not a second bordered card stacked under the first. */
+.wlb-subhead{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin:22px 2px 10px}
+.wlb-subhead span{text-transform:none;letter-spacing:normal;font-weight:500;color:var(--text-muted)}
 @media(max-width:640px){.wlb-sharecell{min-width:110px}}
 
 .dki-note{display:flex;gap:12px;align-items:center;background:linear-gradient(135deg,rgba(37,106,191,.06),rgba(74,58,167,.04));border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--text-secondary);margin-bottom:16px;box-shadow:var(--elev-1)}
@@ -3842,9 +3848,15 @@ function wlbRow(r){
     convention (.tipbd, see rcTipRows) rather than inventing a second one - so
     a week still in progress always has a finished week to compare against,
     one hover away. */
-function wlbPrevTip(){
-  const p=wlbPrevData(), rangeLbl=wlbRangeLabel(p.start,p.end);
-  const head='<b>Previous week</b><br><span style="opacity:.75">'+esc(rangeLbl)+'</span>';
+/** The ranked breakdown behind an already-computed week's figures - same
+    Rank/Centre/Amount shape as the live table, reusing the platform's own
+    itemised-tooltip convention (.tipbd, see rcTipRows) rather than a second
+    one of its own. Takes the week's data rather than computing it again,
+    since every caller has already had to compute it to show a headline
+    number in the first place. */
+function wlbRankTip(p,label){
+  const rangeLbl=wlbRangeLabel(p.start,p.end);
+  const head='<b>'+esc(label)+'</b><br><span style="opacity:.75">'+esc(rangeLbl)+'</span>';
   if(!p.rows.length){
     return head+'<br><span style="opacity:.75">No Regional Centre claims were booked that week.</span>';
   }
@@ -3854,48 +3866,69 @@ function wlbPrevTip(){
     + '</table>';
 }
 function weeklyLeaderboardSection(){
-  if(!SYNC.dsc) return '<div class="card"><div class="card-hd"><h3>Weekly Leaderboard — Regional Centres</h3></div>'
+  if(!SYNC.dsc) return '<div class="card"><div class="card-hd" style="padding:16px 18px 0"><h3>Weekly Leaderboard — Regional Centres</h3></div>'
     +'<div class="dt-empty"><div class="e-ic">⏳</div><div class="e-t">The day book has not been read yet</div>'
     +'<div class="e-s">DSC_Details is pulled on every sync, just after the figures.</div></div></div>';
 
+  /* The header row needs the same explicit padding every other zero-padding
+     card-hd in this file already carries (see Centre utilisation, directly
+     above this) - a .card with padding:0 supplies none on its own, so the
+     header text would otherwise sit flush against the card's own border. */
   const w=wlbData(), rangeLbl=wlbRangeLabel(w.start,w.end);
   const todayLbl=sheetDMY(istDateStr(0));
-  const head='<div class="card-hd"><h3>Weekly Leaderboard — Regional Centres</h3>'
+  const head='<div class="card-hd" style="padding:16px 18px 0"><h3>Weekly Leaderboard — Regional Centres</h3>'
     +'<span class="small muted">This week, to date · '+esc(rangeLbl)+'</span></div>';
 
-  if(!w.rows.length){
-    return '<div class="card">'+head+'<div class="dt-empty"><div class="e-ic">🗓</div>'
+  const tableCard = !w.rows.length
+    ? '<div class="card" style="padding:0;overflow:hidden">'+head+'<div class="dt-empty"><div class="e-ic">🗓</div>'
       +'<div class="e-t">Nothing booked yet this week</div>'
-      +'<div class="e-s">No Regional Centre claims are recorded in DSC_Details for '+esc(rangeLbl)+' as of '+esc(todayLbl)+'.</div></div></div>';
+      +'<div class="e-s">No Regional Centre claims are recorded in DSC_Details for '+esc(rangeLbl)+' as of '+esc(todayLbl)+'.</div></div></div>'
+    : (function(){
+        const rows=w.rows.map(wlbRow).join('');
+        const table='<div class="tscroll"><table class="dt"><thead><tr>'
+          +'<th>Rank</th><th>Regional Centre</th><th>Share of Week</th><th class="num">Total Spent</th>'
+          +'</tr></thead><tbody>'+rows
+          +'<tr class="wlb-total-row"><td colspan="2">Total</td><td></td>'
+          +'<td class="num tnum">'+esc(wlbMoney(w.total))+'</td></tr>'
+          +'</tbody></table></div>';
+        return '<div class="card" style="padding:0;overflow:hidden">'+head+table+'</div>';
+      })();
+
+  /* The KPI row below is deliberately about the week BEFORE the one in the
+     table above, not the same one: this week is still in progress, and its
+     own total only means something once the week is over, so the stable
+     reference point here is a week that has actually finished. Rank-wise
+     detail for that same week is one hover away on the first card, matching
+     the live table's own shape rather than restating it below. */
+  const p=wlbPrevData(), prevRangeLbl=wlbRangeLabel(p.start,p.end);
+  const subhead='<div class="wlb-subhead">Previous Week Statistics <span>· '+esc(prevRangeLbl)+'</span></div>';
+
+  if(!p.rows.length){
+    return tableCard+subhead
+      +'<div class="card"><div class="dt-empty"><div class="e-ic">🗓</div>'
+      +'<div class="e-t">No Regional Centre claims booked that week</div>'
+      +'<div class="e-s">Nothing was recorded in DSC_Details for '+esc(prevRangeLbl)+'.</div></div></div>';
   }
 
-  const rows=w.rows.map(wlbRow).join('');
-  const table='<div class="tscroll"><table class="dt"><thead><tr>'
-    +'<th>Rank</th><th>Regional Centre</th><th>Share of Week</th><th class="num">Total Spent</th>'
-    +'</tr></thead><tbody>'+rows
-    +'<tr class="wlb-total-row"><td colspan="2">Total</td><td></td>'
-    +'<td class="num tnum">'+esc(wlbMoney(w.total))+'</td></tr>'
-    +'</tbody></table></div>';
-
-  const top=w.rows[0];
+  const top=p.rows[0];
   const card=function(lbl,val,ic,icon,sub,tip){
     return '<div class="kpi"'+tattr(tip)+'><div class="kpi-top"><span class="kpi-ic '+ic+'">'+kpiIcon(icon)+'</span>'
       +'<div class="kpi-txt"><div class="lbl">'+esc(lbl)+'</div><div class="val tnum">'+esc(val)+'</div></div></div>'
       +'<div class="sub">'+sub+'</div></div>';
   };
   const kpis='<div class="kpi-grid k3">'
-    +card('Total Spent This Week', wlbMoney(w.total), 'ic-green', 'coins',
-        w.claims+' claim'+(w.claims===1?'':'s')+' across '+w.centres+' centre'+(w.centres===1?'':'s')+' so far',
-        wlbPrevTip())
+    +card('Total Spent Last Week', wlbMoney(p.total), 'ic-green', 'coins',
+        p.claims+' claim'+(p.claims===1?'':'s')+' across '+p.centres+' centre'+(p.centres===1?'':'s'),
+        wlbRankTip(p,'Previous week'))
     +card('Highest Spending Centre', top.name, 'ic-blue', 'bank',
         esc(wlbMoney(top.amt))+' · '+pct(top.share,1)+' of the week',
-        '<b>Highest Spending Centre</b><br>'+esc(top.name)+' — '+esc(wlbMoney(top.amt))+'<br><span style="opacity:.75">'+pct(top.share,1)+' of this week\'s total spend so far.</span>')
-    +card('Average per Centre', wlbMoney(w.total/w.centres), 'ic-orange', 'gauge',
-        'across centres that have claimed so far',
-        '<b>Average per Centre</b><br>'+esc(wlbMoney(w.total/w.centres))+'<br><span style="opacity:.75">'+esc(wlbMoney(w.total))+' ÷ '+w.centres+' centre'+(w.centres===1?'':'s')+' that have claimed this week — not divided across all 12.</span>')
+        '<b>Highest Spending Centre</b><br>'+esc(top.name)+' — '+esc(wlbMoney(top.amt))+'<br><span style="opacity:.75">'+pct(top.share,1)+' of last week\'s total spend.</span>')
+    +card('Average per Centre', wlbMoney(p.total/p.centres), 'ic-orange', 'gauge',
+        'across centres that claimed last week',
+        '<b>Average per Centre</b><br>'+esc(wlbMoney(p.total/p.centres))+'<br><span style="opacity:.75">'+esc(wlbMoney(p.total))+' ÷ '+p.centres+' centre'+(p.centres===1?'':'s')+' that claimed — not divided across all 12.</span>')
     +'</div>';
 
-  return '<div class="card" style="padding:0;overflow:hidden">'+head+table+'</div>'+kpis;
+  return tableCard+subhead+kpis;
 }
 /* ---- SAI Format Summary -----------------------------------------------------------------
    Reproduces the finance wing's own "Expenditure Incurred as on <date>" summary sheet, filled
