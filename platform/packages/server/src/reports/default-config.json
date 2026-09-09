@@ -156,10 +156,11 @@
   },
   "manualOverrides": {
     "_note": "Hand-entered figures for the page-1 summary table, in RUPEES. Any value set here is used on every report until cleared; the dashboard flags on its status card whenever any are in force. null = compute from the sheet.",
+    "_totalAssignedNote": "394,01,00,000 — the sum of the four divisions above, which is also what the workbook's Assignment tab states as Total Assigned. It was 394,00,75,000, carried over from the desktop tool, and that made the report's TOTAL row print 25,000 less than its own division table added up to. Fixing a figure that every source now agrees on buys nothing: this can be unfixed and left to compute.",
     "totalExpenditure": 2091160000.0000002,
     "balance": 1848910000,
     "dayTotal": 15500000,
-    "totalAssigned": 3940075000,
+    "totalAssigned": 3940100000,
     "totalAssignedFixed": true
   },
   "expenditureBaseline": {
