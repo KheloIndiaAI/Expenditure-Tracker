@@ -3724,16 +3724,21 @@ function rcReco(){
   return `<div class="reco" style="border-left-color:var(--critical)"><span class="rl" style="color:var(--critical)">Reconciliation error</span><span>centre actual ${cr(act)} + DDO KI ${cr(dk)} = ${cr(act+dk)}, but scheme expenditure is ${cr(ex)} (Δ ${cr(ex-act-dk)}). Figures on this page and Financial Overview will not agree - the source dataset is inconsistent.</span></div>`;
 }
 /* ---- Weekly Leaderboard: Regional Centres ------------------------------------
-   Mirrors the report pipeline's own Monday leaderboard (vendored at
-   packages/server/src/reports/vendor/dsc.cjs, weeklyRegionalCentreLeaderboard)
-   - same week boundary, same ranking, same leaderboard money precision - but
-   computed here, client-side, from the day book this platform already syncs
-   every ten minutes. There is no "process" step and nothing is stored: the
-   window is a pure function of today's IST date, so it moves itself onto the
-   newly-completed week the instant a new Monday arrives, and a page left open
-   across midnight Sunday shows the new week on its very next repaint - "every
-   week the count starts again" falls out of that for free, with no reset
-   logic anywhere to get wrong.
+   THIS week's Regional Centre spend, Monday through Sunday, live - not the
+   last completed week. The window is a pure function of today's IST date
+   (wlbThisWeek), so a page left open across midnight Sunday shows the new
+   week, at zero, on its very next repaint: "every week the count starts
+   again" falls out of that for free, with no reset logic anywhere to get
+   wrong. A week in progress simply has no rows yet for the days still to
+   come - Saturday and Sunday most often, but equally any day nobody has
+   filed a claim - and that is not treated as missing data, only as a day
+   that has not happened yet by the sheet's own dates.
+
+   Same ranking and leaderboard money precision as the report pipeline's own
+   Monday leaderboard (vendored at packages/server/src/reports/vendor/dsc.cjs,
+   weeklyRegionalCentreLeaderboard), computed here instead from the day book
+   this platform already syncs every ten minutes, with no "process" step and
+   nothing stored.
 
    ONLY rows typed Regional Centre, and belonging to one of the platform's own
    12 named centres, count - the same isRegionalCentre() the Centre utilisation
@@ -3743,7 +3748,12 @@ function rcReco(){
    the platform's own canonical list is what keeps a head office out of a
    league table built to rank centres against each other - and is stricter
    than the report pipeline's own "name doesn't contain ddo" heuristic, since
-   it also refuses any name that is not one of the 12 centres at all. */
+   it also refuses any name that is not one of the 12 centres at all.
+
+   The "Total Spent This Week" card's hover is the one place last week still
+   appears: the COMPLETED week immediately before this one, ranked the same
+   way, so a week still in progress always has a finished week beside it to
+   judge its pace against. */
 function wlbAddDaysISO(iso,days){
   const p=iso.split('-').map(Number);
   const d=new Date(Date.UTC(p[0],p[1]-1,p[2])+days*86400000);
@@ -3751,11 +3761,18 @@ function wlbAddDaysISO(iso,days){
   return d.getUTCFullYear()+'-'+q(d.getUTCMonth()+1)+'-'+q(d.getUTCDate());
 }
 function wlbDow(iso){ const p=iso.split('-').map(Number); return new Date(Date.UTC(p[0],p[1]-1,p[2])).getUTCDay(); }
-/** The most recently COMPLETED Monday-Sunday week, as of IST today. */
-function wlbWeek(){
-  const today=istDateStr(0);
-  const thisMonday=wlbAddDaysISO(today,-((wlbDow(today)+6)%7));
-  return {start:wlbAddDaysISO(thisMonday,-7), end:wlbAddDaysISO(thisMonday,-1)};
+/** Monday of the week containing this IST calendar date, as ISO. */
+function wlbMonday(iso){ return wlbAddDaysISO(iso,-((wlbDow(iso)+6)%7)); }
+/** This week: Monday through Sunday, as of real IST "now" - not the reader's
+    own clock, which is what istDateStr(0) already guarantees platform-wide. */
+function wlbThisWeek(){
+  const mon=wlbMonday(istDateStr(0));
+  return {start:mon, end:wlbAddDaysISO(mon,6)};
+}
+/** The COMPLETED week immediately before this one. */
+function wlbPrevWeek(){
+  const mon=wlbMonday(istDateStr(0));
+  return {start:wlbAddDaysISO(mon,-7), end:wlbAddDaysISO(mon,-1)};
 }
 /** Leaderboard-precision money: crore to THREE decimals, not the platform's
     usual two. At two, a real week's difference (Kolkata vs Trivandrum here,
@@ -3767,14 +3784,15 @@ function wlbMoney(v){
   const sg=v<0?'-':''; v=Math.abs(v);
   return v>=1e7 ? sg+'₹'+(v/1e7).toFixed(3)+' Cr' : sg+'₹'+(v/1e5).toFixed(2)+' L';
 }
-/** This week's rows, ranked - or last week's, any day before the following
-    Monday, which is the only week "this" can mean once it has fully passed. */
-function wlbData(){
-  const wk=wlbWeek();
+/** Ranked Regional Centre spend within an arbitrary [start,end] ISO window -
+    the one aggregation both the live "this week" table and the "last week"
+    comparison in the hover are built from, so the two can never disagree
+    about how a claim is counted. */
+function wlbWeekData(start,end){
   const by={}, order=[]; let total=0, claims=0;
   (SYNC.dsc||[]).forEach(function(e){
     if(e.type!=='rc') return;
-    if(e.date<wk.start||e.date>wk.end) return;
+    if(e.date<start||e.date>end) return;
     if(!(e.amt>0)) return;
     const key=e.name.trim().toUpperCase();
     if(!isRegionalCentre(key)) return;               // drops DDO Head Office and anything unrecognised
@@ -3794,8 +3812,10 @@ function wlbData(){
        2% so the smallest true claimant is still a visible sliver, not nothing. */
     c.barPct=maxAmt?Math.max(2,(c.amt/maxAmt)*100):0;
   });
-  return {start:wk.start, end:wk.end, rows:order, total:total, claims:claims, centres:order.length};
+  return {start:start, end:end, rows:order, total:total, claims:claims, centres:order.length};
 }
+function wlbData(){ const w=wlbThisWeek(); return wlbWeekData(w.start,w.end); }
+function wlbPrevData(){ const w=wlbPrevWeek(); return wlbWeekData(w.start,w.end); }
 const WLB_DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 /** "Mon 31 Aug – Sun 06 Sep 2026" - the year named once, on the end date,
     unless the week itself crosses a year boundary, in which case both carry
@@ -3817,19 +3837,36 @@ function wlbRow(r){
     +'<td class="num tnum"><b>'+esc(wlbMoney(r.amt))+'</b></td>'
     +'</tr>';
 }
+/** The previous week's own rank-wise breakdown - the same Rank/Centre/Amount
+    shape as the live table above, reusing the platform's own itemised-tooltip
+    convention (.tipbd, see rcTipRows) rather than inventing a second one - so
+    a week still in progress always has a finished week to compare against,
+    one hover away. */
+function wlbPrevTip(){
+  const p=wlbPrevData(), rangeLbl=wlbRangeLabel(p.start,p.end);
+  const head='<b>Previous week</b><br><span style="opacity:.75">'+esc(rangeLbl)+'</span>';
+  if(!p.rows.length){
+    return head+'<br><span style="opacity:.75">No Regional Centre claims were booked that week.</span>';
+  }
+  return head+'<div class="tipbd-h">Ranked by spend</div><table class="tipbd">'
+    + p.rows.map(function(r){ return '<tr><td>'+r.rank+'. '+esc(r.name)+'</td><td>'+esc(wlbMoney(r.amt))+'</td></tr>'; }).join('')
+    + '<tr class="tot"><td>Total ('+p.claims+' claim'+(p.claims===1?'':'s')+')</td><td>'+esc(wlbMoney(p.total))+'</td></tr>'
+    + '</table>';
+}
 function weeklyLeaderboardSection(){
   if(!SYNC.dsc) return '<div class="card"><div class="card-hd"><h3>Weekly Leaderboard — Regional Centres</h3></div>'
     +'<div class="dt-empty"><div class="e-ic">⏳</div><div class="e-t">The day book has not been read yet</div>'
     +'<div class="e-s">DSC_Details is pulled on every sync, just after the figures.</div></div></div>';
 
   const w=wlbData(), rangeLbl=wlbRangeLabel(w.start,w.end);
+  const todayLbl=sheetDMY(istDateStr(0));
   const head='<div class="card-hd"><h3>Weekly Leaderboard — Regional Centres</h3>'
-    +'<span class="small muted">Previous week · '+esc(rangeLbl)+'</span></div>';
+    +'<span class="small muted">This week, to date · '+esc(rangeLbl)+'</span></div>';
 
   if(!w.rows.length){
     return '<div class="card">'+head+'<div class="dt-empty"><div class="e-ic">🗓</div>'
-      +'<div class="e-t">No Regional Centre claims booked that week</div>'
-      +'<div class="e-s">Nothing was recorded in DSC_Details for '+esc(rangeLbl)+'.</div></div></div>';
+      +'<div class="e-t">Nothing booked yet this week</div>'
+      +'<div class="e-s">No Regional Centre claims are recorded in DSC_Details for '+esc(rangeLbl)+' as of '+esc(todayLbl)+'.</div></div></div>';
   }
 
   const rows=w.rows.map(wlbRow).join('');
@@ -3847,15 +3884,15 @@ function weeklyLeaderboardSection(){
       +'<div class="sub">'+sub+'</div></div>';
   };
   const kpis='<div class="kpi-grid k3">'
-    +card('Total Spent Last Week', wlbMoney(w.total), 'ic-green', 'coins',
-        w.claims+' claim'+(w.claims===1?'':'s')+' across '+w.centres+' centre'+(w.centres===1?'':'s'),
-        '<b>Total Spent Last Week</b><br>'+esc(wlbMoney(w.total))+'<br><span style="opacity:.75">'+esc(rangeLbl)+' · Regional Centre claims only, DDO Head Office excluded.</span>')
+    +card('Total Spent This Week', wlbMoney(w.total), 'ic-green', 'coins',
+        w.claims+' claim'+(w.claims===1?'':'s')+' across '+w.centres+' centre'+(w.centres===1?'':'s')+' so far',
+        wlbPrevTip())
     +card('Highest Spending Centre', top.name, 'ic-blue', 'bank',
         esc(wlbMoney(top.amt))+' · '+pct(top.share,1)+' of the week',
-        '<b>Highest Spending Centre</b><br>'+esc(top.name)+' — '+esc(wlbMoney(top.amt))+'<br><span style="opacity:.75">'+pct(top.share,1)+' of the week\'s total spend.</span>')
+        '<b>Highest Spending Centre</b><br>'+esc(top.name)+' — '+esc(wlbMoney(top.amt))+'<br><span style="opacity:.75">'+pct(top.share,1)+' of this week\'s total spend so far.</span>')
     +card('Average per Centre', wlbMoney(w.total/w.centres), 'ic-orange', 'gauge',
-        'across centres that claimed last week',
-        '<b>Average per Centre</b><br>'+esc(wlbMoney(w.total/w.centres))+'<br><span style="opacity:.75">'+esc(wlbMoney(w.total))+' ÷ '+w.centres+' centre'+(w.centres===1?'':'s')+' that claimed — not divided across all 12.</span>')
+        'across centres that have claimed so far',
+        '<b>Average per Centre</b><br>'+esc(wlbMoney(w.total/w.centres))+'<br><span style="opacity:.75">'+esc(wlbMoney(w.total))+' ÷ '+w.centres+' centre'+(w.centres===1?'':'s')+' that have claimed this week — not divided across all 12.</span>')
     +'</div>';
 
   return '<div class="card" style="padding:0;overflow:hidden">'+head+table+'</div>'+kpis;
