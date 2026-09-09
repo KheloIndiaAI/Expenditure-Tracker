@@ -664,4 +664,31 @@ function reportLayout(data) {
   return out;
 }
 
-module.exports = { reportLayout };
+/* VENDOR PATCH 6 of 6 — see reports/vendor/README.md.
+   Exports only. leaderboardPage() is this file's own Word rendering of the
+   weekly leaderboard, written here but never called by reportLayout() - the
+   desktop tool only ever produced that page as a PDF. The platform produces a
+   Word copy of the weekly report too, and building it from THIS page rather
+   than a second one written from scratch is what keeps the Word and PDF
+   versions the same document. The helpers beside it are exported for the same
+   reason: the component-spending page has no Word rendering anywhere upstream,
+   so the platform writes one, and it should be drawn with the same cards,
+   rules and bars as everything else here rather than a parallel set of its
+   own. Nothing below changes behaviour - reportLayout() is untouched, and an
+   unused export costs a caller nothing. */
+module.exports = {
+  reportLayout,
+  leaderboardPage,
+  lbAmount,
+  shareOverview,
+  statCard,
+  cardRow,
+  cell,
+  table,
+  para,
+  line,
+  txt,
+  blank,
+  PALETTE: { INK, MUTED, GREEN, RED, CARD_BG, HEAD_BG, LINE, BAR_USED, BRAND, FONT },
+  BORDERS: { NO_BORDERS, BOX, ROW_LINE },
+};

@@ -21,6 +21,8 @@ import { getDb } from '../db/index.ts';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCHEMA = () => readFileSync(resolve(__dirname, 'schema.sql'), 'utf8');
 const SEED = () => JSON.parse(readFileSync(resolve(__dirname, 'default-config.json'), 'utf8'));
+const SEED_SNAPS = (): Array<{ takenOn: string; components: unknown }> =>
+  JSON.parse(readFileSync(resolve(__dirname, 'default-snapshots.json'), 'utf8')).snapshots ?? [];
 
 const now = () => new Date().toISOString();
 
@@ -57,9 +59,39 @@ export function initReports(): Promise<void> {
          mid-flight would otherwise refuse every later one. Inline rather than
          a wrapper that awaits initReports() first, which would deadlock. */
       await reap(db);
+      await seedSnapshots(db);
     })();
   }
   return ready;
+}
+
+/**
+ * Carry the desktop tool's Monday snapshots over, ONCE, into an empty table.
+ *
+ * Component spending on the weekly report is a week-over-week difference, so
+ * it needs a Monday to subtract from. A platform that has never produced a
+ * report has none, and would have to wait two weeks to grow its own - so the
+ * tool's own history is seeded instead, from the same sheet and the same
+ * component keys this pipeline computes.
+ *
+ * Only into an EMPTY table. Once the platform holds any snapshot of its own,
+ * the stored rows are the record and this never runs again - a seed that
+ * reasserted itself on every boot could quietly overwrite a real Monday with
+ * a stale copy of one.
+ */
+async function seedSnapshots(db: Awaited<ReturnType<typeof getDb>>): Promise<number> {
+  const existing = await db.one<{ n: number }>('SELECT COUNT(*) AS n FROM report_snapshot');
+  if (Number(existing?.n ?? 0) > 0) return 0;
+  let seeded = 0;
+  for (const s of SEED_SNAPS()) {
+    if (!s?.takenOn) continue;
+    await db.run(
+      'INSERT INTO report_snapshot (taken_on, components, created_at) VALUES (?, ?, ?)',
+      [s.takenOn, JSON.stringify(s.components ?? []), now()],
+    );
+    seeded++;
+  }
+  return seeded;
 }
 
 const STALE_AFTER_MS = 20 * 60 * 1000;

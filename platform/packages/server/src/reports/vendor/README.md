@@ -69,9 +69,20 @@ Each is marked in the source with `VENDOR PATCH n`.
    HTML that run already stored, reproducing that run rather than re-reading the
    sheet.
 
+6. **`report-layout.cjs` — the Word layout pieces are exported.** Exports only;
+   `reportLayout()` itself is untouched. `leaderboardPage()` is this file's own
+   Word rendering of the weekly leaderboard, written upstream but never called
+   there — the desktop tool only ever produced that page as a PDF. The platform
+   produces a Word copy of the weekly report as well, and building it from that
+   page rather than a second one written from scratch is what keeps the Word and
+   PDF versions the same document. The card, table and bar helpers go with it
+   because the component-spending page has no Word rendering anywhere upstream,
+   so the platform writes one (see `../weekly.ts`) and draws it with these
+   rather than a parallel set of its own.
+
 ## Updating
 
-Re-copy the files, re-apply the five patches, then run the pipeline against the
+Re-copy the files, re-apply the six patches, then run the pipeline against the
 live sheet and compare `result.totals`, `result.divisions` and the document byte
 counts with the run before. A change in any of them is a change to a published
 figure and wants explaining, not accepting.

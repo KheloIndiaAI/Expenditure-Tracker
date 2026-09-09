@@ -32,6 +32,7 @@ const CONTENT_TYPE: Record<string, string> = {
   report: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   html: 'text/html; charset=utf-8',
   'weekly-html': 'text/html; charset=utf-8',
+  'weekly-report': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   pdf: 'application/pdf',
   'weekly-pdf': 'application/pdf',
 };

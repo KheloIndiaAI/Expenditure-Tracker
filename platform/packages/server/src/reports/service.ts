@@ -10,9 +10,10 @@
 import { createRequire } from 'node:module';
 import { dirname, join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync, readFileSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as store from './store.ts';
+import * as weekly from './weekly.ts';
 
 const require_ = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,6 +31,108 @@ type PdfModule = {
 
 const pipeline = (): PipelineModule => require_(join(__dirname, 'vendor', 'pipeline.cjs'));
 const pdfgen = (): PdfModule => require_(join(__dirname, 'vendor', 'pdfgen.cjs'));
+const snapshotMod = (): any => require_(join(__dirname, 'vendor', 'snapshot.cjs'));
+
+/**
+ * The weekly Regional Centre report, built for the last COMPLETED week.
+ *
+ * The pipeline emits this pair of pages itself, but only on a Monday, and it
+ * works the component page out as "everything since the last snapshot" — which
+ * on a Wednesday is two days captioned as a week. So it is built here instead,
+ * for whichever day the report is asked for, from one decision about which
+ * week is being reported. Both files come from that single set of figures, so
+ * the Word copy and the PDF can never state different numbers.
+ *
+ * These entries are appended AFTER the pipeline's own, and report_doc is keyed
+ * on (run, format) — so on a Monday, when the pipeline has produced its own
+ * weekly HTML, this simply replaces it rather than fighting over the row.
+ */
+async function buildWeekly(
+  work: store.WorkDir,
+  detail: any,
+  result: any,
+): Promise<Array<{ format: string; name: string; path: string }>> {
+  const out: Array<{ format: string; name: string; path: string }> = [];
+  const warn = (m: string) => { (result.warnings ??= []).push(m); };
+  /* Which week this is, read in IST — the sheet's own dates are Indian, and a
+     server in another zone must not decide the week is a day out. istDMY()
+     already does this for the manual figures; this is the same shift. */
+  const istNow = new Date(Date.now() + IST_OFFSET_MIN * 60000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  const todayISO = `${istNow.getUTCFullYear()}-${p(istNow.getUTCMonth() + 1)}-${p(istNow.getUTCDate())}`;
+  /* A local-component Date for the vendored leaderboard, whose own previousWeekRange
+     reads local date fields. Built from the IST calendar day, not the server's. */
+  const today = new Date(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate());
+
+  let leaderboard: any = null;
+  let componentWeek: any = null;
+  try {
+    leaderboard = weekly.leaderboardForCompletedWeek(detail?.master?.file, today);
+    if (!leaderboard) {
+      warn('No Regional Centre claims fell in last week, so the weekly report has no leaderboard page.');
+    }
+  } catch (err) {
+    warn(`Could not build the weekly leaderboard (${(err as Error).message}).`);
+  }
+
+  try {
+    componentWeek = weekly.componentWeekForCompletedWeek(todayISO);
+    if (!componentWeek) {
+      warn(
+        'Component spending was left out of the weekly report: it is the difference between two ' +
+        'Monday snapshots of Sheet3, and this week\'s Monday has none yet. One is being recorded ' +
+        'now, so the page appears from the next report onwards.',
+      );
+    }
+  } catch (err) {
+    warn(`Could not work out component spending (${(err as Error).message}).`);
+  }
+
+  if (leaderboard || componentWeek) {
+    const stamp = detail?.stamp || 'latest';
+    const base = `WEEKLY LEADERBOARD - ${stamp}`;
+    const input = { leaderboard, componentWeek, asOn: detail?.asOn, stamp };
+    try {
+      const html = weekly.buildWeeklyHtml(input);
+      if (html) {
+        const file = join(work.outDir, `${base}.html`);
+        mkdirSync(work.outDir, { recursive: true });
+        writeFileSync(file, html, 'utf8');
+        out.push({ format: 'weekly-html', name: basename(file), path: file });
+      }
+    } catch (err) {
+      warn(`Could not lay out the weekly report (${(err as Error).message}).`);
+    }
+    try {
+      const buf = await weekly.buildWeeklyDocx(input);
+      if (buf) {
+        const file = join(work.outDir, `${base}.docx`);
+        mkdirSync(work.outDir, { recursive: true });
+        writeFileSync(file, buf);
+        out.push({ format: 'weekly-report', name: basename(file), path: file });
+      }
+    } catch (err) {
+      warn(`Could not build the Word copy of the weekly report (${(err as Error).message}).`);
+    }
+  }
+
+  /* Keep the Monday series going. Recorded only when this week's Monday has
+     none: the imported history and any snapshot a real Monday run wrote are
+     never overwritten by a later, fuller reading of the same week. */
+  try {
+    const snap = snapshotMod();
+    const monday = weekly.mondayOfISO(todayISO);
+    const have = (snap.readAll() as any[]).some((s) => s.takenOn === monday);
+    if (!have && (result.divisions ?? []).length) {
+      const [y, m, d] = monday.split('-').map(Number);
+      snap.saveSnapshot(new Date(y!, m! - 1, d!), result.divisions);
+    }
+  } catch (err) {
+    warn(`Could not record this week's component snapshot (${(err as Error).message}).`);
+  }
+
+  return out;
+}
 
 /**
  * One run at a time in this process.
@@ -90,7 +193,9 @@ async function execute(opts: RunOptions): Promise<RunResult> {
     });
 
     const result = detail.result ?? {};
-    const stored = await store.persist(work, runId, detail.outputs ?? []);
+    const outputs = [...(detail.outputs ?? [])];
+    outputs.push(...(await buildWeekly(work, detail, result)));
+    const stored = await store.persist(work, runId, outputs);
 
     await store.finishRun(runId, {
       status: 'success',

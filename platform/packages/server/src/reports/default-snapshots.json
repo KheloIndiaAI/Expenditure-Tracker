@@ -1,0 +1,362 @@
+{
+  "_note": "Sheet3 component totals as at each Monday, carried over from the desktop tool this pipeline was vendored from. Seeded into report_snapshot the first time the platform boots with that table empty, and never again - after that the stored rows are the record. Component spending is a week-over-week difference, so without at least two of these there is nothing to subtract and page 2 of the weekly report cannot be built.",
+  "snapshots": [
+    {
+      "takenOn": "2026-08-31",
+      "components": [
+        {
+          "key": "KI-1::Khelo India Games",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Khelo India Games",
+          "label": "KIG",
+          "section": "RECURRING",
+          "expenditure": 194100000
+        },
+        {
+          "key": "KI-1::Sports for Women",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Sports for Women",
+          "label": "Sports for Women",
+          "section": "RECURRING",
+          "expenditure": 132300000
+        },
+        {
+          "key": "KI-1::Fit India Movement",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Fit India Movement",
+          "label": "FIM",
+          "section": "RECURRING",
+          "expenditure": 115600000
+        },
+        {
+          "key": "KI-1::Sports for Peace and Development",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Sports for Peace and Development",
+          "label": "SPANDAN",
+          "section": "RECURRING",
+          "expenditure": 35300000
+        },
+        {
+          "key": "KI-1::Sports for rural/indigenous/tribal",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Sports for rural/indigenous/tribal",
+          "label": "Rural/Indig/Tribal",
+          "section": "RECURRING",
+          "expenditure": 0
+        },
+        {
+          "key": "KI-1::Sports for disabled sportspersons",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Sports for disabled sportspersons",
+          "label": "Sports for specially abled",
+          "section": "RECURRING",
+          "expenditure": 0
+        },
+        {
+          "key": "KI-2::Khelo India Centres",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Khelo India Centres",
+          "label": "KIC (Rec)",
+          "section": "RECURRING",
+          "expenditure": 336600000
+        },
+        {
+          "key": "KI-2::Talent Identification & Development",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Talent Identification & Development",
+          "label": "TID",
+          "section": "RECURRING",
+          "expenditure": 289100000
+        },
+        {
+          "key": "KI-2::Khelo India Centres NR",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Khelo India Centres NR",
+          "label": "KIC (N-Rec)",
+          "section": "NON-RECURRING",
+          "expenditure": 118800000
+        },
+        {
+          "key": "KI-2::Sports Academies NR",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Sports Academies NR",
+          "label": "Sports Academies (N-Rec)",
+          "section": "NON-RECURRING",
+          "expenditure": 226400000
+        },
+        {
+          "key": "KI-2::Sports Academies",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Sports Academies",
+          "label": "Sports Academies (Rec)",
+          "section": "RECURRING",
+          "expenditure": 0
+        },
+        {
+          "key": "KI-2::Community Coaching & Development",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Community Coaching & Development",
+          "label": "Coaching & Dev",
+          "section": "RECURRING",
+          "expenditure": 0
+        }
+      ]
+    },
+    {
+      "takenOn": "2026-09-07",
+      "components": [
+        {
+          "key": "KI-1::Khelo India Games",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Khelo India Games",
+          "label": "KIG",
+          "section": "RECURRING",
+          "expenditure": 194440975
+        },
+        {
+          "key": "KI-1::Sports for Women",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Sports for Women",
+          "label": "Sports for Women",
+          "section": "RECURRING",
+          "expenditure": 134869358
+        },
+        {
+          "key": "KI-1::Fit India Movement",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Fit India Movement",
+          "label": "FIM",
+          "section": "RECURRING",
+          "expenditure": 132575129
+        },
+        {
+          "key": "KI-1::Sports for Peace and Development",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Sports for Peace and Development",
+          "label": "SPANDAN",
+          "section": "RECURRING",
+          "expenditure": 35348858
+        },
+        {
+          "key": "KI-1::Sports for rural/indigenous/tribal",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Sports for rural/indigenous/tribal",
+          "label": "Rural/Indig/Tribal",
+          "section": "RECURRING",
+          "expenditure": 0
+        },
+        {
+          "key": "KI-1::Sports for disabled sportspersons",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Sports for disabled sportspersons",
+          "label": "Sports for specially abled",
+          "section": "RECURRING",
+          "expenditure": 0
+        },
+        {
+          "key": "KI-2::Khelo India Centres",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Khelo India Centres",
+          "label": "KIC (Rec)",
+          "section": "RECURRING",
+          "expenditure": 336809594
+        },
+        {
+          "key": "KI-2::Talent Identification & Development",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Talent Identification & Development",
+          "label": "TID",
+          "section": "RECURRING",
+          "expenditure": 297927421
+        },
+        {
+          "key": "KI-2::Khelo India Centres NR",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Khelo India Centres NR",
+          "label": "KIC (N-Rec)",
+          "section": "NON-RECURRING",
+          "expenditure": 118821435
+        },
+        {
+          "key": "KI-2::Sports Academies NR",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Sports Academies NR",
+          "label": "Sports Academies (N-Rec)",
+          "section": "NON-RECURRING",
+          "expenditure": 228123490
+        },
+        {
+          "key": "KI-2::Sports Academies",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Sports Academies",
+          "label": "Sports Academies (Rec)",
+          "section": "RECURRING",
+          "expenditure": 0
+        },
+        {
+          "key": "KI-2::Community Coaching & Development",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Community Coaching & Development",
+          "label": "Coaching & Dev",
+          "section": "RECURRING",
+          "expenditure": 0
+        },
+        {
+          "key": "SAI-INFRA::New Sports Infrastructure Projects",
+          "division": "SAI-INFRA",
+          "divisionLabel": "INFRA",
+          "name": "New Sports Infrastructure Projects",
+          "label": "New Infra Projects",
+          "section": "INFRASTRUCTURE",
+          "expenditure": 516321765
+        }
+      ]
+    },
+    {
+      "takenOn": "2026-09-14",
+      "components": [
+        {
+          "key": "KI-1::Khelo India Games",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Khelo India Games",
+          "label": "KIG",
+          "section": "RECURRING",
+          "expenditure": 194440975
+        },
+        {
+          "key": "KI-1::Sports for Women",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Sports for Women",
+          "label": "Sports for Women",
+          "section": "RECURRING",
+          "expenditure": 134869358
+        },
+        {
+          "key": "KI-1::Fit India Movement",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Fit India Movement",
+          "label": "FIM",
+          "section": "RECURRING",
+          "expenditure": 132575129
+        },
+        {
+          "key": "KI-1::Sports for Peace and Development",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Sports for Peace and Development",
+          "label": "SPANDAN",
+          "section": "RECURRING",
+          "expenditure": 35348858
+        },
+        {
+          "key": "KI-1::Sports for rural/indigenous/tribal",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Sports for rural/indigenous/tribal",
+          "label": "Rural/Indig/Tribal",
+          "section": "RECURRING",
+          "expenditure": 0
+        },
+        {
+          "key": "KI-1::Sports for disabled sportspersons",
+          "division": "KI-1",
+          "divisionLabel": "KI 1",
+          "name": "Sports for disabled sportspersons",
+          "label": "Sports for specially abled",
+          "section": "RECURRING",
+          "expenditure": 0
+        },
+        {
+          "key": "KI-2::Khelo India Centres",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Khelo India Centres",
+          "label": "KIC (Rec)",
+          "section": "RECURRING",
+          "expenditure": 336809594
+        },
+        {
+          "key": "KI-2::Talent Identification & Development",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Talent Identification & Development",
+          "label": "TID",
+          "section": "RECURRING",
+          "expenditure": 297927421
+        },
+        {
+          "key": "KI-2::Khelo India Centres NR",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Khelo India Centres NR",
+          "label": "KIC (N-Rec)",
+          "section": "NON-RECURRING",
+          "expenditure": 118821435
+        },
+        {
+          "key": "KI-2::Sports Academies NR",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Sports Academies NR",
+          "label": "Sports Academies (N-Rec)",
+          "section": "NON-RECURRING",
+          "expenditure": 228123490
+        },
+        {
+          "key": "KI-2::Sports Academies",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Sports Academies",
+          "label": "Sports Academies (Rec)",
+          "section": "RECURRING",
+          "expenditure": 0
+        },
+        {
+          "key": "KI-2::Community Coaching & Development",
+          "division": "KI-2",
+          "divisionLabel": "KI 2",
+          "name": "Community Coaching & Development",
+          "label": "Coaching & Dev",
+          "section": "RECURRING",
+          "expenditure": 0
+        },
+        {
+          "key": "SAI-INFRA::New Sports Infrastructure Projects",
+          "division": "SAI-INFRA",
+          "divisionLabel": "INFRA",
+          "name": "New Sports Infrastructure Projects",
+          "label": "New Infra Projects",
+          "section": "INFRASTRUCTURE",
+          "expenditure": 516321765
+        }
+      ]
+    }
+  ]
+}

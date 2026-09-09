@@ -23,7 +23,7 @@ const COLORS = {
   dots: ['#2A78D6', '#EB6834', '#1BAF7A', '#EDA100', '#E87BA4', '#4A3AA7', '#E34948', '#008300'],
 };
 
-/* VENDOR PATCH 3 of 5 — see reports/vendor/README.md.
+/* VENDOR PATCH 3 of 6 — see reports/vendor/README.md.
    Upstream looks for Edge or Chrome at the four places they install on Windows,
    because that is where this ran. On the server it runs on Debian, where the
    browser is at a different path entirely and the Windows list finds nothing —

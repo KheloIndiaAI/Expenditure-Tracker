@@ -3121,8 +3121,15 @@ function autoRun(){
    PDF has already been made. */
 const AUTO_DOCS=[
   {f:'report',      t:'Expenditure Summary', ext:'Word',  c:'var(--primary)', needs:'report'},
-  {f:'pdf',         t:'Expenditure Summary', ext:'PDF',   c:'var(--primary)', needs:'html'},
-  {f:'weekly-pdf',  t:'Weekly Leaderboard',  ext:'PDF',   c:'var(--serious)', needs:'weekly-html'}
+  {f:'pdf',         t:'Expenditure Summary', ext:'PDF',   c:'var(--primary)', needs:'html'}
+];
+/* The weekly report is its own document and its own card: two pages about the
+   week just gone, where everything above is about the day. Both formats come
+   from one run - the Word copy is written from the same figures as the PDF, so
+   the two can never state different numbers. */
+const AUTO_WEEKLY_DOCS=[
+  {f:'weekly-report', t:'Weekly Report — Regional Centres', ext:'Word', c:'var(--serious)', needs:'weekly-report'},
+  {f:'weekly-pdf',    t:'Weekly Report — Regional Centres', ext:'PDF',  c:'var(--serious)', needs:'weekly-html'}
 ];
 function autoBytes(b){
   if(!b&&b!==0) return '';
@@ -3134,6 +3141,14 @@ function autoWhen(iso){
   const now=new Date(), sameDay=d.toDateString()===now.toDateString();
   const t=d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
   return sameDay ? 'Today '+t : d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})+' '+t;
+}
+/** A run's timestamp as the IST calendar day it happened on, 'YYYY-MM-DD' -
+    the same day the server used when it decided which week to report. */
+function autoIstISO(iso){
+  const d=new Date(new Date(iso).getTime()+330*60000);
+  if(isNaN(d)) return istDateStr(0);
+  const p=function(n){ return String(n).padStart(2,'0'); };
+  return d.getUTCFullYear()+'-'+p(d.getUTCMonth()+1)+'-'+p(d.getUTCDate());
 }
 
 /* ---- the figures somebody types instead of computing ------------------------
@@ -3426,17 +3441,15 @@ function viewReports(){
     + '<span class="small muted" style="margin-left:auto">'
       + (st.running?'A run is in progress…':(AUTO.at?'Checked '+autoWhen(AUTO.at.toISOString()):''))+'</span></div>';
 
-  /* What the reader can actually download, which is the table's own count.
-     Counting stored documents instead would say two while three rows offer a
-     Download button, because a PDF is not made until it is asked for. */
-  const offered=last?AUTO_DOCS.filter(function(d){ return has(d.needs); }):[];
-
   const failBlock=(last===null&&(st.runs||[]).length&&(st.runs[0].status==='failed'))
     ? '<div class="kig-warn" style="margin-bottom:16px;border-left-color:var(--critical)">'
       + '<b style="color:var(--critical)">The last run failed:</b> '+esc(st.runs[0].error||'')+'</div>'
     : '';
 
-  const rows=offered.map(function(d){
+  /* One table shape for both document cards - the daily Summary and the weekly
+     report differ in what they contain, not in how they are handed over. */
+  const docTable=function(list,emptyText){
+    const rows=(last?list.filter(function(d){ return has(d.needs); }):[]).map(function(d){
       const pdf=d.f==='pdf'||d.f==='weekly-pdf';
       const size=bytesOf(d.f);
       return '<tr><td><div class="dsc-t" style="color:'+d.c+'"><i style="background:'+d.c+'"></i>'+esc(d.t)+'</div></td>'
@@ -3444,24 +3457,39 @@ function viewReports(){
         + '<td class="num muted">'+(size?esc(autoBytes(size)):(pdf?'rendered on request':'—'))+'</td>'
         + '<td class="num"><a class="btn" href="'+esc('/api/reports/'+last.id+'/'+d.f)+'">Download</a></td></tr>';
     }).join('');
-  const docTable=rows
-    ? '<div class="tscroll"><table class="dt"><thead><tr><th>Document</th><th>Format</th>'
-      + '<th class="num">Size</th><th class="num">Download</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
-    : '<div class="dt-empty"><div class="e-ic">📄</div><div class="e-t">No documents yet</div>'
-      + '<div class="e-s">Nothing is produced until you press Process now.</div></div>';
+    return rows
+      ? '<div class="tscroll"><table class="dt"><thead><tr><th>Document</th><th>Format</th>'
+        + '<th class="num">Size</th><th class="num">Download</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      : '<div class="dt-empty"><div class="e-ic">📄</div><div class="e-t">No documents yet</div>'
+        + '<div class="e-s">'+esc(emptyText)+'</div></div>';
+  };
 
   const pdfNote=st.pdf&&st.pdf.available===false
     ? '<div class="qh" style="margin:10px 2px 0;color:var(--serious)">This server has no browser installed, so PDFs cannot be '
       + 'rendered. The Word copy is unaffected.</div>'
     : '';
 
+  /* Which week the stored weekly report actually covers - worked out from the
+     run that produced it, not from today. A report produced last Friday covers
+     the week before THAT, and saying "previous week" against today's calendar
+     would quietly mislabel it. */
+  const weekLbl=last&&last.at ? wlbRangeLabel.apply(null, (function(){
+    const w=wlbPrevWeekOf(autoIstISO(last.at)); return [w.start,w.end];
+  })()) : '—';
+
   return head+bar+failBlock+autoOvCard()
-    + '<div class="card"><div class="card-hd"><h3>Latest documents</h3>'
+    + '<div class="card"><div class="card-hd"><h3>Expenditure Summary</h3>'
       + '<span class="small muted">'+(last?esc(sheetDMY(last.stamp||'')):'—')+'</span>'
       + '<div class="tools">'
         + '<button class="btn ov-go" onclick="autoRun()"'+((AUTO.busy||st.running)?' disabled':'')+'>'
         + (AUTO.busy==='run'?'Processing…':(st.running?'A run is in progress…':'Process now'))+'</button></div></div>'
-      + docTable + pdfNote + '</div>';
+      + docTable(AUTO_DOCS,'Nothing is produced until you press Process now.') + pdfNote + '</div>'
+    + '<div class="card"><div class="card-hd"><h3>Weekly Report — Regional Centres</h3>'
+      + '<span class="small muted">Previous week · '+esc(weekLbl)+'</span></div>'
+      + docTable(AUTO_WEEKLY_DOCS,'Produced alongside the Summary — press Process now.')
+      + '<div class="qh" style="margin:10px 2px 0">Two pages: the Regional Centre leaderboard for the week just '
+      + 'gone, then component spending across that same week. Both formats are laid out from one set of figures, '
+      + 'so the Word copy and the PDF always agree.</div></div>';
 }
 
 /* ---- Daily Expenditure -------------------------------------------------------
@@ -3775,11 +3803,13 @@ function wlbThisWeek(){
   const mon=wlbMonday(istDateStr(0));
   return {start:mon, end:wlbAddDaysISO(mon,6)};
 }
-/** The COMPLETED week immediately before this one. */
-function wlbPrevWeek(){
-  const mon=wlbMonday(istDateStr(0));
+/** The COMPLETED week immediately before the one containing this ISO date. */
+function wlbPrevWeekOf(iso){
+  const mon=wlbMonday(iso);
   return {start:wlbAddDaysISO(mon,-7), end:wlbAddDaysISO(mon,-1)};
 }
+/** The COMPLETED week immediately before this one. */
+function wlbPrevWeek(){ return wlbPrevWeekOf(istDateStr(0)); }
 /** Leaderboard-precision money: crore to THREE decimals, not the platform's
     usual two. At two, a real week's difference (Kolkata vs Trivandrum here,
     roughly ₹14,000 apart) prints as an identical figure in a table whose whole

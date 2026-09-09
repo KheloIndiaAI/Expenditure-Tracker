@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 
-/* VENDOR PATCH 2 of 5 — see reports/vendor/README.md. Same reason as pipeline's:
+/* VENDOR PATCH 2 of 6 — see reports/vendor/README.md. Same reason as pipeline's:
    the Monday snapshots are held in Postgres on the server and written into the
    run's working directory beforehand, so this has to look where they were put.
    FILE is resolved per call rather than once at load, because the working

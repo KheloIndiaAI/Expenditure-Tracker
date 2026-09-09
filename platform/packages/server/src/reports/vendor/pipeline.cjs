@@ -29,7 +29,7 @@ const assignmentKey = name => {
   return ASSIGNMENT_KEY_ALIASES[n] || n;
 };
 
-/* VENDOR PATCH 1 of 5 — see reports/vendor/README.md.
+/* VENDOR PATCH 1 of 6 — see reports/vendor/README.md.
    Upstream this is the project folder, because the pipeline runs from a checkout
    on someone's desktop. On the server it runs from a working directory built for
    the run and thrown away afterwards, so the root has to be told, not assumed.
@@ -386,7 +386,7 @@ async function processReport(o = {}) {
       outputs.push({ format, name, path: dest, bytes: buf.length });
     }
 
-    /* VENDOR PATCH 4 of 5 — see reports/vendor/README.md.
+    /* VENDOR PATCH 4 of 6 — see reports/vendor/README.md.
        On the server the PDF is rendered when somebody asks for it, not on every
        scheduled run: it costs a Chromium launch per document, and most runs are
        never downloaded as PDF. The HTML written here is the very same file the
