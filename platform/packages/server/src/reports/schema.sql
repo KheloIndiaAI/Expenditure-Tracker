@@ -68,3 +68,29 @@ CREATE TABLE IF NOT EXISTS report_state (
   blob       BYTEA,
   updated_at TEXT NOT NULL
 );
+
+-- One row every time an operator enters a new "Yesterday's Total" and it is
+-- saved — the RBI Official Records ledger. This is deliberately NOT the same
+-- table as report_state.manualOverrides: that holds only the figure CURRENTLY
+-- in force, overwritten on every save, while this is an append-only history of
+-- every day a figure was entered, which is the whole point of an official
+-- record. See rbi-records.ts for the one rule that decides when a row is
+-- added (a genuinely new day-total value, not a resave of an old one).
+--
+-- Soft-deleted, not dropped: "delete" in the panel removes a mistaken entry
+-- from what is shown and exported, but a row here is never physically
+-- destroyed. An official record with a silent, untraceable erase is a
+-- contradiction, and keeping the row costs nothing a reader would notice.
+CREATE TABLE IF NOT EXISTS rbi_record (
+  id                 TEXT PRIMARY KEY,
+  entry_date         TEXT NOT NULL,     -- yyyy-mm-dd, IST calendar day of the save
+  total_assigned     INTEGER,           -- rupees; null only if never established
+  total_expenditure  INTEGER NOT NULL,  -- rupees; the fixed total this entry produced
+  balance            INTEGER,           -- rupees
+  day_total          INTEGER NOT NULL,  -- rupees; the "Yesterday's Total" entered
+  recorded_by        TEXT,              -- username
+  created_at         TEXT NOT NULL,
+  deleted_at         TEXT,
+  deleted_by         TEXT
+);
+CREATE INDEX IF NOT EXISTS rbi_record_date_idx ON rbi_record (entry_date DESC, created_at DESC);

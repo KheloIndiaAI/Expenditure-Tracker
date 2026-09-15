@@ -420,4 +420,93 @@ export async function getDailyLog(): Promise<Buffer | null> {
   return row ? asBuffer(row.blob) : null;
 }
 
+// ── RBI Official Records ────────────────────────────────────────────────────
+// The append-only ledger of every day a "Yesterday's Total" was entered. See
+// schema.sql for why this is its own table rather than living inside
+// manualOverrides, and rbi-records.ts for the rule that decides when a row is
+// written and how it is turned into an Excel file.
+
+export interface RbiRecordRow {
+  id: string;
+  entryDate: string;
+  totalAssigned: number | null;
+  totalExpenditure: number;
+  balance: number | null;
+  dayTotal: number;
+  recordedBy: string | null;
+  createdAt: string;
+}
+
+export interface RbiRecordInput {
+  entryDate: string;
+  totalAssigned: number | null;
+  totalExpenditure: number;
+  balance: number | null;
+  dayTotal: number;
+  recordedBy: string | null;
+}
+
+const toRbiRow = (r: Record<string, unknown>): RbiRecordRow => ({
+  id: r.id as string,
+  entryDate: r.entry_date as string,
+  totalAssigned: r.total_assigned == null ? null : Number(r.total_assigned),
+  totalExpenditure: Number(r.total_expenditure),
+  balance: r.balance == null ? null : Number(r.balance),
+  dayTotal: Number(r.day_total),
+  recordedBy: (r.recorded_by as string) ?? null,
+  createdAt: r.created_at as string,
+});
+
+/** Append one entry. Rupees throughout — see rbi-records.ts for the crore boundary. */
+export async function addRbiRecord(input: RbiRecordInput): Promise<RbiRecordRow> {
+  await initReports();
+  const db = await getDb();
+  const id = randomUUID();
+  const createdAt = now();
+  await db.run(
+    `INSERT INTO rbi_record
+       (id, entry_date, total_assigned, total_expenditure, balance, day_total, recorded_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, input.entryDate, input.totalAssigned, input.totalExpenditure, input.balance,
+      input.dayTotal, input.recordedBy, createdAt],
+  );
+  return { id, createdAt, ...input };
+}
+
+/** Newest first — the order the panel and the exported workbook both use. */
+export async function listRbiRecords(): Promise<RbiRecordRow[]> {
+  await initReports();
+  const db = await getDb();
+  const rows = await db.all<Record<string, unknown>>(
+    `SELECT * FROM rbi_record WHERE deleted_at IS NULL ORDER BY entry_date DESC, created_at DESC`,
+  );
+  return rows.map(toRbiRow);
+}
+
+/**
+ * Soft-delete one entry made by mistake.
+ *
+ * Marked, not removed: an "official record" that could be silently and
+ * untraceably erased would not be one. The row simply stops appearing in the
+ * list or the exported workbook from here on — see listRbiRecords, which is
+ * also what the download reads from, so a deleted row can never appear in a
+ * workbook generated after it was deleted.
+ *
+ * Returns false for an id that does not exist or was already deleted, so the
+ * route can tell the difference between "gone" and "never was".
+ */
+export async function deleteRbiRecord(id: string, deletedBy: string | null): Promise<boolean> {
+  await initReports();
+  const db = await getDb();
+  const row = await db.one<{ id: string }>(
+    'SELECT id FROM rbi_record WHERE id = ? AND deleted_at IS NULL', [id],
+  );
+  if (!row) return false;
+  await db.run(
+    'UPDATE rbi_record SET deleted_at = ?, deleted_by = ? WHERE id = ?',
+    [now(), deletedBy, id],
+  );
+  return true;
+}
+
 export const _internal = { asJson, asBuffer, readdirSync, statSync };

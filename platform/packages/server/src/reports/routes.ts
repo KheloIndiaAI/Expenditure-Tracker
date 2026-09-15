@@ -18,6 +18,7 @@ import { getModuleAccess } from '../users.ts';
 import { isSuperAdmin } from '../auth.ts';
 import * as store from './store.ts';
 import * as service from './service.ts';
+import * as rbiRecords from './rbi-records.ts';
 
 /** The caller, if they are allowed to see reports at all. */
 async function allowed(req: unknown): Promise<User | null> {
@@ -127,7 +128,7 @@ export function registerReportRoutes(app: FastifyInstance): void {
       const user = await allowed(req);
       if (!user) return reply.code(403).send({ message: 'You do not have access to Report Automation.' });
       try {
-        const r = await service.saveOverrides(req.body ?? {});
+        const r = await service.saveOverrides(req.body ?? {}, user.username);
         req.log.info({ event: 'reports.overrides', userId: user.id, applied: r.applied });
         return r;
       } catch (err) {
@@ -145,6 +146,49 @@ export function registerReportRoutes(app: FastifyInstance): void {
     return reply
       .header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       .header('Content-Disposition', 'attachment; filename="daily-expenditure-log.xlsx"')
+      .header('Cache-Control', 'private, no-store')
+      .send(buf);
+  });
+
+  /**
+   * RBI Official Records — the daily ledger of the four manual figures.
+   *
+   * A row is written automatically by saveOverrides above, whenever a save
+   * carries a genuinely new "Yesterday's Total"; nothing here ever writes one.
+   * This trio only reads the ledger, removes a mistaken row, and hands the
+   * whole thing over as a workbook.
+   */
+  app.get('/api/reports/rbi-records', async (req, reply) => {
+    const user = await allowed(req);
+    if (!user) return reply.code(403).send({ message: 'You do not have access to Report Automation.' });
+    return { records: await rbiRecords.listView() };
+  });
+
+  /**
+   * Remove one entry made by mistake. Soft-deleted in store.ts — this never
+   * destroys a row, only stops it appearing here on or in the workbook below,
+   * which is what keeps an "official record" honest about corrections.
+   */
+  app.delete<{ Params: { id: string } }>('/api/reports/rbi-records/:id', async (req, reply) => {
+    const user = await allowed(req);
+    if (!user) return reply.code(403).send({ message: 'You do not have access to Report Automation.' });
+    const ok = await store.deleteRbiRecord(req.params.id, user.username);
+    if (!ok) return reply.code(404).send({ message: 'That entry is not there — it may already have been removed.' });
+    req.log.info({ event: 'reports.rbi-records.delete', userId: user.id, recordId: req.params.id });
+    return { ok: true };
+  });
+
+  /** Built fresh from the live table on every request — see buildXlsx's own
+   *  note on why that is what makes a deletion show up in the download too,
+   *  with no separate file to keep in step. */
+  app.get('/api/reports/rbi-records/xlsx', async (req, reply) => {
+    const user = await allowed(req);
+    if (!user) return reply.code(403).send({ message: 'You do not have access to Report Automation.' });
+    const rows = await rbiRecords.listView();
+    const buf = rbiRecords.buildXlsx(rows);
+    return reply
+      .header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      .header('Content-Disposition', 'attachment; filename="rbi-official-records.xlsx"')
       .header('Cache-Control', 'private, no-store')
       .send(buf);
   });

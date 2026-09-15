@@ -14,6 +14,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node
 import { tmpdir } from 'node:os';
 import * as store from './store.ts';
 import * as weekly from './weekly.ts';
+import * as rbiRecords from './rbi-records.ts';
 
 const require_ = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -300,6 +301,12 @@ function istDMY(d = new Date(Date.now() + IST_OFFSET_MIN * 60000)): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${p(d.getUTCDate())}.${p(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`;
 }
+/** Same IST calendar day as istDMY(), as 'yyyy-mm-dd' — what the RBI Official
+ *  Records ledger sorts and keys its display on. */
+function istISO(d = new Date(Date.now() + IST_OFFSET_MIN * 60000)): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
+}
 
 export interface OverrideView {
   totalExpenditure: number | null;
@@ -353,7 +360,10 @@ const FIELD_LABEL: Record<string, string> = {
  *
  * Throws with a message meant for the operator; the route turns that into a 400.
  */
-export async function saveOverrides(input: OverrideInput): Promise<{
+export async function saveOverrides(
+  input: OverrideInput,
+  recordedBy: string | null = null,
+): Promise<{
   applied: string[];
   overrides: OverrideView;
 }> {
@@ -373,12 +383,20 @@ export async function saveOverrides(input: OverrideInput): Promise<{
 
   const assigned = clean('totalAssigned');
   const config = await store.getConfig();
+  /* Read before next overwrites it — this is the ONLY way to tell "Yesterday's
+     Total was just entered" from "the box still holds what was saved last
+     time and this save is about something else". See rbi-records.ts. */
+  const prevDayRupees = (() => {
+    const v = (config.manualOverrides as Record<string, unknown> | undefined)?.dayTotal;
+    return v == null ? null : Number(v);
+  })();
   const totalExpenditure = clean('totalExpenditure');
+  const dayTotal = clean('dayTotal');
   const next = {
     ...((config.manualOverrides ?? {}) as Record<string, unknown>),
     totalExpenditure,
     balance: clean('balance'),
-    dayTotal: clean('dayTotal'),
+    dayTotal,
     totalAssigned: assigned,
     /* Fixing is what makes Total Assigned stick. Without the flag the figure is
        remembered but not applied, so clearing the tick goes back to the computed
@@ -413,6 +431,35 @@ export async function saveOverrides(input: OverrideInput): Promise<{
   }
 
   await store.saveConfig(config);
+
+  /*
+   * RBI Official Records: one row for every day a NEW "Yesterday's Total" is
+   * saved. Total Assigned is whatever is actually in force at this moment —
+   * the fixed figure if fixed, otherwise the latest run's own computed total,
+   * fetched only when it is actually needed, since Total Assigned is fixed in
+   * the overwhelming common case (see pipeline.cjs's own note on why: it is a
+   * standing figure, not something that changes report to report).
+   *
+   * Never allowed to fail the save itself: the operator is waiting on the
+   * figures being fixed for the next report, and a ledger-write problem must
+   * not be the reason that fails. It is logged, not swallowed silently.
+   */
+  try {
+    const totalAssignedRupees = next.totalAssignedFixed
+      ? assigned
+      : (await store.latestSuccess())?.totals?.assigned ?? null;
+    await rbiRecords.maybeRecordEntry({
+      prevDayRupees,
+      nextDayRupees: dayTotal,
+      totalExpenditureRupees: totalExpenditure,
+      totalAssignedRupees,
+      balanceRupees: next.balance as number | null,
+      entryDate: istISO(),
+      recordedBy,
+    });
+  } catch (err) {
+    console.error('RBI Official Records: could not record this entry —', (err as Error)?.message ?? err);
+  }
 
   const applied = (['totalAssigned', 'totalExpenditure', 'balance', 'dayTotal'] as const)
     .filter((k) => (k === 'totalAssigned' ? next.totalAssignedFixed : next[k] != null))

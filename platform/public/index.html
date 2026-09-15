@@ -881,6 +881,12 @@ a.btn{display:inline-block;text-decoration:none;line-height:1.35}
 /* Fixed is a state, not an action, so it stops looking like a button to press. */
 .ov-fix.on{border-color:rgba(27,158,99,.45);background:rgba(27,158,99,.09);color:var(--good)}
 .ov-fix.on:hover{border-color:rgba(27,158,99,.45);color:var(--good)}
+/* RBI Official Records: the only destructive control on the platform, so it is
+   armed rather than immediate - see rbiAskDelete. The colour only appears once
+   armed; at rest it reads as an ordinary secondary button like any other. */
+.rbi-del.confirm{border-color:rgba(198,45,45,.45);background:rgba(198,45,45,.09);color:var(--critical)}
+.rbi-del.confirm:hover{border-color:rgba(198,45,45,.45);color:var(--critical)}
+.rbi-del:disabled{opacity:.6;cursor:default}
 /* Three across, so no box is orphaned on a row of its own. Below the profile
    form's own breakpoint they stack, which is what a phone wants anyway. */
 .ov-grid{max-width:1000px}
@@ -3522,6 +3528,109 @@ function autoOvCard(){
     + '</div></div></div>';
 }
 
+/* ---- RBI Official Records ---------------------------------------------------
+   The daily ledger the server keeps every time the card above saves a NEW
+   Yesterday's Total - see rbi-records.ts for the one rule that decides when a
+   row is written; nothing on this side of the API ever writes one. This block
+   only reads the ledger, offers it as a workbook, and lets a mistaken entry be
+   removed.
+
+   Loaded the same way AUTO is - one attempt per visit, force-refreshable - so
+   opening Report Automation costs one extra request, not one per repaint. */
+const RBI={rows:null, loading:false, err:null, tried:false, busyDel:'', confirmDel:''};
+function rbiLoad(force){
+  if(RBI.loading&&!force) return;
+  if(RBI.tried&&!force) return;
+  RBI.loading=true; RBI.tried=true; RBI.err=null;
+  autoFetch('/api/reports/rbi-records').then(function(r){
+    RBI.rows=(r&&r.records)||[];
+  }).catch(function(err){
+    RBI.rows=null;
+    RBI.err=(err&&err.name==='AbortError')?'The server did not answer in time.':((err&&err.message)||'Could not load.');
+  }).then(function(){
+    RBI.loading=false;
+    if(state.view==='reports') render();
+  });
+}
+function rbiRefresh(){ RBI.tried=false; rbiLoad(true); render(); }
+
+/* Delete is the one destructive control anywhere on this platform - every
+   other table here is an append-only record of something that happened. A
+   single misclick must not be enough to act on that, so the button arms on
+   the first press (turning into "Confirm?" for a few seconds) and only
+   deletes on a second press while armed. Clicking a DIFFERENT row's button
+   re-arms on that row and disarms the first, rather than leaving two rows
+   armed at once. */
+let rbiConfirmTimer=null;
+function rbiAskDelete(id){
+  if(RBI.confirmDel===id){ rbiDoDelete(id); return; }
+  RBI.confirmDel=id;
+  clearTimeout(rbiConfirmTimer);
+  rbiConfirmTimer=setTimeout(function(){ RBI.confirmDel=''; render(); },4000);
+  render();
+}
+function rbiDoDelete(id){
+  if(RBI.busyDel) return;
+  clearTimeout(rbiConfirmTimer);
+  RBI.confirmDel=''; RBI.busyDel=id; RBI.err=null; render();
+  autoFetch('/api/reports/rbi-records/'+encodeURIComponent(id),{method:'DELETE'}).then(function(){
+    RBI.busyDel='';
+    /* Dropped from the list straight away rather than waiting on a reload -
+       the server has already forgotten it, and a stale row sitting on screen
+       until the next refresh is exactly the kind of doubt a delete button
+       exists to remove. */
+    RBI.rows=(RBI.rows||[]).filter(function(r){ return r.id!==id; });
+    render();
+  }).catch(function(err){
+    RBI.busyDel='';
+    RBI.err=(err&&err.message)||'Could not delete that entry.';
+    render();
+  });
+}
+/* Crore, trimmed the same way the manual-figures boxes are (autoOvStr) - a
+   dash rather than a bare "0" or empty cell where nothing was ever
+   established (Total Assigned before any report has run, say). */
+function rbiCr(v){ return v==null?'—':(autoOvStr(v)||'0'); }
+function rbiRow(r){
+  const del=RBI.busyDel===r.id, confirming=RBI.confirmDel===r.id;
+  const btnCls='btn rbi-del'+(confirming?' confirm':'');
+  const btnTxt=del?'Deleting…':(confirming?'Confirm?':'Delete');
+  return '<tr><td><div>'+esc(sheetDMY(r.date))+'</div>'
+    + '<div class="small muted">'+esc(r.recordedBy||'—')+'</div></td>'
+    + '<td class="num tnum">'+esc(rbiCr(r.totalAssigned))+'</td>'
+    + '<td class="num tnum"><b>'+esc(rbiCr(r.totalExpenditure))+'</b></td>'
+    + '<td class="num tnum">'+esc(rbiCr(r.balance))+'</td>'
+    + '<td class="num tnum" style="color:var(--good)">'+esc(rbiCr(r.dayTotal))+'</td>'
+    + '<td class="num"><button class="'+btnCls+'" onclick="rbiAskDelete('+jstr(r.id)+')"'
+      + (del?' disabled':'')+' aria-label="Delete this entry">'+esc(btnTxt)+'</button></td></tr>';
+}
+function rbiCard(){
+  rbiLoad();
+  const rows=RBI.rows;
+  const body = rows==null
+    ? '<div class="dt-empty"><div class="e-ic">'+(RBI.loading?'⏳':'⚠')+'</div>'
+      + '<div class="e-t">'+(RBI.loading?'Reading the ledger':'Could not read the ledger')+'</div>'
+      + '<div class="e-s">'+esc(RBI.loading?'One moment.':(RBI.err||'Unknown error.'))+'</div></div>'
+    : !rows.length
+      ? '<div class="dt-empty"><div class="e-ic">🧾</div><div class="e-t">No entries yet</div>'
+        + "<div class=\"e-s\">A row is added here every time a new Yesterday's Total is entered above and saved.</div></div>"
+      : '<div class="tscroll"><table class="dt"><thead><tr><th>Date</th>'
+        + '<th class="num">Total Assigned</th><th class="num">Total Expenditure</th>'
+        + "<th class=\"num\">Balance</th><th class=\"num\">Yesterday's Total</th><th></th></tr></thead>"
+        + '<tbody>'+rows.map(rbiRow).join('')+'</tbody></table></div>';
+  const errMsg=(rows!=null&&RBI.err)?'<div class="pf-msg err" style="margin-top:10px">'+esc(RBI.err)+'</div>':'';
+  return '<div class="card"><div class="card-hd"><h3>RBI Official Records</h3>'
+    + '<span class="small muted">'+(rows&&rows.length?rows.length+' entr'+(rows.length===1?'y':'ies'):'')+'</span>'
+    + '<div class="tools">'
+      + '<a class="btn" href="/api/reports/rbi-records/xlsx">Download as Excel</a>'
+      + '<button class="btn" onclick="rbiRefresh()">'+(RBI.loading?'Checking…':'Refresh')+'</button>'
+    + '</div></div>'
+    + body + errMsg
+    + "<div class=\"qh\" style=\"margin:10px 2px 0\">One row for every day a new Yesterday's Total is entered above and "
+    + "saved — this is the platform's own record, kept in addition to whatever the report itself says at the time. "
+    + 'Delete removes a mistaken entry from this list and from the Excel file; it is not undone by a refresh.</div></div>';
+}
+
 function viewReports(){
   autoLoad();
   const head=pageHead('Report Automation');
@@ -3598,7 +3707,8 @@ function viewReports(){
       + docTable(AUTO_WEEKLY_DOCS,'Produced alongside the Summary — press Process now.')
       + '<div class="qh" style="margin:10px 2px 0">Two pages: the Regional Centre leaderboard for the week just '
       + 'gone, then component spending across that same week. Both formats are laid out from one set of figures, '
-      + 'so the Word copy and the PDF always agree.</div></div>';
+      + 'so the Word copy and the PDF always agree.</div></div>'
+    + rbiCard();
 }
 
 /* ---- Daily Expenditure -------------------------------------------------------
