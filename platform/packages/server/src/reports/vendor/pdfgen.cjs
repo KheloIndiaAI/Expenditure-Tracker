@@ -677,12 +677,32 @@ const REPORT_CSS = `
      * idle row, header and total) against the Regional Centre page's twelve
      * shorter ones, and its idle row is four lines tall. At the shared
      * padding the total row tipped onto a third sheet, so spacing is tightened
-     * here only — the RC pages still fill their own sheets exactly.
+     * here only.
      */
     .comp-page .rc-table td { padding: 7px 10px; }
     .comp-page .rc-top-cards { margin-bottom: 18px; }
     .comp-page .p2-title { margin-bottom: 12px; }
     .comp-page .idle-names { gap: 3px; }
+    /*
+     * The weekly leaderboard, page 1, carries twelve Regional Centres plus
+     * their Total - a thirteenth row - and at the shared 11px row padding
+     * that no longer fits one A4-landscape sheet: measured against the real
+     * print box (281mm x 198mm usable at the @page margins above), the table
+     * alone ran to roughly 656px against a 748px budget, and the title, cards
+     * and sub-heading around it pushed the total content past 830px - the
+     * Total row, and it alone, spilled onto a second sheet, ahead of the
+     * component page that was meant to be page 2.
+     *
+     * The same tightened density already proven on the component page below
+     * is reused here rather than invented fresh - it carries comfortable
+     * spare room on its own sheet, so the same numbers give this page room to
+     * spare too rather than trading one page's margin of safety for the
+     * other's. It also makes the two pages of one report share one density
+     * instead of page 1 reading noticeably looser than page 2.
+     */
+    .lb-page .rc-table td { padding: 7px 10px; }
+    .lb-page .rc-top-cards { margin-bottom: 18px; }
+    .lb-page .p2-title { margin-bottom: 12px; }
     .idle-note {
       font-size: 9.5px;
       font-style: italic;
@@ -709,7 +729,7 @@ function leaderboardPage(lb) {
 
   return `
 <!-- ==================== WEEKLY LEADERBOARD (Mondays) ==================== -->
-<div class="page-container" style="margin-top: 8px;">
+<div class="page-container lb-page" style="margin-top: 8px;">
   <div class="p2-title">Weekly Leaderboard — Regional Centres</div>
   <div class="lb-sub">Previous week · ${range}</div>
 
