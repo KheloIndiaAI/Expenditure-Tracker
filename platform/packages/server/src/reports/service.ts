@@ -366,11 +366,13 @@ export async function saveOverrides(
 ): Promise<{
   applied: string[];
   overrides: OverrideView;
-  /** Did THIS save add a row to RBI Official Records? Told to the caller
-   *  rather than left for the panel to infer, because "no" is a completely
-   *  ordinary outcome (nothing about Yesterday's Total changed) and looks
-   *  identical to a silent failure unless the response says which one it was. */
+  /** Did THIS save write the day's row in RBI Official Records? */
   rbiRecorded: boolean;
+  /** Why it did not, when something actually went wrong — as opposed to there
+   *  being nothing to record. Carried back so the panel can show it: the one
+   *  failure this feature has had in practice was invisible precisely because
+   *  nothing travelled back with the response. */
+  rbiError: string | null;
 }> {
   const clean = (key: keyof OverrideInput): number | null => {
     const v = input[key];
@@ -388,13 +390,6 @@ export async function saveOverrides(
 
   const assigned = clean('totalAssigned');
   const config = await store.getConfig();
-  /* Read before next overwrites it — this is the ONLY way to tell "Yesterday's
-     Total was just entered" from "the box still holds what was saved last
-     time and this save is about something else". See rbi-records.ts. */
-  const prevDayRupees = (() => {
-    const v = (config.manualOverrides as Record<string, unknown> | undefined)?.dayTotal;
-    return v == null ? null : Number(v);
-  })();
   const totalExpenditure = clean('totalExpenditure');
   const dayTotal = clean('dayTotal');
   const next = {
@@ -450,13 +445,13 @@ export async function saveOverrides(
    * not be the reason that fails. It is logged, not swallowed silently.
    */
   let rbiRecorded = false;
+  let rbiError: string | null = null;
   try {
     const totalAssignedRupees = next.totalAssignedFixed
       ? assigned
       : (await store.latestSuccess())?.totals?.assigned ?? null;
-    const written = await rbiRecords.maybeRecordEntry({
-      prevDayRupees,
-      nextDayRupees: dayTotal,
+    const written = await rbiRecords.recordDailyEntry({
+      dayRupees: dayTotal,
       totalExpenditureRupees: totalExpenditure,
       totalAssignedRupees,
       balanceRupees: next.balance as number | null,
@@ -465,13 +460,20 @@ export async function saveOverrides(
     });
     rbiRecorded = written != null;
   } catch (err) {
-    console.error('RBI Official Records: could not record this entry —', (err as Error)?.message ?? err);
+    /* Still not allowed to fail the save — the operator is waiting on the
+       figures being fixed for the next report, and a ledger problem must not
+       be what stops that. But it is no longer allowed to be INVISIBLE either:
+       this exact path once failed on every single row for days, logging to a
+       server nobody reads while the panel showed an empty table and no reason
+       for it. The message goes back with the response so the panel can say so. */
+    rbiError = (err as Error)?.message ?? String(err);
+    console.error('RBI Official Records: could not record this entry —', rbiError);
   }
 
   const applied = (['totalAssigned', 'totalExpenditure', 'balance', 'dayTotal'] as const)
     .filter((k) => (k === 'totalAssigned' ? next.totalAssignedFixed : next[k] != null))
     .map((k) => FIELD_LABEL[k] as string);
-  return { applied, overrides: viewOverrides(config, null), rbiRecorded };
+  return { applied, overrides: viewOverrides(config, null), rbiRecorded, rbiError };
 }
 
 /** Everything the panel needs in one call. */

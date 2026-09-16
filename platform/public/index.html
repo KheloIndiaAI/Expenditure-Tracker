@@ -3459,10 +3459,19 @@ function autoOvSave(clear){
       AUTO.ovBusy=false; AUTO.ovDirty=false;
       const applied=(r&&r.applied)||[];
       const recorded=!!(r&&r.rbiRecorded);
-      AUTO.ovMsg={ok:true, text:applied.length
-        ? 'Saved. Press Process now to rebuild the report with '+applied.join(', ')+'.'
-          +(recorded?' Recorded in RBI Official Records below.':'')
-        : 'Cleared. Every figure will be worked out from the sheet.'};
+      const ledgerErr=(r&&r.rbiError)||null;
+      /* A ledger write that failed is reported as a FAILURE here, not folded
+         into an otherwise cheerful "Saved." The figures really did save - that
+         part is true and is said first - but this exact path once failed on
+         every row for days while the panel said nothing at all, and a quiet
+         success message over a broken record is what made that possible. */
+      AUTO.ovMsg=ledgerErr
+        ? {ok:false, text:'Figures saved, but the RBI Official Records row could not be written. '
+            +'The figures above are safe; the row below is missing. ('+ledgerErr+')'}
+        : {ok:true, text:applied.length
+            ? 'Saved. Press Process now to rebuild the report with '+applied.join(', ')+'.'
+              +(recorded?' Recorded in RBI Official Records below.':'')
+            : 'Cleared. Every figure will be worked out from the sheet.'};
       /* Re-read rather than trusting the echo: the stored figures are what the
          next report will use, and they are what the boxes must show. */
       AUTO.tried=false; autoLoad(true);
@@ -3623,7 +3632,7 @@ function rbiCard(){
       + '<div class="e-s">'+esc(RBI.loading?'One moment.':(RBI.err||'Unknown error.'))+'</div></div>'
     : !rows.length
       ? '<div class="dt-empty"><div class="e-ic">🧾</div><div class="e-t">No entries yet</div>'
-        + "<div class=\"e-s\">A row is added here every time a new Yesterday's Total is entered above and saved.</div></div>"
+        + '<div class="e-s">A row appears here for every day the figures above are saved.</div></div>'
       : '<div class="tscroll"><table class="dt"><thead><tr><th>Date</th>'
         + '<th class="num">Total Assigned</th><th class="num">Total Expenditure</th>'
         + "<th class=\"num\">Balance</th><th class=\"num\">Yesterday's Total</th><th></th></tr></thead>"
@@ -3636,9 +3645,11 @@ function rbiCard(){
       + '<button class="btn" onclick="rbiRefresh()">'+(RBI.loading?'Checking…':'Refresh')+'</button>'
     + '</div></div>'
     + body + errMsg
-    + "<div class=\"qh\" style=\"margin:10px 2px 0\">One row for every day a new Yesterday's Total is entered above and "
-    + "saved — this is the platform's own record, kept in addition to whatever the report itself says at the time. "
-    + 'Delete removes a mistaken entry from this list and from the Excel file; it is not undone by a refresh.</div></div>';
+    + '<div class="qh" style="margin:10px 2px 0">One row per day, holding the four figures as they stood when they were '
+    + "last saved that day — this is the platform's own record, kept in addition to whatever the report itself says at "
+    + 'the time. Saving again the same day updates that day&rsquo;s row rather than adding a second one, so correcting a '
+    + 'figure leaves one honest entry. Delete removes a day from this list and from the Excel file; it is not undone by '
+    + 'a refresh.</div></div>';
 }
 
 function viewReports(){

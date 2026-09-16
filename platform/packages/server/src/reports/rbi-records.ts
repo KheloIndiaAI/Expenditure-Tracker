@@ -7,19 +7,28 @@
  * daily claims workbook does elsewhere in this pipeline; the two are
  * unrelated files that happen to share a domain. Where manualOverrides
  * (service.ts) holds only whatever is CURRENTLY in force — each save
- * overwrites it — this is the history: one row for every day an operator
- * actually entered a new "Yesterday's Total", kept forever (soft-deleted,
- * never dropped — see store.ts).
+ * overwrites it — this is the history, kept forever (soft-deleted, never
+ * dropped — see store.ts).
  *
- * THE ONE RULE THAT MATTERS: a row is written only when the day-total value
- * being saved is NEW, not merely present. The manual-figures form re-sends
- * whatever is currently in the Yesterday's Total box on every save — including
- * a save that only changed Total Assigned, or that unfixes something else — so
- * "the field is non-empty" is not "it was just entered". Comparing against
- * what was already stored before this save is what tells the two apart, and
- * getting it wrong either floods the ledger with duplicate same-day rows from
- * unrelated saves, or (worse for an official record) silently drops a genuine
- * entry. See maybeRecordEntry.
+ * WHAT A ROW MEANS: the state of the four figures as they were LAST SAVED on
+ * that calendar day. One row per day, rewritten by each later save the same
+ * day, so the day's row always shows what was finally in force for it.
+ *
+ * THIS REPLACED A CONDITIONAL RULE, AND THE REASON MATTERS. The first version
+ * wrote a row only when the day-total differed from the stored one, to avoid
+ * duplicates from saves that merely re-sent an unchanged box. That rule read
+ * the very config value the same request had just advanced — two writes, not
+ * atomic, the second one's trigger derived from the first one's result. When
+ * the row write failed (an INTEGER column too narrow for a figure in the
+ * billions, silently, on Postgres only), the config had ALREADY moved to the
+ * new day-total. Re-entering the same figure then compared equal, decided
+ * "nothing changed", and wrote nothing — so the one action a person would
+ * naturally take to recover was the one action guaranteed not to. A rule that
+ * can be poisoned by its own failure is not worth its saved duplicates.
+ *
+ * So there is no condition now. Every save carrying a figure writes that day's
+ * row, and writing the same row twice is simply writing it twice. Nothing has
+ * to be inferred, and nothing can be silently skipped.
  */
 
 import { createRequire } from 'node:module';
@@ -30,11 +39,11 @@ const xlsxLib = (): any => require_('xlsx');
 
 const CR = 1e7;
 
-export interface MaybeRecordInput {
-  /** config.manualOverrides.dayTotal as it stood BEFORE this save, in rupees. */
-  prevDayRupees: number | null;
-  /** The cleaned dayTotal from THIS save, in rupees. */
-  nextDayRupees: number | null;
+export interface RecordEntryInput {
+  /** The cleaned dayTotal from this save, in rupees. Null and 0 are both
+   *  ordinary values — 0 means a day on which nothing was spent, which is a
+   *  fact worth recording, not an absence. */
+  dayRupees: number | null;
   /** The Total Expenditure this same save leaves in force, in rupees. */
   totalExpenditureRupees: number | null;
   /** Total Assigned in force at save time — the fixed figure, or the computed
@@ -47,24 +56,23 @@ export interface MaybeRecordInput {
 }
 
 /**
- * Record one day's entry, but only if a day-total genuinely changed.
+ * Write this day's row. The only thing that stops it is having nothing to
+ * write: a save that clears every figure (the Clear button) is the operator
+ * saying no manual figure is in force, and a row of blanks records nothing.
  *
- * Equal-to-what-was-already-stored (including both null, the ordinary case of
- * a save that never touched Yesterday's Total) is not an entry and writes
- * nothing. A missing Total Expenditure would mean the day figure was typed but
- * never actually applied — the frontend always derives one from it, so this
- * only guards against a malformed request reaching here some other way.
+ * Anything else — including a day total of exactly 0, and including a figure
+ * identical to yesterday's — is a row. See the header for why there is no
+ * cleverer test than this one.
  */
-export async function maybeRecordEntry(input: MaybeRecordInput): Promise<store.RbiRecordRow | null> {
-  const { nextDayRupees, totalExpenditureRupees } = input;
-  const entered = nextDayRupees != null && nextDayRupees !== input.prevDayRupees;
-  if (!entered || totalExpenditureRupees == null) return null;
-  return store.addRbiRecord({
+export async function recordDailyEntry(input: RecordEntryInput): Promise<store.RbiRecordRow | null> {
+  const { dayRupees, totalExpenditureRupees } = input;
+  if (dayRupees == null && totalExpenditureRupees == null) return null;
+  return store.upsertRbiRecord({
     entryDate: input.entryDate,
     totalAssigned: input.totalAssignedRupees,
     totalExpenditure: totalExpenditureRupees,
     balance: input.balanceRupees,
-    dayTotal: nextDayRupees,
+    dayTotal: dayRupees,
     recordedBy: input.recordedBy,
   });
 }
@@ -73,9 +81,9 @@ export interface RbiRecordView {
   id: string;
   date: string;
   totalAssigned: number | null;
-  totalExpenditure: number;
+  totalExpenditure: number | null;
   balance: number | null;
-  dayTotal: number;
+  dayTotal: number | null;
   recordedBy: string | null;
   createdAt: string;
 }
@@ -97,9 +105,9 @@ export async function listView(): Promise<RbiRecordView[]> {
     id: r.id,
     date: r.entryDate,
     totalAssigned: toCrNum(r.totalAssigned),
-    totalExpenditure: toCrNum(r.totalExpenditure) as number,
+    totalExpenditure: toCrNum(r.totalExpenditure),
     balance: toCrNum(r.balance),
-    dayTotal: toCrNum(r.dayTotal) as number,
+    dayTotal: toCrNum(r.dayTotal),
     recordedBy: r.recordedBy,
     createdAt: r.createdAt,
   }));

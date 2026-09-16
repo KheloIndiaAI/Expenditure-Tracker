@@ -92,13 +92,19 @@ CREATE TABLE IF NOT EXISTS report_state (
 -- silently, forever, on every single row, and never once on SQLite, whose
 -- INTEGER has no such limit. That combination is what makes it worth this
 -- much explanation: it is invisible in dev and total in production.
+-- Every rupee column is nullable, including the two that once were not. A row
+-- records whichever figures were in force at the save; "not established yet"
+-- is a real state (a first-ever entry with no baseline behind it, a figure
+-- fixed without a day total beside it) and has to be storable as itself. The
+-- alternative, writing 0 for absent, would put a number in an official record
+-- that nobody entered.
 CREATE TABLE IF NOT EXISTS rbi_record (
   id                 TEXT PRIMARY KEY,
   entry_date         TEXT NOT NULL,     -- yyyy-mm-dd, IST calendar day of the save
-  total_assigned     BIGINT,            -- rupees; null only if never established
-  total_expenditure  BIGINT NOT NULL,   -- rupees; the fixed total this entry produced
+  total_assigned     BIGINT,            -- rupees
+  total_expenditure  BIGINT,            -- rupees; the total in force after this save
   balance            BIGINT,            -- rupees
-  day_total          BIGINT NOT NULL,   -- rupees; the "Yesterday's Total" entered
+  day_total          BIGINT,            -- rupees; the "Yesterday's Total" entered
   recorded_by        TEXT,              -- username
   created_at         TEXT NOT NULL,
   deleted_at         TEXT,

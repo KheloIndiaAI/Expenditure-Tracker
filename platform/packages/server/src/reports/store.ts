@@ -48,20 +48,27 @@ function asBuffer(v: unknown): Buffer | null {
 }
 
 /**
- * Widen rbi_record's rupee columns to BIGINT on Postgres.
+ * Bring an existing rbi_record table up to the shape schema.sql now declares.
  *
- * `CREATE TABLE IF NOT EXISTS` in schema.sql only helps a table that does not
- * exist yet — an environment that already ran an earlier version of this
- * schema (INTEGER, which overflows at ~2.14 billion rupees — see schema.sql's
- * own note) is stuck with the narrow columns forever unless something here
- * actually widens them. SQLite is untouched: its INTEGER never had this limit,
- * and it has no ALTER COLUMN TYPE syntax to run this against in the first
- * place — this is why the check for DATABASE_URL comes first.
+ * `CREATE TABLE IF NOT EXISTS` only helps a table that does not exist yet, so
+ * an environment that already ran an earlier version of this schema keeps
+ * whatever it was first given. Two things have to be corrected there:
  *
- * Safe to run on every boot: ALTER COLUMN TYPE to a column's own current
- * type is a valid no-op in Postgres, not an error, so there is nothing to
- * detect or skip. A failure here is logged, never thrown — a migration
- * problem must not stop the whole server from starting.
+ *  · BIGINT, not INTEGER. Postgres's INTEGER stops at 2,147,483,647 and this
+ *    scheme's own Total Assigned is already ~3.94 billion rupees, so every
+ *    insert was rejected — silently, because the caller is right to swallow
+ *    errors from a ledger write rather than fail the operator's save.
+ *  · NOT NULL dropped from the two figure columns, which a row is now allowed
+ *    to be missing (see schema.sql).
+ *
+ * Postgres only — SQLite has neither ALTER COLUMN TYPE nor DROP NOT NULL, and
+ * needs neither: its INTEGER never had a width limit. It does inherit the
+ * NOT NULL columns though, which migrateRbiSqlite below deals with separately.
+ *
+ * Safe on every boot: altering a column to the type it already has, or
+ * dropping a NOT NULL that is already gone, are both valid no-ops in Postgres.
+ * A failure is logged, never thrown — a migration problem must not be the
+ * reason the whole server refuses to start.
  */
 async function migrateRbiColumns(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
   if (!process.env.DATABASE_URL) return;
@@ -71,9 +78,62 @@ async function migrateRbiColumns(db: Awaited<ReturnType<typeof getDb>>): Promise
       ALTER TABLE rbi_record ALTER COLUMN total_expenditure TYPE BIGINT;
       ALTER TABLE rbi_record ALTER COLUMN balance TYPE BIGINT;
       ALTER TABLE rbi_record ALTER COLUMN day_total TYPE BIGINT;
+      ALTER TABLE rbi_record ALTER COLUMN total_expenditure DROP NOT NULL;
+      ALTER TABLE rbi_record ALTER COLUMN day_total DROP NOT NULL;
     `);
   } catch (err) {
-    console.error('rbi_record: could not widen its rupee columns to BIGINT —', (err as Error)?.message ?? err);
+    console.error('rbi_record: could not bring its columns up to date —', (err as Error)?.message ?? err);
+  }
+}
+
+/**
+ * The same correction for SQLite, which cannot express it as an ALTER.
+ *
+ * Only the NOT NULL half applies here — SQLite's INTEGER has no width to
+ * outgrow — and the only way to drop a constraint it has is to build the table
+ * again beside it, copy the rows across and swap the names. That is a real
+ * operation on a table holding real records, so it runs ONLY when the old
+ * constraint is actually still there, and inside a transaction, so a database
+ * that fails half way through is left exactly as it was rather than half
+ * converted.
+ *
+ * This exists for development databases created in the short window when the
+ * columns were NOT NULL. It costs a PRAGMA on every boot and does nothing at
+ * all afterwards.
+ */
+async function migrateRbiSqlite(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
+  if (process.env.DATABASE_URL) return;
+  try {
+    const cols = await db.all<{ name: string; notnull: number }>('PRAGMA table_info(rbi_record)');
+    const stuck = cols.some((c) => (c.name === 'total_expenditure' || c.name === 'day_total') && Number(c.notnull) === 1);
+    if (!stuck) return;
+    await db.exec(`
+      BEGIN;
+      CREATE TABLE rbi_record_new (
+        id                 TEXT PRIMARY KEY,
+        entry_date         TEXT NOT NULL,
+        total_assigned     BIGINT,
+        total_expenditure  BIGINT,
+        balance            BIGINT,
+        day_total          BIGINT,
+        recorded_by        TEXT,
+        created_at         TEXT NOT NULL,
+        deleted_at         TEXT,
+        deleted_by         TEXT
+      );
+      INSERT INTO rbi_record_new
+        SELECT id, entry_date, total_assigned, total_expenditure, balance, day_total,
+               recorded_by, created_at, deleted_at, deleted_by
+          FROM rbi_record;
+      DROP TABLE rbi_record;
+      ALTER TABLE rbi_record_new RENAME TO rbi_record;
+      CREATE INDEX IF NOT EXISTS rbi_record_date_idx ON rbi_record (entry_date DESC, created_at DESC);
+      COMMIT;
+    `);
+    console.log('✓ rbi_record: rebuilt without the NOT NULL columns (SQLite).');
+  } catch (err) {
+    try { await db.exec('ROLLBACK;'); } catch { /* nothing open to roll back */ }
+    console.error('rbi_record: could not rebuild the table —', (err as Error)?.message ?? err);
   }
 }
 
@@ -84,6 +144,7 @@ export function initReports(): Promise<void> {
       const db = await getDb();
       await db.exec(SCHEMA());
       await migrateRbiColumns(db);
+      await migrateRbiSqlite(db);
       /* Once per process, right after the tables are known to exist. There is no
          scheduler to do this at boot any more, and it has to happen before the
          first status or run — a run left 'running' by a container replaced
@@ -452,18 +513,18 @@ export async function getDailyLog(): Promise<Buffer | null> {
 }
 
 // ── RBI Official Records ────────────────────────────────────────────────────
-// The append-only ledger of every day a "Yesterday's Total" was entered. See
-// schema.sql for why this is its own table rather than living inside
-// manualOverrides, and rbi-records.ts for the rule that decides when a row is
-// written and how it is turned into an Excel file.
+// One row per calendar day, holding the four figures as they were last saved
+// that day. See schema.sql for why this is its own table rather than living
+// inside manualOverrides, and rbi-records.ts for what a row means and why
+// nothing conditional decides whether one gets written.
 
 export interface RbiRecordRow {
   id: string;
   entryDate: string;
   totalAssigned: number | null;
-  totalExpenditure: number;
+  totalExpenditure: number | null;
   balance: number | null;
-  dayTotal: number;
+  dayTotal: number | null;
   recordedBy: string | null;
   createdAt: string;
 }
@@ -471,27 +532,61 @@ export interface RbiRecordRow {
 export interface RbiRecordInput {
   entryDate: string;
   totalAssigned: number | null;
-  totalExpenditure: number;
+  totalExpenditure: number | null;
   balance: number | null;
-  dayTotal: number;
+  dayTotal: number | null;
   recordedBy: string | null;
 }
+
+const num = (v: unknown): number | null => (v == null ? null : Number(v));
 
 const toRbiRow = (r: Record<string, unknown>): RbiRecordRow => ({
   id: r.id as string,
   entryDate: r.entry_date as string,
-  totalAssigned: r.total_assigned == null ? null : Number(r.total_assigned),
-  totalExpenditure: Number(r.total_expenditure),
-  balance: r.balance == null ? null : Number(r.balance),
-  dayTotal: Number(r.day_total),
+  totalAssigned: num(r.total_assigned),
+  totalExpenditure: num(r.total_expenditure),
+  balance: num(r.balance),
+  dayTotal: num(r.day_total),
   recordedBy: (r.recorded_by as string) ?? null,
   createdAt: r.created_at as string,
 });
 
-/** Append one entry. Rupees throughout — see rbi-records.ts for the crore boundary. */
-export async function addRbiRecord(input: RbiRecordInput): Promise<RbiRecordRow> {
+/**
+ * Write the row for one calendar day: update the day's existing row if it has
+ * one, otherwise insert it. Rupees throughout — see rbi-records.ts for the
+ * crore boundary.
+ *
+ * Read-then-write rather than ON CONFLICT, for two reasons. The table shipped
+ * without a unique constraint on entry_date, and adding one to a table that
+ * already exists in production is a migration that can fail on data it finds;
+ * and the two engines spell upsert differently enough that the plain version
+ * is the one that is obviously correct on both. This runs once per save, so
+ * the extra SELECT costs nothing worth optimising.
+ *
+ * A day whose row was deleted starts clean: the lookup only considers rows
+ * that are not soft-deleted, so re-entering a figure after deleting a mistake
+ * inserts a fresh row rather than resurrecting the discarded one.
+ */
+export async function upsertRbiRecord(input: RbiRecordInput): Promise<RbiRecordRow> {
   await initReports();
   const db = await getDb();
+  const existing = await db.one<{ id: string; created_at: string }>(
+    'SELECT id, created_at FROM rbi_record WHERE entry_date = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1',
+    [input.entryDate],
+  );
+
+  if (existing) {
+    await db.run(
+      `UPDATE rbi_record
+          SET total_assigned = ?, total_expenditure = ?, balance = ?, day_total = ?,
+              recorded_by = ?, created_at = ?
+        WHERE id = ?`,
+      [input.totalAssigned, input.totalExpenditure, input.balance, input.dayTotal,
+        input.recordedBy, now(), existing.id],
+    );
+    return { id: existing.id, createdAt: now(), ...input };
+  }
+
   const id = randomUUID();
   const createdAt = now();
   await db.run(
