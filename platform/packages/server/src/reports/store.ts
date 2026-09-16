@@ -47,12 +47,43 @@ function asBuffer(v: unknown): Buffer | null {
   return null;
 }
 
+/**
+ * Widen rbi_record's rupee columns to BIGINT on Postgres.
+ *
+ * `CREATE TABLE IF NOT EXISTS` in schema.sql only helps a table that does not
+ * exist yet — an environment that already ran an earlier version of this
+ * schema (INTEGER, which overflows at ~2.14 billion rupees — see schema.sql's
+ * own note) is stuck with the narrow columns forever unless something here
+ * actually widens them. SQLite is untouched: its INTEGER never had this limit,
+ * and it has no ALTER COLUMN TYPE syntax to run this against in the first
+ * place — this is why the check for DATABASE_URL comes first.
+ *
+ * Safe to run on every boot: ALTER COLUMN TYPE to a column's own current
+ * type is a valid no-op in Postgres, not an error, so there is nothing to
+ * detect or skip. A failure here is logged, never thrown — a migration
+ * problem must not stop the whole server from starting.
+ */
+async function migrateRbiColumns(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+  try {
+    await db.exec(`
+      ALTER TABLE rbi_record ALTER COLUMN total_assigned TYPE BIGINT;
+      ALTER TABLE rbi_record ALTER COLUMN total_expenditure TYPE BIGINT;
+      ALTER TABLE rbi_record ALTER COLUMN balance TYPE BIGINT;
+      ALTER TABLE rbi_record ALTER COLUMN day_total TYPE BIGINT;
+    `);
+  } catch (err) {
+    console.error('rbi_record: could not widen its rupee columns to BIGINT —', (err as Error)?.message ?? err);
+  }
+}
+
 let ready: Promise<void> | null = null;
 export function initReports(): Promise<void> {
   if (!ready) {
     ready = (async () => {
       const db = await getDb();
       await db.exec(SCHEMA());
+      await migrateRbiColumns(db);
       /* Once per process, right after the tables are known to exist. There is no
          scheduler to do this at boot any more, and it has to happen before the
          first status or run — a run left 'running' by a container replaced

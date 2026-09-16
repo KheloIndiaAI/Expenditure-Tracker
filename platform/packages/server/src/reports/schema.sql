@@ -81,13 +81,24 @@ CREATE TABLE IF NOT EXISTS report_state (
 -- from what is shown and exported, but a row here is never physically
 -- destroyed. An official record with a silent, untraceable erase is a
 -- contradiction, and keeping the row costs nothing a reader would notice.
+-- BIGINT, not INTEGER, on every rupee column. Postgres's INTEGER is 4 bytes
+-- and tops out at 2,147,483,647 - and this scheme's own Total Assigned
+-- (roughly 394 crore, i.e. 3,940,075,000 rupees) is already past that on its
+-- own. INTEGER here would not fail loudly either: node-postgres sends a
+-- parameter as text and the column's own input function rejects it with
+-- "value out of range for type integer", which is exactly the kind of error
+-- the try/catch around this insert (see service.ts) is right to swallow for
+-- everything else it might throw - so this specific mistake would fail
+-- silently, forever, on every single row, and never once on SQLite, whose
+-- INTEGER has no such limit. That combination is what makes it worth this
+-- much explanation: it is invisible in dev and total in production.
 CREATE TABLE IF NOT EXISTS rbi_record (
   id                 TEXT PRIMARY KEY,
   entry_date         TEXT NOT NULL,     -- yyyy-mm-dd, IST calendar day of the save
-  total_assigned     INTEGER,           -- rupees; null only if never established
-  total_expenditure  INTEGER NOT NULL,  -- rupees; the fixed total this entry produced
-  balance            INTEGER,           -- rupees
-  day_total          INTEGER NOT NULL,  -- rupees; the "Yesterday's Total" entered
+  total_assigned     BIGINT,            -- rupees; null only if never established
+  total_expenditure  BIGINT NOT NULL,   -- rupees; the fixed total this entry produced
+  balance            BIGINT,            -- rupees
+  day_total          BIGINT NOT NULL,   -- rupees; the "Yesterday's Total" entered
   recorded_by        TEXT,              -- username
   created_at         TEXT NOT NULL,
   deleted_at         TEXT,
