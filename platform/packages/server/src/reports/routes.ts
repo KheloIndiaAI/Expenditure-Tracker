@@ -129,7 +129,7 @@ export function registerReportRoutes(app: FastifyInstance): void {
       if (!user) return reply.code(403).send({ message: 'You do not have access to Report Automation.' });
       try {
         const r = await service.saveOverrides(req.body ?? {}, user.username);
-        req.log.info({ event: 'reports.overrides', userId: user.id, applied: r.applied });
+        req.log.info({ event: 'reports.overrides', userId: user.id, applied: r.applied, rbiRecorded: r.rbiRecorded });
         return r;
       } catch (err) {
         return reply.code(400).send({ message: (err as Error).message });

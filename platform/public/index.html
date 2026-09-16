@@ -3458,12 +3458,22 @@ function autoOvSave(clear){
     .then(function(r){
       AUTO.ovBusy=false; AUTO.ovDirty=false;
       const applied=(r&&r.applied)||[];
+      const recorded=!!(r&&r.rbiRecorded);
       AUTO.ovMsg={ok:true, text:applied.length
         ? 'Saved. Press Process now to rebuild the report with '+applied.join(', ')+'.'
+          +(recorded?' Recorded in RBI Official Records below.':'')
         : 'Cleared. Every figure will be worked out from the sheet.'};
       /* Re-read rather than trusting the echo: the stored figures are what the
          next report will use, and they are what the boxes must show. */
-      AUTO.tried=false; autoLoad(true); render();
+      AUTO.tried=false; autoLoad(true);
+      /* The ledger card below has its OWN one-fetch-per-visit guard (RBI.tried),
+         exactly like AUTO's above it - which means a save that DID add a row
+         would sit there invisible until somebody happened to press that card's
+         own Refresh button. A save is precisely the moment a new row can exist,
+         so it is what re-arms that guard here, every time - whether or not this
+         particular save turned out to add one. */
+      RBI.tried=false; rbiLoad(true);
+      render();
     })
     .catch(function(err){
       AUTO.ovBusy=false;

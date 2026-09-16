@@ -366,6 +366,11 @@ export async function saveOverrides(
 ): Promise<{
   applied: string[];
   overrides: OverrideView;
+  /** Did THIS save add a row to RBI Official Records? Told to the caller
+   *  rather than left for the panel to infer, because "no" is a completely
+   *  ordinary outcome (nothing about Yesterday's Total changed) and looks
+   *  identical to a silent failure unless the response says which one it was. */
+  rbiRecorded: boolean;
 }> {
   const clean = (key: keyof OverrideInput): number | null => {
     const v = input[key];
@@ -444,11 +449,12 @@ export async function saveOverrides(
    * figures being fixed for the next report, and a ledger-write problem must
    * not be the reason that fails. It is logged, not swallowed silently.
    */
+  let rbiRecorded = false;
   try {
     const totalAssignedRupees = next.totalAssignedFixed
       ? assigned
       : (await store.latestSuccess())?.totals?.assigned ?? null;
-    await rbiRecords.maybeRecordEntry({
+    const written = await rbiRecords.maybeRecordEntry({
       prevDayRupees,
       nextDayRupees: dayTotal,
       totalExpenditureRupees: totalExpenditure,
@@ -457,6 +463,7 @@ export async function saveOverrides(
       entryDate: istISO(),
       recordedBy,
     });
+    rbiRecorded = written != null;
   } catch (err) {
     console.error('RBI Official Records: could not record this entry —', (err as Error)?.message ?? err);
   }
@@ -464,7 +471,7 @@ export async function saveOverrides(
   const applied = (['totalAssigned', 'totalExpenditure', 'balance', 'dayTotal'] as const)
     .filter((k) => (k === 'totalAssigned' ? next.totalAssignedFixed : next[k] != null))
     .map((k) => FIELD_LABEL[k] as string);
-  return { applied, overrides: viewOverrides(config, null) };
+  return { applied, overrides: viewOverrides(config, null), rbiRecorded };
 }
 
 /** Everything the panel needs in one call. */
