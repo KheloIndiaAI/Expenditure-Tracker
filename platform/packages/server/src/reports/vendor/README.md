@@ -80,9 +80,30 @@ Each is marked in the source with `VENDOR PATCH n`.
    so the platform writes one (see `../weekly.ts`) and draws it with these
    rather than a parallel set of its own.
 
+7. **`pdfgen.cjs` / `report-layout.cjs` — page 1 drops Yesterday's Expenditure
+   Distribution, and the summary is centred.** Upstream, page 1 is a two-column
+   band: the four-row Expenditure Summary on the left, a grid of the day's
+   claims — three name/amount pairs per row, under the heading "Yesterday's
+   Expenditure Distribution" — on the right. The grid is no longer printed in
+   either format, and the summary table is centred at the width its column used
+   to give it (42%) rather than stretched across the sheet.
+
+   This is a change to what the report *says*, not to how it runs, so unlike
+   the six above it has no "unset, behaviour is upstream's" escape: re-copying
+   these two files brings the block back. To restore it deliberately, take
+   `distributionGrid()` and its wrapper row from upstream `report-layout.cjs`,
+   and the `gridRows` loop, `formatLakh()`, `.top-grid`, `.dist-title` and
+   `.nowrap` from upstream `pdfgen.cjs`.
+
+   **The claims data is untouched.** `day.agencies` is still built by
+   `rollup.cjs` and still written in full to the day-by-day log workbook by
+   `log.cjs` — only page 1's rendering of it is gone. A run's figures,
+   `result.totals` and `result.divisions` are all unaffected, so the comparison
+   below should show no change in any published figure.
+
 ## Updating
 
-Re-copy the files, re-apply the six patches, then run the pipeline against the
+Re-copy the files, re-apply the seven patches, then run the pipeline against the
 live sheet and compare `result.totals`, `result.divisions` and the document byte
 counts with the run before. A change in any of them is a change to a published
 figure and wants explaining, not accepting.

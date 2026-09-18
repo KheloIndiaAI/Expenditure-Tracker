@@ -23,7 +23,7 @@ const COLORS = {
   dots: ['#2A78D6', '#EB6834', '#1BAF7A', '#EDA100', '#E87BA4', '#4A3AA7', '#E34948', '#008300'],
 };
 
-/* VENDOR PATCH 3 of 6 — see reports/vendor/README.md.
+/* VENDOR PATCH 3 of 7 — see reports/vendor/README.md.
    Upstream looks for Edge or Chrome at the four places they install on Windows,
    because that is where this ran. On the server it runs on Debian, where the
    browser is at a different path entirely and the Windows list finds nothing —
@@ -78,16 +78,6 @@ function formatCr(val) {
   const v = Math.abs(val) / 1e7;
   const sign = val < 0 ? '-' : '';
   return `${sign}₹${v.toFixed(2)} Cr`;
-}
-
-/** Format amounts in lakhs for distribution table e.g. "₹ 0.79 Lakhs" */
-function formatLakh(val) {
-  if (val == null || val === 0) return '—';
-  if (Math.abs(val) >= 1e7) {
-    return `₹ ${(val / 1e7).toFixed(2)} Cr`;
-  }
-  const l = (val / 1e5).toFixed(2).replace(/\.?0+$/, '');
-  return `₹ ${l} Lakhs`;
 }
 
 /**
@@ -172,10 +162,10 @@ const REPORT_CSS = `
 
     /*
      * Page 1 sizing. The whole sheet used to be set very small so that a
-     * ten-row distribution grid would still fit; now that grid is two rows and
-     * the type can breathe. Sizes below are set to fill an A4 landscape page —
-     * if content is ever added back, scale these down together rather than
-     * letting the page spill onto a third sheet.
+     * ten-row distribution grid would still fit beside the summary; that grid
+     * is gone (VENDOR PATCH 7) and the type can breathe. Sizes below are set to
+     * fill an A4 landscape page — if content is ever added back, scale these
+     * down together rather than letting the page spill onto a third sheet.
      */
     .report-title {
       font-size: 17px;
@@ -184,11 +174,20 @@ const REPORT_CSS = `
       margin: 0 0 10px 0;
       color: #0F172A;
     }
-    .top-grid {
-      display: grid;
-      grid-template-columns: 36% 62%;
-      column-gap: 2%;
+    /*
+     * The summary table, alone and centred. It sat in the left column of a
+     * two-column grid while the distribution filled the right; with nothing
+     * beside it, a full-width table would stretch four short rows across the
+     * whole sheet, so it keeps a table's worth of width and is centred in the
+     * space instead.
+     */
+    .summary-wrap {
+      display: flex;
+      justify-content: center;
       margin-bottom: 14px;
+    }
+    .summary-wrap .table-bordered {
+      width: 42%;
     }
     .table-bordered {
       width: 100%;
@@ -221,15 +220,6 @@ const REPORT_CSS = `
     }
     .text-right {
       text-align: right;
-    }
-    /* Amounts must not break across lines — "₹ 57.19 Lakhs" is one token. */
-    .nowrap {
-      white-space: nowrap;
-    }
-    .dist-title {
-      font-size: 13.5px;
-      font-weight: 600;
-      margin-bottom: 8px;
     }
 
     /* KI 1 and KI 2 */
@@ -969,30 +959,12 @@ function generateReportHtml(data, opts = {}) {
   const infra = divisions.find(d => d.key === 'SAI-INFRA');
   const scheme = divisions.filter(d => !d.source).reduce((s, d) => s + d.assigned, 0);
 
-  const items = (data.day.agencies || []).filter(a => a.amount > 0);
-
-  /*
-   * Yesterday's claims, laid out row-wise: the items simply fill left to
-   * right, three name/amount pairs per row, and the table ends when they run
-   * out. An earlier version sorted them into a fixed column per stream
-   * (centres | DDO HQ | everything else) and padded to a minimum of four
-   * rows, which left most of the grid blank — any stream with no claims
-   * yesterday still cost a full empty column, and a single stream with five
-   * claims stretched the table down the page beside them.
-   */
-  const PAIRS_PER_ROW = 3;
-  const label = a => (a.stream === 'DDO_KI' ? 'DDO KI' : a.name);
-  const gridRows = [];
-  for (let i = 0; i < items.length; i += PAIRS_PER_ROW) {
-    const slice = items.slice(i, i + PAIRS_PER_ROW);
-    const row = {};
-    for (let j = 0; j < PAIRS_PER_ROW; j++) {
-      const a = slice[j];
-      row[`c${j + 1}Name`] = a ? label(a) : '';
-      row[`c${j + 1}Amt`] = a ? formatLakh(a.amount) : '';
-    }
-    gridRows.push(row);
-  }
+  /* VENDOR PATCH 7 of 7 — see reports/vendor/README.md.
+     Yesterday's Expenditure Distribution used to be laid out here, a grid of
+     the day's claims three name/amount pairs to a row, sitting beside the
+     summary table. It is no longer printed. `data.day.agencies` still carries
+     those claims and is still written to the day-by-day log workbook by
+     log.cjs — only this page's rendering of them is gone. */
 
   // Regional Centres on Page 2
   let rcs = data.regionalCentres || [];
@@ -1140,44 +1112,26 @@ ${REPORT_CSS}
   <div class="page-container">
     <div class="report-title">EXPENDITURE SUMMARY (as on ${asOn})</div>
 
-    <!-- Top Summary & Yesterday's Distribution Grid -->
-    <div class="top-grid">
-      <div>
-        <table class="table-bordered">
-          <tr>
-            <td class="font-bold">Total Assigned</td>
-            <td class="text-right font-bold">${formatCr(data.totals.assigned)}</td>
-          </tr>
-          <tr>
-            <td class="font-bold">Total Expenditure</td>
-            <td class="text-right font-bold">${formatCr(data.totals.expenditure)}</td>
-          </tr>
-          <tr class="bg-balance">
-            <td class="font-bold red-text">BALANCE</td>
-            <td class="text-right font-bold red-text">${formatCr(data.totals.balance)}</td>
-          </tr>
-          <tr>
-            <td class="font-bold">Yesterday's Total Expenditure</td>
-            <td class="text-right font-bold">${formatCr(data.day.total)}</td>
-          </tr>
-        </table>
-      </div>
-
-      <div>
-        <div class="dist-title">Yesterday's Expenditure Distribution &nbsp; ( ${formatCr(data.day.total)} )</div>
-        <table class="table-bordered">
-          ${gridRows.map(r => `
-            <tr>
-              <td class="font-bold" style="width: 17%;">${r.c1Name}</td>
-              <td class="text-right font-medium nowrap" style="width: 16%; color: ${r.c1Amt && r.c1Amt !== '—' ? '#16A34A' : '#0F172A'};">${r.c1Amt}</td>
-              <td class="font-bold" style="width: 17%;">${r.c2Name}</td>
-              <td class="text-right font-medium nowrap" style="width: 16%; color: ${r.c2Amt && r.c2Amt !== '—' ? '#16A34A' : '#0F172A'};">${r.c2Amt}</td>
-              <td class="font-bold" style="width: 17%;">${r.c3Name}</td>
-              <td class="text-right font-medium nowrap" style="width: 17%; color: ${r.c3Amt && r.c3Amt !== '—' ? '#16A34A' : '#0F172A'};">${r.c3Amt}</td>
-            </tr>
-          `).join('')}
-        </table>
-      </div>
+    <!-- Top Summary, centred — see VENDOR PATCH 7 -->
+    <div class="summary-wrap">
+      <table class="table-bordered">
+        <tr>
+          <td class="font-bold">Total Assigned</td>
+          <td class="text-right font-bold">${formatCr(data.totals.assigned)}</td>
+        </tr>
+        <tr>
+          <td class="font-bold">Total Expenditure</td>
+          <td class="text-right font-bold">${formatCr(data.totals.expenditure)}</td>
+        </tr>
+        <tr class="bg-balance">
+          <td class="font-bold red-text">BALANCE</td>
+          <td class="text-right font-bold red-text">${formatCr(data.totals.balance)}</td>
+        </tr>
+        <tr>
+          <td class="font-bold">Yesterday's Total Expenditure</td>
+          <td class="text-right font-bold">${formatCr(data.day.total)}</td>
+        </tr>
+      </table>
     </div>
 
     <!-- KI 1 and KI 2 Side by Side -->

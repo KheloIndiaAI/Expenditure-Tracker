@@ -1,9 +1,10 @@
 'use strict';
 /*
  * The "report" Word layout — a direct rendering of the Expenditure Summary
- * Report PDF: header block + yesterday's distribution grid, KI-1 and KI-2 side
- * by side with their stat cards and component panels, SAI-INFRA beneath, and a
- * Regional Centre page.
+ * Report PDF: the centred summary block, KI-1 and KI-2 side by side with their
+ * stat cards and component panels, SAI-INFRA beneath, and a Regional Centre
+ * page. (Yesterday's distribution grid sat beside the summary until VENDOR
+ * PATCH 7 removed it from both formats.)
  *
  * Word cannot draw the PDF's rounded icon cards, so a "card" here is a shaded,
  * hairline-bordered table cell and a "progress bar" is a two-cell table shaded
@@ -89,6 +90,9 @@ const table = (rows, o = {}) => new Table({
   borders: o.borders || NO_BORDERS,
   columnWidths: o.columnWidths,
   layout: o.layout,
+  /* Only meaningful on a table narrower than the page. Left undefined by every
+     caller but the centred page-1 summary, which keeps Word's default. */
+  alignment: o.alignment,
 });
 
 /* ---------- building blocks ---------- */
@@ -230,11 +234,11 @@ const badge = section => {
 
 /* ---------- page 1 blocks ---------- */
 
-function headerSummary(d) {
-  const rowOf = (label, value, o = {}) => new TableRow({ cantSplit: true,
+function headerSummary(d, o = {}) {
+  const rowOf = (label, value, ro = {}) => new TableRow({ cantSplit: true,
     children: [
-      cell([line(label, { bold: true, size: 19, italics: o.italics })], { width: 62, borders: BOX }),
-      cell([line(value, { bold: true, size: 19, color: o.color })], { width: 38, borders: BOX }),
+      cell([line(label, { bold: true, size: 19, italics: ro.italics })], { width: 62, borders: BOX }),
+      cell([line(value, { bold: true, size: 19, color: ro.color })], { width: 38, borders: BOX }),
     ],
   });
   return table([
@@ -242,45 +246,15 @@ function headerSummary(d) {
     rowOf('Total Expenditure', cr(d.totals.expenditure), { color: GREEN }),
     rowOf('  BALANCE', cr(d.totals.balance), { color: RED }),
     rowOf("Yesterday's Total Expenditure", cr(d.day.total), { italics: true }),
-  ], { borders: BOX });
+  ], { borders: BOX, width: o.width, alignment: o.alignment });
 }
 
-/**
- * The day's claims as the PDF lays them out: a compact grid of name/amount
- * pairs, three pairs per row, amounts in lakhs below a crore.
- */
-function distributionGrid(d) {
-  const items = (d.day.agencies || []).filter(a => a.amount > 0);
-  if (!items.length) {
-    return [line('No claims settled in this report.', { size: 16, color: MUTED })];
-  }
-  // Construction agencies carry long legal names ("National Buildings
-  // Construction Corporation Limited [NBCC]") that would wrap this compact
-  // grid into a mess — shorten to the recognisable part.
-  const shortName = n => {
-    const s = String(n).replace(/\s+/g, ' ').trim();
-    const bracketed = s.match(/\[([A-Z]{2,8})\]/);        // "... [NBCC]" -> NBCC
-    if (bracketed) return bracketed[1];
-    return s.length > 26 ? `${s.slice(0, 24).trimEnd()}…` : s;
-  };
-
-  const PAIRS = 3;
-  const rows = [];
-  for (let i = 0; i < items.length; i += PAIRS) {
-    const slice = items.slice(i, i + PAIRS);
-    const cells = [];
-    for (let j = 0; j < PAIRS; j++) {
-      const a = slice[j];
-      cells.push(cell([line(a ? shortName(a.name) : '', { bold: true, size: 17 })], { width: 20, borders: BOX }));
-      cells.push(cell([line(a ? crOrLakh(a.amount) : '', { size: 17, color: a ? GREEN : INK })], { width: 13, borders: BOX }));
-    }
-    rows.push(new TableRow({ cantSplit: true, children: cells }));
-  }
-  return [
-    line(`Yesterday's Expenditure Distribution   ( ${cr(d.day.total)} )`, { size: 19, after: 80 }),
-    table(rows, { borders: BOX }),
-  ];
-}
+/* VENDOR PATCH 7 of 7 — see reports/vendor/README.md.
+   distributionGrid() stood here: the day's claims as a grid of name/amount
+   pairs, three to a row, drawn beside headerSummary() on page 1 to match the
+   PDF. Neither format prints it now. The claims themselves are untouched —
+   `d.day.agencies` still carries them and log.cjs still writes every one of
+   them to the day-by-day log workbook. */
 
 /** One division block: highlighted heading, three stat cards, component panel. */
 function divisionBlock(div, schemeTotal) {
@@ -592,20 +566,12 @@ function reportLayout(data) {
     spacing: { after: 200 },
   }));
 
-  // --- header summary beside the distribution grid ---
-  // These two large wrapper rows must NOT be cantSplit: they hold everything
-  // below them (in the KI-1/KI-2 case, entire component tables), and forcing
-  // such a tall row to stay whole makes Word's page-break estimate for it
-  // wildly conservative — it was reserving an extra blank page rather than
-  // ever risk splitting a row that size. The rows *inside* each column (the
-  // individual cards, component lines, table rows) keep cantSplit, which is
-  // what actually prevents an ugly mid-card split.
-  out.push(table([new TableRow({
-    children: [
-      cell([headerSummary(data)], { width: 40, margins: { top: 0, bottom: 0, left: 0, right: 260 } }),
-      cell(distributionGrid(data), { width: 60, margins: { top: 0, bottom: 0, left: 0, right: 0 } }),
-    ],
-  })]));
+  // --- header summary, centred ---
+  // It used to be the left column of a wrapper table, with the distribution
+  // grid filling the right (VENDOR PATCH 7). Alone, it is centred at the width
+  // that column gave it rather than stretched across the sheet, which is what
+  // a full-width table of four short rows would do.
+  out.push(headerSummary(data, { width: 42, alignment: AlignmentType.CENTER }));
   out.push(blank(240));
 
   // --- KI-1 and KI-2 side by side ---
@@ -664,7 +630,7 @@ function reportLayout(data) {
   return out;
 }
 
-/* VENDOR PATCH 6 of 6 — see reports/vendor/README.md.
+/* VENDOR PATCH 6 of 7 — see reports/vendor/README.md.
    Exports only. leaderboardPage() is this file's own Word rendering of the
    weekly leaderboard, written here but never called by reportLayout() - the
    desktop tool only ever produced that page as a PDF. The platform produces a
