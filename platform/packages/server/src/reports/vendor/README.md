@@ -101,9 +101,33 @@ Each is marked in the source with `VENDOR PATCH n`.
    `result.totals` and `result.divisions` are all unaffected, so the comparison
    below should show no change in any published figure.
 
+8. **`dsc.cjs` / `snapshot.cjs` / `pdfgen.cjs` — the weekly pages can be asked
+   for a different window, and told what to call it.** Upstream, both weekly
+   figures are derived rather than requested: the leaderboard always covers the
+   completed week before its reference date, and component spend always
+   differences against whichever snapshot happens to be the most recent one
+   before it. The platform's "this week so far" report needs Monday-to-today
+   and this Monday's snapshot specifically, so each gained one optional
+   argument — `range` on `weeklyRegionalCentreLeaderboard`, `baselineOn` on
+   `componentWeeklySpend`. `pdfgen.cjs`'s two weekly pages gained an optional
+   `words` object on the data they are handed.
+
+   **Unset, all three are upstream exactly** — same window, same baseline, same
+   wording — and the completed-week report passes none of them, so it is
+   untouched.
+
+   The `baselineOn` argument is the one worth understanding. Asked on a Monday,
+   "the most recent snapshot before today" reaches *past* this week's Monday to
+   the week before, and a page captioned "this week so far" would then show a
+   full previous week. Naming the baseline is what stops that.
+
+   The wording defaults matter for the same reason: a page covering Monday to
+   today, captioned "Previous week" and "Total Spent Last Week", would be wrong
+   in precisely the way this report exists to avoid.
+
 ## Updating
 
-Re-copy the files, re-apply the seven patches, then run the pipeline against the
+Re-copy the files, re-apply the eight patches, then run the pipeline against the
 live sheet and compare `result.totals`, `result.divisions` and the document byte
 counts with the run before. A change in any of them is a change to a published
 figure and wants explaining, not accepting.

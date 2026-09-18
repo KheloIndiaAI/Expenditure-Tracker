@@ -512,6 +512,59 @@ export async function getDailyLog(): Promise<Buffer | null> {
   return row ? asBuffer(row.blob) : null;
 }
 
+// ── the current-week report ─────────────────────────────────────────────────
+//
+// A singleton, deliberately: "this week so far" has exactly one meaningful
+// answer at any moment, and generating it again replaces the old one rather
+// than adding to a history. That is the whole difference from report_doc,
+// which keys documents to the run that produced them because each of those is
+// a record of a particular day and all of them stay worth keeping.
+
+export interface CurrentWeekMeta {
+  generatedAt: string;
+  generatedBy: string | null;
+  /** The window the pages actually cover, yyyy-mm-dd. */
+  rangeStart: string | null;
+  rangeEnd: string | null;
+  bytes: number;
+  pages: number | null;
+  /** Anything the reader should know about what is and is not on the pages. */
+  warnings: string[];
+}
+
+const CURRENT_WEEK_KEY = 'weekly-current';
+
+export async function putCurrentWeek(pdf: Buffer, meta: CurrentWeekMeta): Promise<void> {
+  await initReports();
+  const db = await getDb();
+  await db.run(
+    `INSERT INTO report_state (key, json, blob, updated_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT (key) DO UPDATE SET
+       json = excluded.json, blob = excluded.blob, updated_at = excluded.updated_at`,
+    [CURRENT_WEEK_KEY, JSON.stringify(meta), pdf, now()],
+  );
+}
+
+/** The metadata alone — what the panel needs to describe the stored copy. */
+export async function getCurrentWeekMeta(): Promise<CurrentWeekMeta | null> {
+  await initReports();
+  const db = await getDb();
+  const row = await db.one<{ json: string }>(
+    'SELECT json FROM report_state WHERE key = ?', [CURRENT_WEEK_KEY],
+  );
+  return row?.json ? asJson<CurrentWeekMeta | null>(row.json, null) : null;
+}
+
+/** The stored PDF itself, for the download. */
+export async function getCurrentWeekPdf(): Promise<Buffer | null> {
+  await initReports();
+  const db = await getDb();
+  const row = await db.one<{ blob: unknown }>(
+    'SELECT blob FROM report_state WHERE key = ?', [CURRENT_WEEK_KEY],
+  );
+  return row ? asBuffer(row.blob) : null;
+}
+
 // ── RBI Official Records ────────────────────────────────────────────────────
 // One row per calendar day, holding the four figures as they were last saved
 // that day. See schema.sql for why this is its own table rather than living

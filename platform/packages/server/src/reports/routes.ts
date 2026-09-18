@@ -138,6 +138,49 @@ export function registerReportRoutes(app: FastifyInstance): void {
     },
   );
 
+  /**
+   * The current-week report — "this week so far", Monday to today.
+   *
+   * Produced ONLY here, by pressing Generate. No run produces it, nothing
+   * schedules it, and it replaces nothing: the weekly report above still
+   * covers the last completed week and is still written by Process now.
+   *
+   * Rate-limited harder than a report run, and for the same reason: it reads
+   * the whole workbook and then launches a browser to print, so a held-down
+   * button should not become a queue of them.
+   */
+  app.post(
+    '/api/reports/weekly-current',
+    { config: { rateLimit: { max: 4, timeWindow: '1 minute' } } },
+    async (req, reply) => {
+      const user = await allowed(req);
+      if (!user) return reply.code(403).send({ message: 'You do not have access to Report Automation.' });
+
+      const already = await store.runningRun();
+      if (already) {
+        return reply.code(409).send({ message: 'A report run is in progress.', since: already.at ?? null });
+      }
+      req.log.info({ event: 'reports.weekly-current', userId: user.id });
+      const r = await service.generateCurrentWeek(user.username);
+      if (!r.ok) return reply.code(422).send({ message: r.error ?? 'The report could not be generated.' });
+      return r;
+    },
+  );
+
+  /** The stored copy of the above. 404 until it has been generated once. */
+  app.get('/api/reports/weekly-current/pdf', async (req, reply) => {
+    const user = await allowed(req);
+    if (!user) return reply.code(403).send({ message: 'You do not have access to Report Automation.' });
+    const [pdf, meta] = await Promise.all([store.getCurrentWeekPdf(), store.getCurrentWeekMeta()]);
+    if (!pdf) return reply.code(404).send({ message: 'No current-week report has been generated yet.' });
+    const stamp = meta?.rangeEnd ?? 'latest';
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `attachment; filename="WEEKLY REPORT - this week so far - ${stamp}.pdf"`)
+      .header('Cache-Control', 'private, no-store')
+      .send(pdf);
+  });
+
   /** The cumulative day-by-day log workbook. */
   app.get('/api/reports/daily-log', async (req, reply) => {
     const user = await allowed(req);

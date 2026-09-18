@@ -3172,7 +3172,10 @@ const AUTO={status:null, err:null, denied:false, loading:false, at:null, busy:''
      rather than wiping half-finished input. `dirty` stops a status refresh from
      overwriting it with the stored values while somebody is still typing. */
   ov:{exp:'',bal:'',day:'',assigned:'',fixed:false}, ovTouched:{}, ovDirty:false,
-  ovOpen:false, ovSeen:false, ovBusy:false, ovMsg:null};
+  ovOpen:false, ovSeen:false, ovBusy:false, ovMsg:null,
+  /* The current-week card's own message, kept apart from ovMsg so generating a
+     report never speaks over a "figures saved" note, or vice versa. */
+  cwMsg:null};
 
 /* Every request carries its own timeout: a report run reads the whole workbook
    and lays out two documents, so it is allowed minutes, while merely asking how
@@ -3246,6 +3249,84 @@ const AUTO_WEEKLY_DOCS=[
   {f:'weekly-report', t:'Weekly Report — Regional Centres', ext:'Word', c:'var(--serious)', needs:'weekly-report'},
   {f:'weekly-pdf',    t:'Weekly Report — Regional Centres', ext:'PDF',  c:'var(--serious)', needs:'weekly-html'}
 ];
+
+/* ---- this week so far -------------------------------------------------------
+   The card below the figures and above the weekly report. It answers a
+   different question from that one: not what last week came to, which is
+   settled, but where this week stands at this moment - so it is read off the
+   sheet when Generate is pressed and at no other time. PDF only, by design.
+
+   It is deliberately NOT part of a run: pressing Process now leaves it alone,
+   and pressing Generate leaves the daily and weekly documents alone. Two
+   reports about overlapping weeks would otherwise quietly overwrite each
+   other's meaning. */
+function autoCwGenerate(){
+  if(AUTO.busy) return;
+  AUTO.busy='cw'; AUTO.cwMsg=null; render();
+  autoFetch('/api/reports/weekly-current',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:'{}',timeoutMs:300000})
+    .then(function(r){
+      AUTO.busy='';
+      const w=(r&&r.meta&&r.meta.warnings)||[];
+      AUTO.cwMsg={ok:true, text:'Generated. '+(w.length?w.join(' '):'Ready to download below.')};
+      /* Re-read rather than trusting the echo, exactly as saving the figures
+         does: what the panel offers for download must be what is stored. */
+      AUTO.tried=false; autoLoad(true); render();
+    })
+    .catch(function(err){
+      AUTO.busy='';
+      AUTO.cwMsg={ok:false, text:(err&&err.name==='AbortError')
+        ? 'The server did not answer in time. It may still be working - press Refresh in a moment.'
+        : ((err&&err.message)||'Could not generate the report.')};
+      render();
+    });
+}
+/** 'yyyy-mm-dd' -> 'Mon 14 Sep', matching the weekly card's own range label. */
+function autoCwDay(iso){
+  if(!iso) return '—';
+  const p=String(iso).split('-').map(Number);
+  if(p.length<3) return String(iso);
+  const d=new Date(Date.UTC(p[0],p[1]-1,p[2]));
+  const D=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return D[d.getUTCDay()]+' '+String(p[2]).padStart(2,'0')+' '+M[p[1]-1];
+}
+function autoCwCard(st){
+  const cw=st.currentWeek||null;
+  const busy=AUTO.busy==='cw';
+  const range=cw&&cw.rangeStart
+    ? autoCwDay(cw.rangeStart)+' – '+autoCwDay(cw.rangeEnd)+' '+String(cw.rangeEnd).slice(0,4)
+    : '';
+  /* The stored copy's own range, not today's. A report generated on Tuesday
+     still covers Monday to Tuesday however long it sits there, and relabelling
+     it with today's date would be the one kind of wrong this card cannot
+     afford. */
+  const body = cw
+    ? '<div class="tscroll"><table class="dt"><thead><tr><th>Document</th><th>Format</th>'
+      + '<th class="num">Size</th><th class="num">Download</th></tr></thead><tbody>'
+      + '<tr><td><div class="dsc-t" style="color:var(--primary)"><i style="background:var(--primary)"></i>'
+      + 'This Week so far — Regional Centres</div>'
+      + '<div class="small muted">'+esc(range)+' · generated '+esc(autoWhen(cw.generatedAt))+'</div></td>'
+      + '<td>PDF</td>'
+      + '<td class="num muted">'+esc(autoBytes(cw.bytes))+'</td>'
+      + '<td class="num"><a class="btn" href="/api/reports/weekly-current/pdf">Download</a></td></tr>'
+      + '</tbody></table></div>'
+      + ((cw.warnings&&cw.warnings.length)
+          ? '<div class="qh" style="margin:10px 2px 0;color:var(--serious)">'+esc(cw.warnings.join(' '))+'</div>'
+          : '')
+    : '<div class="dt-empty"><div class="e-ic">📄</div><div class="e-t">Not generated yet</div>'
+      + '<div class="e-s">Press Generate this week report to read the sheet as it stands right now.</div></div>';
+
+  return '<div class="card"><div class="card-hd"><h3>This Week so far — Regional Centres</h3>'
+    + '<span class="small muted">'+(cw?esc(range):'Monday to today')+'</span>'
+    + '<div class="tools"><button class="btn ov-go" onclick="autoCwGenerate()"'
+      + ((AUTO.busy||st.running)?' disabled':'')+'>'
+      + (busy?'Generating…':(st.running?'A run is in progress…':'Generate this week report'))+'</button></div></div>'
+    + (AUTO.cwMsg?'<div class="pf-msg '+(AUTO.cwMsg.ok?'ok':'err')+'" style="margin:0 0 12px">'+esc(AUTO.cwMsg.text)+'</div>':'')
+    + body
+    + '<div class="qh" style="margin:10px 2px 0">The same two pages as the weekly report, covering this Monday up to '
+    + 'today instead of the week just gone. Read from the sheet when you press Generate and at no other time, so it '
+    + 'is current as of that moment — press it again for a fresher answer. PDF only.</div></div>';
+}
 function autoBytes(b){
   if(!b&&b!==0) return '';
   return b>=1048576 ? (b/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(b/1024))+' KB';
@@ -3723,6 +3804,7 @@ function viewReports(){
         + '<button class="btn ov-go" onclick="autoRun()"'+((AUTO.busy||st.running)?' disabled':'')+'>'
         + (AUTO.busy==='run'?'Processing…':(st.running?'A run is in progress…':'Process now'))+'</button></div></div>'
       + docTable(AUTO_DOCS,'Nothing is produced until you press Process now.') + pdfNote + '</div>'
+    + autoCwCard(st)
     + '<div class="card"><div class="card-hd"><h3>Weekly Report — Regional Centres</h3>'
       + '<span class="small muted">Previous week · '+esc(weekLbl)+'</span></div>'
       + docTable(AUTO_WEEKLY_DOCS,'Produced alongside the Summary — press Process now.')

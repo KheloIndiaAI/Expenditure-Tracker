@@ -136,14 +136,28 @@ async function buildWeekly(
 }
 
 /**
- * One run at a time in this process.
+ * One pipeline job at a time in this process — whichever kind.
  *
- * EFIP_REPORTS_HOME is process-wide, so two runs overlapping would have the
+ * EFIP_REPORTS_HOME is process-wide, so two jobs overlapping would have the
  * second one's folder silently become the first one's too. The database check
  * in runReport guards across containers; this guards within one, and does it
  * without a race because a promise is stored before anything awaits.
+ *
+ * The kind is tracked alongside because there are now two: a report run and a
+ * current-week generation. Both drive the same pipeline through the same
+ * working directory, so they must not overlap — but they return different
+ * things, and handing one caller the other's promise would be worse than
+ * making it wait.
  */
-let inFlight: Promise<RunResult> | null = null;
+let inFlight: Promise<unknown> | null = null;
+let inFlightKind: 'report' | 'current-week' | null = null;
+
+function claim<T>(kind: 'report' | 'current-week', job: () => Promise<T>): Promise<T> {
+  const p = job().finally(() => { inFlight = null; inFlightKind = null; });
+  inFlight = p;
+  inFlightKind = kind;
+  return p;
+}
 
 export interface RunResult {
   ok: boolean;
@@ -172,9 +186,15 @@ export function isRunning(): boolean {
 }
 
 export async function runReport(opts: RunOptions): Promise<RunResult> {
-  if (inFlight) return inFlight;
-  inFlight = execute(opts).finally(() => { inFlight = null; });
-  return inFlight;
+  /* Two people pressing Process now get the same run, as before. A press that
+     lands while the current-week report is being generated is refused instead:
+     the two cannot share a working directory, and returning that job's promise
+     would hand back a result of the wrong shape entirely. */
+  if (inFlight && inFlightKind === 'report') return inFlight as Promise<RunResult>;
+  if (inFlight) {
+    return { ok: false, runId: '', error: 'The current-week report is being generated. Try again in a moment.' };
+  }
+  return claim('report', () => execute(opts));
 }
 
 async function execute(opts: RunOptions): Promise<RunResult> {
@@ -221,6 +241,134 @@ async function execute(opts: RunOptions): Promise<RunResult> {
     const message = (err as Error)?.message ?? String(err);
     await store.finishRun(runId, { status: 'failed', error: message, warnings: [] });
     return { ok: false, runId, error: message };
+  } finally {
+    if (prevHome === undefined) delete process.env.EFIP_REPORTS_HOME;
+    else process.env.EFIP_REPORTS_HOME = prevHome;
+    store.discard(work);
+  }
+}
+
+/* ── the current-week report ──────────────────────────────────────────────────
+ *
+ * "Where does this week stand right now" — Monday to today, produced only when
+ * somebody presses Generate.
+ *
+ * WHY THIS READS THE SHEET AGAIN rather than reusing the last run's documents.
+ * Those describe the day that run happened; this question is about the moment
+ * it is asked, and the sheet moves between the two. So it drives the same
+ * pipeline over the same working directory — which is exactly why it takes the
+ * same in-process claim a report run does.
+ *
+ * WHAT IT DELIBERATELY DOES NOT DO: it writes no Word file, stores no run row,
+ * records no Monday snapshot and replaces none of the daily documents. It is a
+ * look at work in progress, not a record of anything, and pressing Generate
+ * must not quietly stand in for pressing Process now.
+ */
+export interface CurrentWeekResult {
+  ok: boolean;
+  meta?: store.CurrentWeekMeta;
+  error?: string;
+}
+
+const isoOf = (d: Date): string => {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+};
+
+export async function generateCurrentWeek(generatedBy: string | null): Promise<CurrentWeekResult> {
+  if (inFlight) {
+    return { ok: false, error: inFlightKind === 'report'
+      ? 'A report run is in progress. Try again when it finishes.'
+      : 'The current-week report is already being generated.' };
+  }
+  return claim('current-week', () => buildCurrentWeek(generatedBy));
+}
+
+async function buildCurrentWeek(generatedBy: string | null): Promise<CurrentWeekResult> {
+  const gen = pdfgen();
+  if (!gen.findBrowser()) {
+    return { ok: false, error: 'No browser is available on the server to render a PDF, so this report cannot be produced.' };
+  }
+
+  const work = await store.hydrate();
+  const prevHome = process.env.EFIP_REPORTS_HOME;
+  process.env.EFIP_REPORTS_HOME = work.home;
+  const warnings: string[] = [];
+
+  try {
+    /* Read the sheet, and nothing else: no documents, no daily log. Only the
+       figures are wanted, and writing either here would mean pressing Generate
+       quietly altered what Process now is responsible for. */
+    const detail = await pipeline().processReport({ writeDocs: false, writeLog: false, writePdf: false });
+    const result = detail.result ?? {};
+
+    /* IST, like every other date this platform decides — the sheet's dates are
+       Indian and a server in another zone must not pick a different "today". */
+    const istNow = new Date(Date.now() + IST_OFFSET_MIN * 60000);
+    const today = new Date(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate());
+    const todayISO = isoOf(today);
+
+    let leaderboard: any = null;
+    try {
+      leaderboard = weekly.leaderboardForCurrentWeek(detail?.master?.file, today);
+      if (!leaderboard) warnings.push('No Regional Centre claims have been recorded yet this week, so the leaderboard page is not included.');
+    } catch (err) {
+      warnings.push(`Could not build the leaderboard (${(err as Error).message}).`);
+    }
+
+    let componentWeek: any = null;
+    try {
+      componentWeek = weekly.componentWeekToDate(todayISO, result.divisions ?? []);
+      if (!componentWeek) {
+        warnings.push(
+          'Component spending is left out: it is measured against this week\'s Monday snapshot of Sheet3, ' +
+          'and there is none yet. Press Process now once and it appears from then on.',
+        );
+      }
+    } catch (err) {
+      warnings.push(`Could not work out component spending (${(err as Error).message}).`);
+    }
+
+    if (!leaderboard && !componentWeek) {
+      return { ok: false, error: warnings[0] ?? 'There is nothing to report for this week yet.' };
+    }
+
+    const range = weekly.currentWeekRange(today);
+    const html = weekly.buildCurrentWeekHtml({ leaderboard, componentWeek, today, asOn: detail?.asOn });
+    if (!html) return { ok: false, error: 'The report could not be laid out.' };
+
+    /* Printed through a throwaway directory, the same way renderPdf does it:
+       the browser prints from a file, and nothing should survive on a disk the
+       next deploy replaces. */
+    const dir = join(tmpdir(), `efip-weekly-current-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    try {
+      const res = await gen.htmlToPdf(html, dir, 'WEEKLY REPORT - this week so far');
+      if (!res.pdfFile || !existsSync(res.pdfFile)) {
+        return { ok: false, error: res.warning || 'The PDF could not be rendered.' };
+      }
+      const content = readFileSync(res.pdfFile);
+      const pages = gen.pdfPageCount(res.pdfFile);
+      const expected = (leaderboard ? 1 : 0) + (componentWeek ? 1 : 0);
+      if (pages != null && pages !== expected) {
+        warnings.push(`The PDF came out at ${pages} pages where its layout expects ${expected} — check the last page for a stranded row.`);
+      }
+      const meta: store.CurrentWeekMeta = {
+        generatedAt: new Date().toISOString(),
+        generatedBy,
+        rangeStart: isoOf(range.start),
+        rangeEnd: isoOf(range.end),
+        bytes: content.length,
+        pages: pages ?? null,
+        warnings,
+      };
+      await store.putCurrentWeek(content, meta);
+      return { ok: true, meta };
+    } finally {
+      try { rmSync(dir, { recursive: true, force: true }); } catch { /* a temp dir is not worth failing over */ }
+    }
+  } catch (err) {
+    return { ok: false, error: (err as Error)?.message ?? String(err) };
   } finally {
     if (prevHome === undefined) delete process.env.EFIP_REPORTS_HOME;
     else process.env.EFIP_REPORTS_HOME = prevHome;
@@ -478,11 +626,12 @@ export async function saveOverrides(
 
 /** Everything the panel needs in one call. */
 export async function status(): Promise<Record<string, unknown>> {
-  const [config, latest, running, runs] = await Promise.all([
+  const [config, latest, running, runs, currentWeek] = await Promise.all([
     store.getConfig(),
     store.latestSuccess(),
     store.runningRun(),
     store.listRuns(12),
+    store.getCurrentWeekMeta(),
   ]);
   return {
     overrides: viewOverrides(config, latest),
@@ -490,6 +639,9 @@ export async function status(): Promise<Record<string, unknown>> {
     runningSince: running?.at ?? null,
     latest,
     runs,
+    /* null until somebody presses Generate — this report is never produced by
+       a run, only on demand. */
+    currentWeek,
     pdf: { available: !!pdfgen().findBrowser() },
     source: {
       sheetId: (config.googleSheets as Record<string, unknown>)?.sheetId ?? null,

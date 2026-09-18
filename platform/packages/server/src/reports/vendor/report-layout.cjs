@@ -249,7 +249,7 @@ function headerSummary(d, o = {}) {
   ], { borders: BOX, width: o.width, alignment: o.alignment });
 }
 
-/* VENDOR PATCH 7 of 7 — see reports/vendor/README.md.
+/* VENDOR PATCH 7 of 8 — see reports/vendor/README.md.
    distributionGrid() stood here: the day's claims as a grid of name/amount
    pairs, three to a row, drawn beside headerSummary() on page 1 to match the
    PDF. Neither format prints it now. The claims themselves are untouched —
@@ -630,7 +630,7 @@ function reportLayout(data) {
   return out;
 }
 
-/* VENDOR PATCH 6 of 7 — see reports/vendor/README.md.
+/* VENDOR PATCH 6 of 8 — see reports/vendor/README.md.
    Exports only. leaderboardPage() is this file's own Word rendering of the
    weekly leaderboard, written here but never called by reportLayout() - the
    desktop tool only ever produced that page as a PDF. The platform produces a

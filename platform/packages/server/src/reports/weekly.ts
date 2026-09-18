@@ -97,6 +97,100 @@ export function leaderboardForCompletedWeek(masterFile: string, today: Date): an
   return lb && lb.rows && lb.rows.length ? lb : null;
 }
 
+// ── the week in progress ─────────────────────────────────────────────────────
+//
+// Everything below answers a different question from everything above: not
+// "what happened last week", which is settled and will never change, but "where
+// does this week stand right now", which is different every time it is asked.
+// The two are kept apart deliberately — the completed-week report is a record,
+// this is a look at work in progress, and conflating them is how a page ends up
+// captioned as one while showing the other.
+
+/** This week's Monday 00:00 through the end of `today`, as local Dates. */
+export function currentWeekRange(today: Date): { start: Date; end: Date } {
+  const d = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const offsetToMonday = (d.getDay() + 6) % 7;          // getDay(): 0 = Sunday
+  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - offsetToMonday);
+  return { start, end: d };
+}
+
+/**
+ * Regional Centre spend from this Monday up to and including today.
+ *
+ * The window is stated rather than derived, so the page's own header prints
+ * the days actually covered — see vendor patch 8. Asked on a Monday this is a
+ * single day, which is the honest answer rather than an empty page.
+ */
+export function leaderboardForCurrentWeek(masterFile: string, today: Date): any | null {
+  const range = currentWeekRange(today);
+  const lb = dscMod().weeklyRegionalCentreLeaderboard(masterFile, today, 'DSC_Details', range);
+  return lb && lb.rows && lb.rows.length ? lb : null;
+}
+
+/**
+ * Component spend so far this week: the run's live figures minus THIS Monday's
+ * snapshot.
+ *
+ * The baseline is named explicitly rather than left to "the most recent
+ * snapshot before today" (vendor patch 8). Asked on a Monday, that rule would
+ * reach past this week's snapshot to the one before it and report a full week
+ * of spend as though it had all happened today.
+ *
+ * Returns null when this week's Monday has no snapshot yet — the page is then
+ * left out rather than differenced against some older week, and the caller
+ * says why.
+ */
+export function componentWeekToDate(todayISO: string, divisions: unknown[]): any | null {
+  const snap = snapshotMod();
+  const monday = mondayOfISO(todayISO);
+  if (!(snap.readAll() as any[]).some((s) => s.takenOn === monday)) return null;
+  const [y, m, d] = todayISO.split('-').map(Number);
+  /* Local-component Date, because isoKey() inside the vendored module reads
+     local date fields - a UTC-built date can land a day either side. */
+  const cw = snap.componentWeeklySpend(new Date(y!, m! - 1, d!), divisions, monday);
+  return cw && cw.rows ? cw : null;
+}
+
+/** dd Mon yyyy, for the wording on a page covering a part-week. */
+function dayLabelShort(d: Date): string {
+  return `${String(d.getDate()).padStart(2, '0')} ${MON[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/**
+ * The HTML for the current-week PDF: the same two pages as the completed-week
+ * report, from the same renderers, captioned for a week still running.
+ *
+ * Only the wording differs, and only where the default would be false — the
+ * figures, the layout and the stylesheet are shared with the weekly report
+ * precisely so the two cannot drift into looking like different publications.
+ */
+export function buildCurrentWeekHtml(input: {
+  leaderboard: any | null;
+  componentWeek: any | null;
+  today: Date;
+  asOn?: string;
+}): string | null {
+  const asOfLabel = dayLabelShort(input.today);
+  const leaderboard = input.leaderboard && {
+    ...input.leaderboard,
+    words: {
+      period: 'This week so far',
+      spent: 'Total Spent This Week',
+      avgSub: 'across centres that have claimed this week',
+    },
+  };
+  const componentWeek = input.componentWeek && {
+    ...input.componentWeek,
+    words: {
+      title: 'Component Spending — This Week so far',
+      idleSub: `unchanged so far this week`,
+    },
+  };
+  return pdfgen().generateWeeklyHtml({
+    leaderboard, componentWeek, asOn: input.asOn ?? asOfLabel,
+  });
+}
+
 // ── page 2, in Word ──────────────────────────────────────────────────────────
 
 function dayLabel(iso: string): string {

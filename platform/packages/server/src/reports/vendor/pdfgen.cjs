@@ -23,7 +23,7 @@ const COLORS = {
   dots: ['#2A78D6', '#EB6834', '#1BAF7A', '#EDA100', '#E87BA4', '#4A3AA7', '#E34948', '#008300'],
 };
 
-/* VENDOR PATCH 3 of 7 — see reports/vendor/README.md.
+/* VENDOR PATCH 3 of 8 — see reports/vendor/README.md.
    Upstream looks for Edge or Chrome at the four places they install on Windows,
    because that is where this ran. On the server it runs on Debian, where the
    browser is at a different path entirely and the Windows list finds nothing —
@@ -663,13 +663,22 @@ const REPORT_CSS = `
     .idle-names .comp-cell-name { font-weight: 500; color: #64748B; }
     .lb-rank-idle { background: #F1F5F9; color: #94A3B8; }
     /*
-     * The component page carries eleven rows (eight ranked, the collapsed
-     * idle row, header and total) against the Regional Centre page's twelve
-     * shorter ones, and its idle row is four lines tall. At the shared
-     * padding the total row tipped onto a third sheet, so spacing is tightened
-     * here only.
+     * The component page's row count is not fixed the way the Regional Centre
+     * page's twelve centres are: every component that moved gets a ranked row,
+     * and the quiet ones collapse into a single row listing their names. So
+     * the page is TALLEST IN A BUSY WEEK, when nothing is left to collapse —
+     * all thirteen components ranked, and no idle row to absorb them. A ranked
+     * row is roughly twice the height of one name in the idle list, which is
+     * why that is the worst case rather than the reverse.
+     *
+     * Measured against the real print box (281mm x 198mm usable at the @page
+     * margins above): at 7px padding, thirteen ranked rows came to 782px
+     * against a 748px budget and spilled the total row onto a third sheet.
+     * At 5px it is 726px, leaving ~22px in hand. Both weekly reports use this
+     * page, so the completed-week one had the same latent ceiling — it simply
+     * had not met a week busy enough to hit it.
      */
-    .comp-page .rc-table td { padding: 7px 10px; }
+    .comp-page .rc-table td { padding: 5px 10px; }
     .comp-page .rc-top-cards { margin-bottom: 18px; }
     .comp-page .p2-title { margin-bottom: 12px; }
     .comp-page .idle-names { gap: 3px; }
@@ -683,14 +692,24 @@ const REPORT_CSS = `
      * Total row, and it alone, spilled onto a second sheet, ahead of the
      * component page that was meant to be page 2.
      *
-     * The same tightened density already proven on the component page below
-     * is reused here rather than invented fresh - it carries comfortable
-     * spare room on its own sheet, so the same numbers give this page room to
-     * spare too rather than trading one page's margin of safety for the
-     * other's. It also makes the two pages of one report share one density
-     * instead of page 1 reading noticeably looser than page 2.
+     * TWELVE WAS NEVER THE LIMIT, though, which is what the tightening above
+     * assumed. The rows are not the twelve Regional Centres: they are whatever
+     * DSC_Details names as a claiming agency typed "regionalcentre" that week,
+     * grouped by name — and the live sheet has already produced thirteen. Any
+     * name variant makes another. So the page is sized for the count it might
+     * meet rather than the count the centre list implies, and the row padding
+     * and rank badge are cut together to buy that room: a row is as tall as
+     * the badge inside it, so trimming padding alone only ever buys one row.
+     *
+     * Measured against the same print box: fourteen rows came to 769px against
+     * a 748px budget; at 5px padding with a 22px badge they come to 657px,
+     * which leaves room for about three more rows before this needs looking at
+     * again. checkPageCount() is the backstop either way — it warns on every
+     * run that renders more pages than the layout intends, and the current-week
+     * report carries that warning onto the panel where somebody will see it.
      */
-    .lb-page .rc-table td { padding: 7px 10px; }
+    .lb-page .rc-table td { padding: 5px 10px; }
+    .lb-page .lb-rank { width: 22px; height: 22px; font-size: 10px; }
     .lb-page .rc-top-cards { margin-bottom: 18px; }
     .lb-page .p2-title { margin-bottom: 12px; }
     .idle-note {
@@ -717,11 +736,21 @@ function leaderboardPage(lb) {
   const maxAmount = top.amount || 1;
   const totalClaims = lb.rows.reduce((s, r) => s + r.claims, 0);
 
+  /* VENDOR PATCH 8 of 8 — see reports/vendor/README.md.
+     Every default below is upstream's own wording, for the completed week this
+     page was written to report. The platform's "this week so far" report
+     passes its own: a page covering Monday to today captioned "Previous week"
+     would be wrong in the one way this report exists to avoid. */
+  const w = lb.words || {};
+  const periodLabel = w.period || 'Previous week';
+  const spentLabel = w.spent || 'Total Spent Last Week';
+  const avgSub = w.avgSub || 'across centres that claimed last week';
+
   return `
 <!-- ==================== WEEKLY LEADERBOARD (Mondays) ==================== -->
 <div class="page-container lb-page" style="margin-top: 8px;">
   <div class="p2-title">Weekly Leaderboard — Regional Centres</div>
-  <div class="lb-sub">Previous week · ${range}</div>
+  <div class="lb-sub">${periodLabel} · ${range}</div>
 
   <div class="rc-top-cards">
     <div class="stat-card" style="padding: 8px 10px;">
@@ -729,7 +758,7 @@ function leaderboardPage(lb) {
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#16A34A" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
       </div>
       <div class="card-body">
-        <div class="card-label" style="font-size: 8.5px;">Total Spent Last Week</div>
+        <div class="card-label" style="font-size: 8.5px;">${spentLabel}</div>
         <div class="card-val green-text" style="font-size: 15px;">${formatLeaderboard(lb.total)}</div>
         <div class="card-sub" style="font-size: 7.5px;">${totalClaims} claims across ${lb.centres} centre${lb.centres === 1 ? '' : 's'}</div>
       </div>
@@ -753,7 +782,7 @@ function leaderboardPage(lb) {
       <div class="card-body">
         <div class="card-label" style="font-size: 8.5px;">Average per Centre</div>
         <div class="card-val orange-text" style="font-size: 15px;">${formatLeaderboard(lb.total / lb.centres)}</div>
-        <div class="card-sub" style="font-size: 7.5px;">across centres that claimed last week</div>
+        <div class="card-sub" style="font-size: 7.5px;">${avgSub}</div>
       </div>
     </div>
   </div>
@@ -829,10 +858,18 @@ function componentLeaderboardPage(cw) {
   const divColour = d => (d === 'KI-1' ? COLORS.bluePill : d === 'KI-2' ? COLORS.purplePill : COLORS.orange);
   const idle = cw.idleRows || [];
 
+  /* VENDOR PATCH 8 of 8 — see reports/vendor/README.md. Upstream's own wording
+     is the default; the "this week so far" report supplies its own. The
+     "Movement between …" line below needs no override: it names the two dates
+     it actually differenced, which is true of either report. */
+  const w = cw.words || {};
+  const compTitle = w.title || 'Component Spending — Last Week';
+  const idleSub = w.idleSub || 'unchanged all week';
+
   return `
   <!-- ============== COMPONENT SPEND (week) ============== -->
   <div class="page-container comp-page" style="margin-top: 8px;">
-    <div class="p2-title">Component Spending — Last Week</div>
+    <div class="p2-title">${compTitle}</div>
     <div class="lb-sub">Movement between ${label(cw.baselineOn)} and ${label(cw.takenOn)}</div>
 
     <div class="rc-top-cards cards-4">
@@ -881,7 +918,7 @@ function componentLeaderboardPage(cw) {
         <div class="card-body">
           <div class="card-label" style="font-size: 8.5px;">No Movement</div>
           <div class="card-val orange-text" style="font-size: 15px;">${cw.idle}</div>
-          <div class="card-sub" style="font-size: 7.5px;">component${cw.idle === 1 ? '' : 's'} unchanged all week</div>
+          <div class="card-sub" style="font-size: 7.5px;">component${cw.idle === 1 ? '' : 's'} ${idleSub}</div>
         </div>
       </div>
     </div>
@@ -959,7 +996,7 @@ function generateReportHtml(data, opts = {}) {
   const infra = divisions.find(d => d.key === 'SAI-INFRA');
   const scheme = divisions.filter(d => !d.source).reduce((s, d) => s + d.assigned, 0);
 
-  /* VENDOR PATCH 7 of 7 — see reports/vendor/README.md.
+  /* VENDOR PATCH 7 of 8 — see reports/vendor/README.md.
      Yesterday's Expenditure Distribution used to be laid out here, a grid of
      the day's claims three name/amount pairs to a row, sitting beside the
      summary table. It is no longer printed. `data.day.agencies` still carries

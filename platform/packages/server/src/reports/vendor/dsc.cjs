@@ -280,9 +280,13 @@ function dayFromKey(key) {
  * @param {string} file     workbook holding the DSC_Details tab
  * @param {Date}   refDate  any day in the week *after* the one being reported
  */
-function weeklyRegionalCentreLeaderboard(file, refDate, tabName = 'DSC_Details') {
+function weeklyRegionalCentreLeaderboard(file, refDate, tabName = 'DSC_Details', range = null) {
   const records = readDscDetailsSheet(file, tabName) || [];
-  const { start, end } = previousWeekRange(refDate);
+  /* VENDOR PATCH 8 of 8 — see reports/vendor/README.md.
+     `range` lets the caller state the window instead of taking the completed
+     week before refDate. The platform's "this week so far" report asks for
+     Monday-to-today; unset, this is upstream's previousWeekRange exactly. */
+  const { start, end } = range || previousWeekRange(refDate);
 
   const byAgency = new Map();
   let total = 0;
