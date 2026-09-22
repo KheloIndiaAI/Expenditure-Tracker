@@ -1772,6 +1772,12 @@ let SECT=DATA.sectionTotals;
 let G=DATA.grand;
 let SECTIONS=DATA.sections.slice();
 let ACTIVE_CENTRES=DATA.centres.slice();
+/* Sub-categories are derived, not data. The labels baked into the seed above are whatever
+   the classifier said on the day this file was built; syncScat has been corrected since, so
+   they are re-derived here and again on every sync. One set of rules therefore decides every
+   release's label - the seed the page opens with, the rows already in the sheet, and the
+   rows added to it tomorrow - and they cannot drift apart. */
+(DATA.txns||[]).forEach(function(t){ t.scat=syncScat(t.nar,t.sv); });
 const TXN=DATA.txns||[], RMETA=DATA.releasesMeta||{count:0,net:0,util:0,bal:0};
 const SERIES=['#2a78d6','#eb6834','#1baf7a','#eda100','#e87ba4','#008300','#4a3aa7','#e34948','#5b8def','#c0533b','#2bb98a','#b98a00'];
 const SVCOL={}; SV.forEach(s=>SVCOL[s.name]=SERIES[s.idx%SERIES.length]);
@@ -6135,37 +6141,126 @@ function parseTxRows(rows,rcName){
 }
 
 /* Spend-category classifier.
-   `scat` is a descriptive label used for the Expenditure Detail filter and tooltips - it is
-   NOT a source figure. Existing releases always keep the label they already carry (matched on
-   centre+voucher+amount), so this only ever runs on releases appearing for the first time.
-   Rules are ordered most-specific-first and read the sub-vertical as context, because the
-   narration alone is often ambiguous (a KIC release "for 07 KICS" is coach salary; the same
-   phrasing under Academies is academy support). Anything genuinely unrecognised is labelled
-   "Unclassified" rather than guessed into a wrong bucket. */
+
+   `scat` is the sub-category shown against every release - in the voucher tables, the
+   Expenditure Detail filter, the sub-component breakdown of Trend Analysis and the CSV. It
+   is a descriptive label, never a source figure, and it is DERIVED, never stored: correcting
+   a rule here re-labels every release the platform holds, the ones already in the sheet and
+   the ones added to it tomorrow alike. Nothing has to be re-keyed for a fix to take effect.
+
+   Every rule is anchored to the words a sanction actually uses, and the FIRST match wins, so
+   the order below is itself part of the meaning - the notes mark the places where it decides
+   something. The sub-vertical is read only where the narration alone is genuinely ambiguous:
+   an "annual recurring grant" means different things at a Khelo India Centre and at an
+   academy. Anything unrecognised is left "Unclassified" rather than guessed into a bucket -
+   a confidently wrong label is worse than an honest blank, and it is what put five host-state
+   releases under "Athlete Travel Grant".
+
+   Narrations are typed by hand into the workbook and mis-spell freely - CONSUABLES,
+   CONSUMBABLES, COUNSUMABLE, SALRY, SALARU, VERIFICATIO, CONTIGENT - so word tests run
+   through word(), which forgives a letter or two. Phrases are matched on the normalised
+   text, where punctuation has become space: NON-CONSUMABLE and NON CONSUMABLE are one
+   string there, and "(KIBG)" is a word. */
+
+/** Edit distance, capped: true when `tok` is `want` give or take `max` letters. */
+function scatNear(tok,want,max){
+  const n=tok.length, m=want.length;
+  if(Math.abs(n-m)>max) return false;
+  let prev=[], cur=[];
+  for(let j=0;j<=m;j++) prev[j]=j;
+  for(let i=1;i<=n;i++){
+    cur[0]=i; let best=i;
+    for(let j=1;j<=m;j++){
+      cur[j]=Math.min(prev[j]+1, cur[j-1]+1,
+        prev[j-1]+(tok.charCodeAt(i-1)===want.charCodeAt(j-1)?0:1));
+      if(cur[j]<best) best=cur[j];
+    }
+    if(best>max) return false;                      // every path is already too far
+    const t=prev; prev=cur; cur=t;
+  }
+  return prev[m]<=max;
+}
 function syncScat(nar,sv){
-  const s=String(nar||'').toUpperCase(), v=String(sv||'');
+  const s=' '+String(nar||'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim()+' ';
+  const v=String(sv||''), toks=s.trim().split(' ');
   const has=re=>re.test(s);
-  if(has(/MARATHON/)) return 'Marathons & Mass Participation Events';
+  /* One typo forgiven on a short word, two once a word is long enough that two cannot
+     carry it into a different word. */
+  const word=function(){
+    for(let a=0;a<arguments.length;a++){
+      const want=arguments[a], max=want.length>9?2:1;
+      for(let i=0;i<toks.length;i++) if(scatNear(toks[i],want,max)) return true;
+    }
+    return false;
+  };
+  const kic=/^Khelo India Centres/.test(v), tid=/^Talent Identification/.test(v),
+        acad=/^Sports Academies/.test(v), games=/^Khelo India Games/.test(v),
+        fit=/^Fit India/.test(v);
+  const edition=has(/ KI(YG|WG|BG|TG|UG|WSF) |KHELO INDIA (YOUTH|WINTER|BEACH|TRIBAL|PARA|UNIVERSITY) GAMES/);
+
+  /* ---- 1. the purpose the sanction states outright ---------------------------------- */
   if(has(/CAPACITY BUILDING/)) return 'Capacity Building Programme';
-  if(has(/BOARDING/)) return 'Boarding, Lodging & Travel';
-  if(has(/SCIENTIFIC EQUIPMENT/)) return 'Sports Science Equipment';
-  if(has(/ASSESSMENT CAMP|PERFORMANCE ASSESSMENT CAMP/)) return 'Talent Assessment Camps';
-  if(has(/WORKFORCE|E-KHEL|DIGITAL COACHING|CONSULTANT/)) return 'Programme Workforce Salary';
-  if(has(/TRAVEL GRANT|KIYG|KIWG|KIBG|KITG|YOUTH GAMES|WINTER GAMES|PARA GAMES/)) return 'Athlete Travel Grant';
-  if(has(/NON-CONSUMABLE|SPORTS EQUIPMENT|SPORTS GOODS/)) return 'Sports Equipment';
-  if(has(/CONSUMABLE/)) return 'Sports Consumables Grant';
-  if(has(/KIAS GETTING TRAINED|NCOE/)) return 'Athlete Training Support (NCOE)';
-  if(v==='Sports Academies'||v==='Sports Academies (Rec)') return 'Accredited Academy Support';
-  if(v==='Khelo India Centres'||v==='Khelo India Centres (N-Rec)'){
-    if(has(/MANPOWER|REMUNERATION|KISCE/)) return 'Manpower Remuneration (KISCE)';
+  if(word('BOARDING','LODGING')) return 'Boarding, Lodging & Travel';
+  if(word('VERIFICATION')&&has(/ AGE /)) return 'Age Verification Tests';
+  if(word('MARATHON','CYCLOTHON','WALKATHON')||has(/ROAD RACE/))
+    return 'Marathons & Mass Participation Events';
+  if(word('ASSESSMENT')&&word('CAMP','CAMPS')) return 'Talent Assessment Camps';
+  /* Sports equipment before scientific: one sanction buys both, is written "SPORTS
+     EQUIPMENTS & SCIENCE EQUIPMENT", and the sports head is the larger of the two. */
+  if(has(/SPORTS (EQUIPMENT|GOODS)/)) return 'Sports Equipment';
+  if(has(/SCIENTIFIC EQUIPMENT|SCIENCE EQUIPMENT/)) return 'Sports Science Equipment';
+  if(has(/CONSTRUCTION|CIVIL WORK|RENOVATION|SYNTHETIC (TRACK|SURFACE)|INFRASTRUCTURE (DEVELOPMENT|WORK|PROJECT)/))
+    return 'Infrastructure Development';
+  if(has(/NATIONAL SPORTS DAY/)) return 'National Sports Day';
+
+  /* ---- 2. people and content -------------------------------------------------------- */
+  if(has(/DEVELOPMENT OF CONTENT|CONTENT DEVELOPMENT|DIGITAL COACHING MODULE/))
+    return 'Digital Content Development';
+  /* Ahead of Fit India below, and deliberately: the two consultants engaged at every centre
+     are named "(MEDIA & FIT INDIA ACTIVITIES)" and are a payroll cost, not an activity. */
+  if(word('WORKFORCE','CONSULTANT')||has(/ E KHEL |PATHSHALA/))
+    return 'Programme Workforce Salary';
+
+  /* ---- 3. where the money is finally spent ------------------------------------------ */
+  if(has(/ NCOE /)||has(/KIAS? GETTING TRAINED|KIAS? TRAINED/))
+    return 'Athlete Training Support (NCOE)';
+  if(has(/TRAVEL GRANT/)||(has(/FINANCIAL ASSISTANCE/)&&word('CONTINGENT')))
+    return 'Athlete Travel Grant';
+  /* Assistance to the state or UT staging an edition of the Games, and the administrative
+     and technical cost of running it. Not a travel grant - nobody travels on it, and it is
+     the largest money in this component: three releases here are worth ₹32.6 Cr. Reached
+     only after the travel-grant test above, which a contingent's own release matches. */
+  if((games||edition)&&(has(/HOST STATE|HOST UT|HOSTING/)||
+      (edition&&has(/PREPARATION|EDITION OF|ADMINISTRATIVE|TECHNICAL CONDUCT|CONDUCT OF THE GAMES/))))
+    return 'Games Hosting & Conduct';
+
+  /* ---- 4. the Khelo India Centres recurring grant ------------------------------------ */
+  /* "NON CONSUMABLE" is the opposite thing - durable kit - so the word before decides. */
+  const cons=toks.findIndex(t=>scatNear(t,'CONSUMABLE',2)||scatNear(t,'CONSUMABLES',2));
+  if(cons>=0) return toks[cons-1]==='NON' ? 'Sports Equipment' : 'Sports Consumables Grant';
+  if(has(/ PCA |PAST CHAMPION/)) return 'Coach Salary (PCA)';
+  if(has(/KISCE/)&&word('MANPOWER','REMUNERATION','SALARY','SALARIES','HIRED'))
+    return 'Manpower Remuneration (KISCE)';
+  if(kic){
+    /* The ₹5 lakh a centre draws each year splits into the coach's ₹3 lakh, released
+       quarterly and always described as a period, and ₹2 lakh of consumables, released once
+       for the year. So an "annual recurring grant" that names no head is the consumables
+       half - and every one of them in this workbook divides out at exactly ₹2 lakh per
+       centre. A KISCE draws the same grant on the same terms. */
+    if(has(/ANNUAL RECURRING/)) return 'Sports Consumables Grant';
+    if(has(/KISCE/)) return 'Manpower Remuneration (KISCE)';
     return 'Coach Salary (PCA)';
   }
-  if(has(/PCA SALARY|PCA SALARIED|COACH/)) return 'Coach Salary (PCA)';
-  if(has(/MANPOWER|REMUNERATION/)) return 'Manpower Remuneration (KISCE)';
-  if(v==='Fit India Movement') return 'Accredited Academy Support';
-  if(v==='Talent Identification & Development') return 'Accredited Academy Support';
-  if(has(/PRIZE MONEY|ORGANIZING|TOURNAMENT|LEAGUE|CONDUCTING|EVENT/)) return 'Sports Events & Tournaments';
-  if(has(/ACADEMY|ACADEMIES|FOUNDATION|TRUST|SOCIETY|CLUB/)) return 'Accredited Academy Support';
+
+  /* ---- 5. events -------------------------------------------------------------------- */
+  if(word('TOURNAMENT','TOURNAMENTS','LEAGUE','LEAGUES','CHAMPIONSHIP','ASMITA')||has(/PRIZE MONEY/))
+    return 'Sports Events & Tournaments';
+
+  /* ---- 6. the component itself, where the narration names no head of its own --------- */
+  if(has(/PENDING LIABILIT/)) return 'Pending Liabilities';
+  if(fit||has(/FIT INDIA/)) return 'Fit India Activities';
+  if((tid||acad)&&has(/FURTHER RELEASE TO/)) return 'Accredited Academy Support';
+  if(acad) return 'Accredited Academy Support';
   return 'Unclassified';
 }
 
@@ -6304,15 +6399,16 @@ function syncBuild(summaryRows,txRows){
       bal:o.assign-exp,up:o.assign?exp/o.assign:0,byCentre:bc};
   });
   const byName={}; subs.forEach(function(x){ byName[x.name]=x; });
-  // releases: existing labels preserved on centre+voucher+amount, new ones classified
-  const known={}; (DATA.txns||[]).forEach(function(t){ known[t.rc+'|'+t.voucher+'|'+t.net]=t.scat; });
+  /* releases: every one classified from its own narration, on every sync. Labels used to be
+     carried over from the previous build, matched on centre+voucher+amount, so a release
+     kept whatever it was first given and a corrected rule could never reach it. */
   let tx=[];
   SYNC.txTabs.forEach(function(tab,i){ tx=tx.concat(parseTxRows(txRows[i],tab)); });
   const secOf={}; subs.forEach(function(x){ secOf[x.name]=x.section; });
   tx=tx.map(function(t){
     return {rc:t.rc,sv:t.sv,section:secOf[t.sv]||t.head,head:t.head,date:t.date,
       voucher:t.voucher,sanction:t.sanction,grantee:t.grantee,nar:t.nar,
-      scat:known[t.rc+'|'+t.voucher+'|'+t.net]||syncScat(t.nar,t.sv),
+      scat:syncScat(t.nar,t.sv),
       etype:t.etype,net:t.net,util:t.util,bal:t.bal};
   }).sort(function(a,b){ return (a.date||'').localeCompare(b.date||'')||a.rc.localeCompare(b.rc)||a.voucher.localeCompare(b.voucher); });
   const roll=function(rows){ const g={assign:0,exp:0,bal:0,limit:0,actual:0,ddoki:0};

@@ -11,6 +11,16 @@
  *
  * Every pattern below is derived from evidence in the workbook's own
  * CLASSIFICATION AUDIT sheet. Baseline expectation: 84 explicit / 4 contextual.
+ *
+ * NOT THE LIVE CLASSIFIER. Nothing calls `classify()` today: the dashboard labels its own
+ * releases in `platform/public/index.html`, in `syncScat()`, which is the implementation to
+ * read and the one to correct. The rules here were written against the 88-row baseline and
+ * do not know what the 468-row sheet has since shown — that an "annual recurring grant"
+ * naming no head is the consumables half of the KIC grant rather than the coach's (CR-C02
+ * says the opposite), that host-state assistance for staging the Games is not a travel
+ * grant, and that Fit India activities, National Sports Day and age verification tests each
+ * need a category of their own. Kept for the upload pipeline `07` describes; align it with
+ * `syncScat` before wiring it to anything.
  */
 
 import type { ClassificationBasis } from './types.js';
