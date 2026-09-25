@@ -54,6 +54,7 @@
     }
   },
   "_divisionsNote": "The KI-1 / KI-2 split and componentTargets below were taken from the 'Components of KI 1 / KI 2' panels in the 02.09.2026 Expenditure Summary Report PDF, then verified against live data: this split reproduces the Assignment tab's own expenditure figures exactly (KI-1 48.3636 Cr, KI-2 97.4687 Cr), and each division's targets sum exactly to its assignment. The live cross-check in src/pipeline.js re-verifies this on every run.",
+  "_assignedNote": "Each division's 'assigned' is OVERRIDDEN at run time by the workbook's own Assignment tab whenever that tab can be read (see applyAssignmentTab) — that tab is where division targets are hand maintained, so it beats anything typed here. The figures below are what the platform falls back on, and are kept in step with it: they include the 25.09.2026 allocation (KI-2 +67.98 Cr, SAI-INFRA +50.00 Cr) and the KI Infra block's own growth to 57.36 Cr. Until the Assignment tab's four division rows are updated to match, a run will read the older figures from the sheet and the report's division table will total less than its Total Assigned row.",
   "divisions": [
     {
       "key": "KI-1",
@@ -74,7 +75,7 @@
     {
       "key": "KI-2",
       "label": "KI-2",
-      "assigned": 1608000000,
+      "assigned": 2287800000,
       "components": [
         "Khelo India Centres",
         "Talent Identification & Development",
@@ -90,7 +91,7 @@
     {
       "key": "SAI-INFRA",
       "label": "SAI-INFRA",
-      "assigned": 795500000,
+      "assigned": 1295500000,
       "components": [
         "New Sports Infrastructure Projects"
       ],
@@ -100,7 +101,7 @@
     {
       "key": "MSD-INFRA",
       "label": "MSD-INFRA (State)",
-      "assigned": 528000000,
+      "assigned": 573600000,
       "source": "kiInfraStates"
     }
   ],
@@ -128,13 +129,13 @@
     "Sports for Peace and Development": 81700000,
     "Sports for rural/indigenous/tribal": 14900000,
     "Sports for disabled sportspersons": 0,
-    "Khelo India Centres": 601300000,
-    "Talent Identification & Development": 517400000,
-    "Khelo India Centres NR": 245800000,
-    "Sports Academies NR": 193700000,
+    "Khelo India Centres": 605400000,
+    "Talent Identification & Development": 603100000,
+    "Khelo India Centres NR": 335800000,
+    "Sports Academies NR": 693700000,
     "Sports Academies": 49800000,
     "Community Coaching & Development": 0,
-    "New Sports Infrastructure Projects": 795500000
+    "New Sports Infrastructure Projects": 1295500000
   },
   "_agencyAliasNote": "Maps the Child Agency Name as written in the RBI report to the Test sheet 2 tab name. Matching is case-insensitive and ignores the SAI/RC/NSNIS prefixes, so most names resolve without an entry here.",
   "agencyAliases": {
@@ -156,11 +157,11 @@
   },
   "manualOverrides": {
     "_note": "Hand-entered figures for the page-1 summary table, in RUPEES. Any value set here is used on every report until cleared; the dashboard flags on its status card whenever any are in force. null = compute from the sheet.",
-    "_totalAssignedNote": "394,01,00,000 — the sum of the four divisions above, which is also what the workbook's Assignment tab states as Total Assigned. It was 394,00,75,000, carried over from the desktop tool, and that made the report's TOTAL row print 25,000 less than its own division table added up to. Fixing a figure that every source now agrees on buys nothing: this can be unfixed and left to compute.",
+    "_totalAssignedNote": "516,55,00,000 — the sum of the four divisions above, after the 25.09.2026 allocation of 117.98 Cr and the KI Infra block's growth to 57.36 Cr (the Srinagar J&K row of 4.56 Cr). It was 394,01,00,000 before that. The workbook's Assignment tab states 516,54,75,000, which is 25,000 lower for a reason already known: its own total has carried that shortfall since the desktop tool, and the divisions it lists add up to the figure here, not to that cell. Unfixing this and letting it compute gives the same number, and would keep giving the right one on its own — but only once the Assignment tab's division rows carry the allocation too.",
     "totalExpenditure": 2091160000.0000002,
-    "balance": 1848910000,
+    "balance": 3074310000,
     "dayTotal": 15500000,
-    "totalAssigned": 3940100000,
+    "totalAssigned": 5165500000,
     "totalAssignedFixed": true
   },
   "expenditureBaseline": {
@@ -168,5 +169,9 @@
     "asOn": "03.09.2026",
     "amount": 2075662322
   },
-  "_seedNote": "Seed copy of the automation config, used the first time the platform boots with an empty report_state. After that the live copy is the one in Postgres (report_state.key=config), which is what the manual-figures endpoint writes to. Editing this file changes nothing on a database that already has a row. The upstream 'automation' block is deliberately absent: it configured the desktop tool's morning cron, and on the platform a report is produced only when somebody presses Process now."
+  "_allocationsNote": "Allocations already folded into the figures above, by date. Because a database that already holds a config ignores this file, each allocation is ALSO applied to the stored copy once, by applyAllocations() in store.ts, which reads this same list to know what it has done. Never remove an entry to force a re-run: that would add the money a second time.",
+  "allocationsApplied": [
+    "25.09.2026"
+  ],
+  "_seedNote": "Seed copy of the automation config, used the first time the platform boots with an empty report_state. After that the live copy is the one in Postgres (report_state.key=config), which is what the manual-figures endpoint writes to. Editing this file changes nothing on a database that already has a row — which is why an allocation needs the one-time migration named above, not just an edit here. The upstream 'automation' block is deliberately absent: it configured the desktop tool's morning cron, and on the platform a report is produced only when somebody presses Process now."
 }

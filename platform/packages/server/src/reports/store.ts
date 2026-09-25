@@ -137,6 +137,96 @@ async function migrateRbiSqlite(db: Awaited<ReturnType<typeof getDb>>): Promise<
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * ALLOCATIONS
+ * ---------------------------------------------------------------------------
+ * An allocation raises the assignment of named components part-way through the
+ * year. default-config.json carries the resulting figures, but a database that
+ * already holds a config never reads that file again — the operator's copy is
+ * the live one — so on its own an allocation would reach a fresh deployment and
+ * no other. Each one is therefore ALSO applied to the stored config, exactly
+ * once, keyed by its date in `allocationsApplied`.
+ *
+ * Deltas, not replacements, and only to the figures the allocation actually
+ * moves: whatever else the operator has typed since is left alone. The marker
+ * is what makes it safe on every boot, so it is written in the same statement
+ * as the money — an allocation that applied but failed to record itself would
+ * add the money again on the next boot.
+ */
+const ALLOCATIONS: {
+  id: string;
+  note: string;
+  componentTargets: Record<string, number>;
+  divisions: Record<string, number>;
+  totalAssigned: number;
+  balance: number;
+}[] = [
+  {
+    id: '25.09.2026',
+    note: '117.98 Cr to five components, and KI Infra to 57.36 Cr',
+    /* 8.57 + 0.41 Cr recurring, 50.00 + 9.00 + 50.00 Cr non-recurring. The names are the
+       config's own, which differ from the dashboard's: "Sports Academies NR" is the
+       non-recurring component here, and plain "Sports Academies" is the recurring one. */
+    componentTargets: {
+      'Talent Identification & Development': 85700000,
+      'Khelo India Centres': 4100000,
+      'Khelo India Centres NR': 90000000,
+      'Sports Academies NR': 500000000,
+      'New Sports Infrastructure Projects': 500000000,
+    },
+    /* MSD-INFRA moves for a different reason: not this allocation, but the KI Infra
+       States/UTs block growing by the 4.56 Cr Srinagar (J&K) row. It belongs here
+       because Total Assigned must account for it too. */
+    divisions: { 'KI-2': 679800000, 'SAI-INFRA': 500000000, 'MSD-INFRA': 45600000 },
+    totalAssigned: 1225400000,           // 117.98 + 4.56 Cr
+    /* Money assigned and not yet spent is money available, so the balance moves by the
+       same amount. Without this the report's own first page stops adding up: assigned
+       would rise while balance, an entered figure, stood where the old total left it. */
+    balance: 1225400000,
+  },
+];
+
+async function applyAllocations(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
+  try {
+    const row = await db.one<{ json: string }>("SELECT json FROM report_state WHERE key = 'config'");
+    if (!row?.json) return;              // nothing stored yet — the seed file already carries them
+    let cfg: Record<string, any>;
+    try { cfg = JSON.parse(row.json); } catch { return; }   // unreadable config is not ours to rewrite
+
+    const done: string[] = Array.isArray(cfg.allocationsApplied) ? cfg.allocationsApplied.slice() : [];
+    const applied: string[] = [];
+    for (const a of ALLOCATIONS) {
+      if (done.includes(a.id)) continue;
+      const targets = (cfg.componentTargets ??= {});
+      for (const [name, delta] of Object.entries(a.componentTargets)) {
+        targets[name] = (Number(targets[name]) || 0) + delta;
+      }
+      for (const d of (Array.isArray(cfg.divisions) ? cfg.divisions : [])) {
+        const delta = a.divisions[String(d?.key)];
+        if (delta) d.assigned = (Number(d.assigned) || 0) + delta;
+      }
+      /* Only when a figure is actually fixed. Left to compute, Total Assigned is the sum
+         of the divisions just raised, so it is already right and adding to a null would
+         invent one. */
+      const ov = cfg.manualOverrides;
+      if (ov && typeof ov.totalAssigned === 'number') ov.totalAssigned += a.totalAssigned;
+      if (ov && typeof ov.balance === 'number') ov.balance += a.balance;
+      done.push(a.id);
+      applied.push(`${a.id} (${a.note})`);
+    }
+    if (!applied.length) return;
+    cfg.allocationsApplied = done;
+    await db.run(
+      'UPDATE report_state SET json = ?, updated_at = ? WHERE key = ?',
+      [JSON.stringify(cfg), now(), 'config'],
+    );
+    console.log(`✓ report config: allocation applied — ${applied.join('; ')}.`);
+  } catch (err) {
+    // A boot must not fail over this; the figures simply stay as they were.
+    console.error('report config: could not apply an allocation —', (err as Error)?.message ?? err);
+  }
+}
+
 let ready: Promise<void> | null = null;
 export function initReports(): Promise<void> {
   if (!ready) {
@@ -145,6 +235,7 @@ export function initReports(): Promise<void> {
       await db.exec(SCHEMA());
       await migrateRbiColumns(db);
       await migrateRbiSqlite(db);
+      await applyAllocations(db);
       /* Once per process, right after the tables are known to exist. There is no
          scheduler to do this at boot any more, and it has to happen before the
          first status or run — a run left 'running' by a container replaced

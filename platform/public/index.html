@@ -162,9 +162,10 @@ button{font-family:inherit}
 .kpi:hover{transform:translateY(-2px);box-shadow:var(--elev-2);border-color:rgba(37,106,191,.30)}
 .kpi .lbl{font-size:12.5px;color:var(--text-muted);font-weight:500;display:flex;align-items:center;gap:6px}
 .kpi .val{font-size:28px;font-weight:700;margin-top:8px;letter-spacing:-.01em}
-/* Two of the five cards carry their sub on two lines (the Q2 tranche under the
-   previous assignment, the two denominators under the spend). A tighter leading
-   keeps that pair from towering over the three single-line cards beside them. */
+/* Two of the five cards carry their sub on several lines (each assignment
+   tranche under the previous assignment, the two denominators under the spend).
+   A tighter leading keeps that pair from towering over the three single-line
+   cards beside them. */
 .kpi .sub{font-size:12.5px;color:var(--text-secondary);margin-top:3px;line-height:1.45}
 /* The spend rates sit last on their card, under the KI Infra caption, so they
    need a little more air than a sub that follows the headline directly. */
@@ -1738,33 +1739,68 @@ const Q2_TRANCHE={
 };
 const Q2_TOTAL=Object.keys(Q2_TRANCHE).reduce(function(a,k){ return a+Q2_TRANCHE[k]; },0);
 
-/* Fold the tranche into the assignment every view reads, and keep the seeded
+/* ============================================================================
+   25 SEPTEMBER TRANCHE - the allocation of 25.09.2026
+   ============================================================================
+   Held exactly as the Q2 tranche above is, and for the same reason: the base
+   and each tranche stay separately visible on the component, so the KPI card
+   can state this allocation on its own line and the addition can be checked or
+   reversed without unpicking anything underneath it.
+
+   Source: the workbook's own allocation table, which states a recurring block
+   of 8.98 Cr and a non-recurring one of 109.00 Cr - 117.98 Cr in all. The
+   non-recurring block is why three of these five differ from the Q2 mapping,
+   and the names matter more than usual here:
+     * "New Sports Infra Project" is the INFRASTRUCTURE row of the
+       non-recurring block, so it lands on New Sports Infrastructure Projects.
+     * "a) Khelo India Centres" appears in BOTH blocks - 0.41 Cr recurring, to
+       Khelo India Centres, and 9.00 Cr non-recurring, to Khelo India Centres
+       (N-Rec). They are different components and must not be merged.
+     * "b) Sports Academies" is in the non-recurring block, so it lands on
+       Sports Academies - the non-recurring component - and NOT on Sports
+       Academies (Rec), which is where the Q2 tranche's academies money went.
+   Figures are exact rupees: 8.57 Cr = 8,57,00,000. */
+const SEP25_LABEL='25 Sept';
+const SEP25_TRANCHE={
+  'Talent Identification & Development':  85700000,   //  8.57 Cr · recurring
+  'Khelo India Centres':                   4100000,   //  0.41 Cr · recurring
+  'New Sports Infrastructure Projects':  500000000,   // 50.00 Cr · infrastructure
+  'Khelo India Centres (N-Rec)':          90000000,   //  9.00 Cr · non-recurring
+  'Sports Academies':                    500000000    // 50.00 Cr · non-recurring
+};
+const SEP25_TOTAL=Object.keys(SEP25_TRANCHE).reduce(function(a,k){ return a+SEP25_TRANCHE[k]; },0);
+
+/* Fold both tranches into the assignment every view reads, and keep the seeded
    rollups in step so nothing reads a pre-tranche total before the first render. */
-(function applyQ2Tranche(){
-  var unmatched=Object.keys(Q2_TRANCHE);
+(function applyTranches(){
   (DATA.subverticals||[]).forEach(function(s){
-    var q=Q2_TRANCHE[s.name]||0;
-    s.assignQ1=s.assign||0;
-    s.q2=q;
-    if(!q) return;
-    unmatched.splice(unmatched.indexOf(s.name),1);
-    s.assign=s.assignQ1+q;
+    s.assignQ1=s.assign||0;                          // the base, before either tranche
+    s.q2=Q2_TRANCHE[s.name]||0;
+    s.sep25=SEP25_TRANCHE[s.name]||0;
+    var add=s.q2+s.sep25;
+    if(!add) return;
+    s.assign=s.assignQ1+add;
     s.bal=s.assign-(s.exp||0);
     s.up=s.assign?(s.exp||0)/s.assign:0;
   });
-  if(unmatched.filter(function(k){ return Q2_TRANCHE[k]>0; }).length)
-    console.warn('Q2 tranche: no component matched for', unmatched);
+  /* A tranche naming a component this platform does not carry would otherwise be
+     silently dropped - the money would vanish rather than land somewhere wrong. */
+  var have={}; (DATA.subverticals||[]).forEach(function(s){ have[s.name]=1; });
+  [['Q2',Q2_TRANCHE],[SEP25_LABEL,SEP25_TRANCHE]].forEach(function(p){
+    var miss=Object.keys(p[1]).filter(function(k){ return p[1][k]>0 && !have[k]; });
+    if(miss.length) console.warn(p[0]+' tranche: no component matched for', miss);
+  });
   // seeded section and grand rollups
   var byS={};
   (DATA.subverticals||[]).forEach(function(s){
-    byS[s.section]=(byS[s.section]||0)+(s.q2||0);
+    byS[s.section]=(byS[s.section]||0)+(s.q2||0)+(s.sep25||0);
   });
   Object.keys(DATA.sectionTotals||{}).forEach(function(k){
     var t=DATA.sectionTotals[k], add=byS[k]||0;
     if(!add) return;
     t.assign+=add; t.bal=t.assign-t.exp;
   });
-  if(DATA.grand){ DATA.grand.assign+=Q2_TOTAL; DATA.grand.bal=DATA.grand.assign-DATA.grand.exp; }
+  if(DATA.grand){ DATA.grand.assign+=Q2_TOTAL+SEP25_TOTAL; DATA.grand.bal=DATA.grand.assign-DATA.grand.exp; }
 })();
 let SV=DATA.subverticals;
 let SVA=SV.filter(s=>s.assign>0||s.exp>0);
@@ -2734,11 +2770,12 @@ function kpiScheme(){
      limit, and subtraction carries the reduction through, whereas a raw assignQ1
      sum would report a base the headline no longer matches. */
   const q2In=sum(SV,function(x){ return x.q2||0; });
+  const sepIn=sum(SV,function(x){ return x.sep25||0; });
   const tipIdle=`<b>Unspent by Centre</b><br>${cr(ex.idle)} (Regional Centres + DDO HQ)${inc?`<br>+ Infrastructure-MDSD unspent ₹${(G.mdsdIdle/1e7).toFixed(2)} Cr = ${cr(G.idle)}`:''}${idleTipRows(SV)}`;
   const asgBE=ex.assign+mAssign;
   return `<div class="kpi-grid k5">
     <div class="kpi"><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('bank')}</span><div class="kpi-txt"><div class="lbl">Budget Allotment</div><div class="val tnum">${cr(BUDGET_BE)}</div></div></div><div class="sub">Budget Estimates · ${esc(FY)}</div>${capRow('Assigned',asgBE,pct(BUDGET_BE?asgBE/BUDGET_BE:0,1)+' of BE')}</div>
-    <div class="kpi accent"><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">Total Assignment</div><div class="val tnum">${cr(ex.assign)}</div></div></div><div class="sub">Previous ${cr(ex.assign-q2In)}<br><b>Q2 Limit: ${cr(q2In)}</b></div>${cap(ex.assign+mAssign)}</div>
+    <div class="kpi accent"><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">Total Assignment</div><div class="val tnum">${cr(ex.assign)}</div></div></div><div class="sub">Previous ${cr(ex.assign-q2In-sepIn)}<br><b>Q2 Limit: ${cr(q2In)}</b><br><b>${SEP25_LABEL}: ${cr(sepIn)}</b></div>${cap(ex.assign+mAssign)}</div>
     <div class="kpi"><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">Expenditure to date</div><div class="val tnum">${cr(ex.exp)}</div></div></div>${cap(ex.exp+mExp)}<div class="sub kpi-rates" style="color:var(--serious)">${pct(beUp,1)} of Budget allotment<br>${pct(exUp,1)} of assignment</div></div>
     <div class="kpi"><div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('scale')}</span><div class="kpi-txt"><div class="lbl">Balance</div><div class="val tnum">${cr(ex.bal)}</div></div></div><div class="sub">${pct(ex.assign?ex.bal/ex.assign:0,1)} unspent</div>${cap(ex.bal+mBal)}</div>
     <div class="kpi"${tattr(tipIdle)}><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('gauge')}</span><div class="kpi-txt"><div class="lbl">Unspent by Centre</div><div class="val tnum neg">${cr(ex.idle)}</div></div></div><div class="sub">limit assigned, not spent</div>${cap(ex.idle+mBal)}</div>
@@ -5103,8 +5140,9 @@ function exportTxLog(){
        Assigned limit = amount released in the period   (release "net")
        Expenditure    = amount utilised in the period   (release "util")
        Balance        = released - utilised, i.e. money released but not drawn
-   Component assignment (Rs 219.84 Cr) has no date column anywhere in the
-   workbook and is deliberately NOT inferred onto the timeline.
+   Component assignment (Rs 459.19 Cr, base plus both tranches) has no date
+   column anywhere in the workbook and is deliberately NOT inferred onto the
+   timeline.
 
    COVERAGE. Dated releases cover Rs 89.20 Cr of the Rs 99.80 Cr the summary
    reports as released. The gap is one component - New Sports Infrastructure
@@ -6395,7 +6433,7 @@ function syncBuild(summaryRows,txRows){
     const ddoki=m2?m2.ddoki:0, totLim=m2?m2.totLim:0, totAct=m2?m2.totAct:0;
     const exp=ddoki+totAct;
     return {name:n,short:o.short,parent:o.parent,section:o.section,code:o.code,idx:o.idx,
-      assign:o.assign,assignQ1:o.assignQ1,q2:o.q2,ddoki:ddoki,totLim:totLim,totAct:totAct,exp:exp,
+      assign:o.assign,assignQ1:o.assignQ1,q2:o.q2,sep25:o.sep25,ddoki:ddoki,totLim:totLim,totAct:totAct,exp:exp,
       bal:o.assign-exp,up:o.assign?exp/o.assign:0,byCentre:bc};
   });
   const byName={}; subs.forEach(function(x){ byName[x.name]=x; });
