@@ -54,7 +54,7 @@
     }
   },
   "_divisionsNote": "The KI-1 / KI-2 split and componentTargets below were taken from the 'Components of KI 1 / KI 2' panels in the 02.09.2026 Expenditure Summary Report PDF, then verified against live data: this split reproduces the Assignment tab's own expenditure figures exactly (KI-1 48.3636 Cr, KI-2 97.4687 Cr), and each division's targets sum exactly to its assignment. The live cross-check in src/pipeline.js re-verifies this on every run.",
-  "_assignedNote": "Each division's 'assigned' is OVERRIDDEN at run time by the workbook's own Assignment tab whenever that tab can be read (see applyAssignmentTab) — that tab is where division targets are hand maintained, so it beats anything typed here. The figures below are what the platform falls back on, and are kept in step with it: they include the 25.09.2026 allocation (KI-2 +67.98 Cr, SAI-INFRA +50.00 Cr) and the KI Infra block's own growth to 57.36 Cr. Until the Assignment tab's four division rows are updated to match, a run will read the older figures from the sheet and the report's division table will total less than its Total Assigned row.",
+  "_assignedNote": "Each division's 'assigned' below is now only a FALLBACK. A division is assigned the sum of its own componentTargets, and the KI Infra division the States/UTs table's total read live from the sheet (rollup.cjs, VENDOR PATCH 9) — so the division table always adds up to its own component rows, and matches the platform's KI 1 / KI 2 / INFRA panel, which derives its figures the same way. The workbook's Assignment tab is still read and still overwrites these numbers, but with every component targeted that override no longer decides anything; its expenditure column still runs the live cross-check. The figures here are kept in step anyway, for the case where componentTargets is empty: they include the 25.09.2026 allocation (KI-2 +67.98 Cr, SAI-INFRA +50.00 Cr) and KI Infra at 57.36 Cr.",
   "divisions": [
     {
       "key": "KI-1",
@@ -157,12 +157,12 @@
   },
   "manualOverrides": {
     "_note": "Hand-entered figures for the page-1 summary table, in RUPEES. Any value set here is used on every report until cleared; the dashboard flags on its status card whenever any are in force. null = compute from the sheet.",
-    "_totalAssignedNote": "516,55,00,000 — the sum of the four divisions above, after the 25.09.2026 allocation of 117.98 Cr and the KI Infra block's growth to 57.36 Cr (the Srinagar J&K row of 4.56 Cr). It was 394,01,00,000 before that. The workbook's Assignment tab states 516,54,75,000, which is 25,000 lower for a reason already known: its own total has carried that shortfall since the desktop tool, and the divisions it lists add up to the figure here, not to that cell. Unfixing this and letting it compute gives the same number, and would keep giving the right one on its own — but only once the Assignment tab's division rows carry the allocation too.",
+    "_totalAssignedNote": "Left to compute, deliberately. It is now the sum of the four divisions, and each of those is the sum of its own components (or, for KI Infra, of the States/UTs table) — so the total follows an allocation the moment componentTargets carries it, with nothing to re-type and nothing to go stale. It computes to 516,55,00,000 today: 100.86 + 228.78 + 129.55 + 57.36 Cr. It was fixed at that same figure, and at 394,01,00,000 before the 25.09.2026 allocation. The workbook's Assignment tab states 516,54,75,000, which is 25,000 lower for a reason already known: its own total has carried that shortfall since the desktop tool. Typing a figure into the dashboard and ticking Fixed still overrides all of this, for the day someone needs it to.",
     "totalExpenditure": 2091160000.0000002,
     "balance": 3074310000,
     "dayTotal": 15500000,
-    "totalAssigned": 5165500000,
-    "totalAssignedFixed": true
+    "totalAssigned": null,
+    "totalAssignedFixed": false
   },
   "expenditureBaseline": {
     "_note": "Known-good cumulative expenditure as at asOn, in RUPEES. When only yesterday-s figure is entered, Total Expenditure is derived as baseline + that figure.",

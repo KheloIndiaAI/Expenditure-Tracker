@@ -282,7 +282,7 @@ function dayFromKey(key) {
  */
 function weeklyRegionalCentreLeaderboard(file, refDate, tabName = 'DSC_Details', range = null) {
   const records = readDscDetailsSheet(file, tabName) || [];
-  /* VENDOR PATCH 8 of 8 — see reports/vendor/README.md.
+  /* VENDOR PATCH 8 of 9 — see reports/vendor/README.md.
      `range` lets the caller state the window instead of taking the completed
      week before refDate. The platform's "this week so far" report asks for
      Monday-to-today; unset, this is upstream's previousWeekRange exactly. */

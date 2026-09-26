@@ -49,7 +49,25 @@ function rollup({ master, rbi, dsc, config, resolver }) {
       }
     }
 
-    const assigned = Number(d.assigned) || 0;
+    /* VENDOR PATCH 9 of 9 — see reports/vendor/README.md.
+       A division is assigned what its own parts are assigned.
+       Upstream this is `config.divisions[].assigned`, a hand-maintained figure typed
+       beside the division (and, on the platform, overwritten from the sheet's Assignment
+       tab). Both are standing numbers that the component figures move past the moment an
+       allocation lands, and the report then printed a division total its own component
+       rows did not add up to — 160.80 Cr over rows totalling 228.78 Cr. So it is summed
+       from the components instead, and for the KI Infra division from the States/UTs
+       table's own total, which is read from the sheet on every run. Both are then the
+       same figures, from the same source, as the platform's KI 1 / KI 2 / INFRA panel.
+
+       Unset, behaviour is upstream's: a division whose components are not all targeted —
+       upstream's usual case, where componentTargets is empty (see _componentTargetsNote)
+       — still takes the configured figure, exactly as before. */
+    const assigned = d.source === 'kiInfraStates'
+      ? (master.kiInfraTotal ? master.kiInfraTotal.limitAssigned : Number(d.assigned) || 0)
+      : (components.length && components.every(c => c.target != null)
+          ? components.reduce((a, c) => a + (c.target || 0), 0)
+          : Number(d.assigned) || 0);
     const fundedComponents = components.filter(c => c.target != null && c.target > 0);
 
     // A division with SOME targets set and SOME missing is very likely an

@@ -1,7 +1,7 @@
 # Vendored report pipeline
 
 This folder is the daily-report automation, copied in and run **unmodified**
-except for the five patches listed below. Every figure in every document the
+except for the nine patches listed below. Every figure in every document the
 platform serves is computed by this code, not by anything written for the
 platform — that is the whole point of vendoring it rather than reimplementing
 it.
@@ -125,9 +125,35 @@ Each is marked in the source with `VENDOR PATCH n`.
    today, captioned "Previous week" and "Total Spent Last Week", would be wrong
    in precisely the way this report exists to avoid.
 
+9. **`rollup.cjs` — a division is assigned what its own parts are assigned.**
+   Upstream, each division's assignment is `config.divisions[].assigned`, typed
+   beside the division; on the platform it is then overwritten from the live
+   sheet's Assignment tab, which is maintained by hand as well. Both are
+   standing figures, and the per-component figures move past them the moment an
+   allocation lands — the 25.09.2026 one left the report printing a KI 2
+   assignment of 160.80 Cr above its own component rows totalling 228.78 Cr,
+   with the same 50.00 Cr gap on INFRA.
+
+   A division is now the sum of its components' targets, and the KI Infra
+   division the States/UTs table's own total, read from the sheet on every run.
+   Total Assigned is the sum of the divisions, as it already was, so it follows
+   too — and `manualOverrides.totalAssigned` is left unfixed for that reason,
+   since a figure typed there would go stale in exactly the same way. The
+   division table now always adds up to its own rows, and to the platform's
+   KI 1 / KI 2 / INFRA panel, which derives its figures the same way.
+
+   Like patch 7, this changes what the report *says*, so it has no "unset,
+   behaviour is upstream's" escape at the level of the published figure — but
+   it does at the level of the code: a division whose components are not all
+   targeted still takes the configured figure, which is upstream's usual case
+   (`componentTargets` is empty there — see `_componentTargetsNote`). The
+   Assignment tab is still read and its expenditure column still runs the live
+   cross-check; only its assignment column has stopped deciding anything while
+   every component carries a target.
+
 ## Updating
 
-Re-copy the files, re-apply the eight patches, then run the pipeline against the
+Re-copy the files, re-apply the nine patches, then run the pipeline against the
 live sheet and compare `result.totals`, `result.divisions` and the document byte
 counts with the run before. A change in any of them is a change to a published
 figure and wants explaining, not accepting.

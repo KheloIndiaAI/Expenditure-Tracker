@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 
-/* VENDOR PATCH 2 of 8 — see reports/vendor/README.md. Same reason as pipeline's:
+/* VENDOR PATCH 2 of 9 — see reports/vendor/README.md. Same reason as pipeline's:
    the Monday snapshots are held in Postgres on the server and written into the
    run's working directory beforehand, so this has to look where they were put.
    FILE is resolved per call rather than once at load, because the working
@@ -97,7 +97,7 @@ function latestBefore(date) {
  * answer on the very first Monday.
  */
 function componentWeeklySpend(date, divisions, baselineOn = null) {
-  /* VENDOR PATCH 8 of 8 — see reports/vendor/README.md.
+  /* VENDOR PATCH 8 of 9 — see reports/vendor/README.md.
      `baselineOn` names the snapshot to difference against, instead of taking
      whichever one happens to be the most recent before `date`. The platform's
      "this week so far" report needs THIS Monday specifically: asked on a
