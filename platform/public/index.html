@@ -1779,36 +1779,52 @@ const SEP25_TRANCHE={
 const SEP25_TOTAL=Object.keys(SEP25_TRANCHE).reduce(function(a,k){ return a+SEP25_TRANCHE[k]; },0);
 
 /* ============================================================================
-   GRANT - 59.00 Cr assigned to the scheme, NOT YET ATTRIBUTED to any component
+   28 SEPTEMBER TRANCHE - the allocation of 28.09.2026
    ============================================================================
-   The workbook's Assignment tab moved its Total Assigned from 527.87 Cr to 586.87 Cr
-   (it prints 5,86,86,75,000 - the same 25,000 short it has always carried) with no
-   component breakdown anywhere in the workbook. So it is held here as scheme money,
-   deliberately kept OUT of every component and every rollup built from them (SV, G,
-   the KI blocks): the KI panel reconciles its blocks against G.ex.assign to the rupee,
-   and putting unattributed money into a component would be a guess presented as a
-   figure.
+   Held like the two tranches above, and shown on its own line of the KPI card.
+   It first reached the platform as a single 59.00 Cr "Grant" - the amount by which
+   the workbook's Total Assigned had moved, with no component named anywhere - and
+   was carried unattributed at scheme level. The split since given is 60.00 Cr, not
+   59.00 Cr, plus a further 25.00 Cr for TID: 85.00 Cr in all, every rupee of it on
+   a named component, so the grant line is gone.
 
-   It is added only where the page states a scheme-wide figure - the KPI band, the
-   tracker's grand total, the overall-utilisation insight - through grantInScope(),
-   and it is shown on its own line wherever it is, so the component rows above it
-   still add up to themselves. When the split is known, it moves into a tranche table
-   like the two above and this goes to zero. */
+   The workbook's Assignment tab still states 586.87 Cr (the 59.00 Cr version) until
+   SAI updates it; the platform's 612.87 Cr is the split as given.
+     * 50.00 Cr to SAI Infra - New Sports Infrastructure Projects, 129.55 -> 179.55 Cr.
+     * 10.00 Cr to Khelo India Centres, the RECURRING component - not KIC (N-Rec).
+     * 25.00 Cr to Talent Identification & Development.
+   Figures are exact rupees: 85.00 Cr = 85,00,00,000. */
+const SEP28_LABEL='28 Sept';
+const SEP28_TRANCHE={
+  'Talent Identification & Development': 250000000,   // 25.00 Cr · recurring
+  'Khelo India Centres':                 100000000,   // 10.00 Cr · recurring
+  'New Sports Infrastructure Projects':  500000000    // 50.00 Cr · infrastructure
+};
+const SEP28_TOTAL=Object.keys(SEP28_TRANCHE).reduce(function(a,k){ return a+SEP28_TRANCHE[k]; },0);
+
+/* Money assigned to the scheme but not yet to any component. Zero today - the 59.00 Cr
+   held here became the 28 Sept tranche above once its split was known. When such an
+   amount is set, it is counted only where the page states a scheme-wide figure (the
+   KPI band, the tracker's grand total, the overall-utilisation insight) and always on
+   a line of its own, never inside a component or the rollups built from them: the KI
+   panel reconciles its blocks against G.ex.assign to the rupee. The report reads its
+   twin, config.unattributedGrants. */
 const GRANT_LABEL='Grant';
-const GRANT_UNATTRIBUTED=590000000;               // 59.00 Cr
+const GRANT_UNATTRIBUTED=0;
 /* It belongs to no classification and to no centre, so it is counted only while the
    whole scheme is in view: every classification in scope, and not the Regional-Centres
    -only reading, which is about money at the centres. */
 function grantInScope(){ return (state.filt||'All')==='All' && !rcOnlyOn() ? GRANT_UNATTRIBUTED : 0; }
 
-/* Fold both tranches into the assignment every view reads, and keep the seeded
+/* Fold every tranche into the assignment every view reads, and keep the seeded
    rollups in step so nothing reads a pre-tranche total before the first render. */
 (function applyTranches(){
   (DATA.subverticals||[]).forEach(function(s){
-    s.assignQ1=s.assign||0;                          // the base, before either tranche
+    s.assignQ1=s.assign||0;                          // the base, before any tranche
     s.q2=Q2_TRANCHE[s.name]||0;
     s.sep25=SEP25_TRANCHE[s.name]||0;
-    var add=s.q2+s.sep25;
+    s.sep28=SEP28_TRANCHE[s.name]||0;
+    var add=s.q2+s.sep25+s.sep28;
     if(!add) return;
     s.assign=s.assignQ1+add;
     s.bal=s.assign-(s.exp||0);
@@ -1817,21 +1833,21 @@ function grantInScope(){ return (state.filt||'All')==='All' && !rcOnlyOn() ? GRA
   /* A tranche naming a component this platform does not carry would otherwise be
      silently dropped - the money would vanish rather than land somewhere wrong. */
   var have={}; (DATA.subverticals||[]).forEach(function(s){ have[s.name]=1; });
-  [['Q2',Q2_TRANCHE],[SEP25_LABEL,SEP25_TRANCHE]].forEach(function(p){
+  [['Q2',Q2_TRANCHE],[SEP25_LABEL,SEP25_TRANCHE],[SEP28_LABEL,SEP28_TRANCHE]].forEach(function(p){
     var miss=Object.keys(p[1]).filter(function(k){ return p[1][k]>0 && !have[k]; });
     if(miss.length) console.warn(p[0]+' tranche: no component matched for', miss);
   });
   // seeded section and grand rollups
   var byS={};
   (DATA.subverticals||[]).forEach(function(s){
-    byS[s.section]=(byS[s.section]||0)+(s.q2||0)+(s.sep25||0);
+    byS[s.section]=(byS[s.section]||0)+(s.q2||0)+(s.sep25||0)+(s.sep28||0);
   });
   Object.keys(DATA.sectionTotals||{}).forEach(function(k){
     var t=DATA.sectionTotals[k], add=byS[k]||0;
     if(!add) return;
     t.assign+=add; t.bal=t.assign-t.exp;
   });
-  if(DATA.grand){ DATA.grand.assign+=Q2_TOTAL+SEP25_TOTAL; DATA.grand.bal=DATA.grand.assign-DATA.grand.exp; }
+  if(DATA.grand){ DATA.grand.assign+=Q2_TOTAL+SEP25_TOTAL+SEP28_TOTAL; DATA.grand.bal=DATA.grand.assign-DATA.grand.exp; }
 })();
 let SV=DATA.subverticals;
 let SVA=SV.filter(s=>s.assign>0||s.exp>0);
@@ -2817,6 +2833,7 @@ function kpiScheme(){
      sum would report a base the headline no longer matches. */
   const q2In=sum(SV,function(x){ return x.q2||0; });
   const sepIn=sum(SV,function(x){ return x.sep25||0; });
+  const sep28In=sum(SV,function(x){ return x.sep28||0; });
   /* The unattributed grant: scheme money that is assigned and not spent, so it raises
      the assignment and the balance by the same amount and every rate struck against
      them - and nothing else. It is at no centre, so Unspent by Centre does not move. */
@@ -2826,7 +2843,7 @@ function kpiScheme(){
   const asgBE=asg+mAssign;
   return `<div class="kpi-grid k5">
     <div class="kpi"><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('bank')}</span><div class="kpi-txt"><div class="lbl">Budget Allotment</div><div class="val tnum">${cr(BUDGET_BE)}</div></div></div><div class="sub">Budget Estimates · ${esc(FY)}</div>${capRow('Assigned',asgBE,pct(BUDGET_BE?asgBE/BUDGET_BE:0,1)+' of BE')}</div>
-    <div class="kpi accent"><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">Total Assignment</div><div class="val tnum">${cr(asg)}</div></div></div><div class="sub">Previous ${cr(ex.assign-q2In-sepIn)}<br><b>Q2 Limit: ${cr(q2In)}</b><br><b>${SEP25_LABEL}: ${cr(sepIn)}</b>${grIn?`<br><b>${GRANT_LABEL}: ${cr(grIn)}</b>`:''}</div>${cap(asg+mAssign)}</div>
+    <div class="kpi accent"><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">Total Assignment</div><div class="val tnum">${cr(asg)}</div></div></div><div class="sub">Previous ${cr(ex.assign-q2In-sepIn-sep28In)}<br><b>Q2 Limit: ${cr(q2In)}</b><br><b>${SEP25_LABEL}: ${cr(sepIn)}</b><br><b>${SEP28_LABEL}: ${cr(sep28In)}</b>${grIn?`<br><b>${GRANT_LABEL}: ${cr(grIn)}</b>`:''}</div>${cap(asg+mAssign)}</div>
     <div class="kpi"><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">Expenditure to date</div><div class="val tnum">${cr(ex.exp)}</div></div></div>${cap(ex.exp+mExp)}<div class="sub kpi-rates" style="color:var(--serious)">${pct(beUp,1)} of Budget allotment<br>${pct(asg?ex.exp/asg:0,1)} of assignment</div></div>
     <div class="kpi"><div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('scale')}</span><div class="kpi-txt"><div class="lbl">Balance</div><div class="val tnum">${cr(bal)}</div></div></div><div class="sub">${pct(asg?bal/asg:0,1)} unspent</div>${cap(bal+mBal)}</div>
     <div class="kpi"${tattr(tipIdle)}><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('gauge')}</span><div class="kpi-txt"><div class="lbl">Unspent by Centre</div><div class="val tnum neg">${cr(ex.idle)}</div></div></div><div class="sub">limit assigned, not spent</div>${cap(ex.idle+mBal)}</div>
@@ -5196,7 +5213,7 @@ function exportTxLog(){
        Assigned limit = amount released in the period   (release "net")
        Expenditure    = amount utilised in the period   (release "util")
        Balance        = released - utilised, i.e. money released but not drawn
-   Component assignment (Rs 459.19 Cr, base plus both tranches) has no date
+   Component assignment (Rs 544.19 Cr, base plus the three tranches) has no date
    column anywhere in the workbook and is deliberately NOT inferred onto the
    timeline.
 
@@ -6531,7 +6548,7 @@ function syncBuild(summaryRows,txRows){
     const ddoki=m2?m2.ddoki:0, totLim=m2?m2.totLim:0, totAct=m2?m2.totAct:0;
     const exp=ddoki+totAct;
     return {name:n,short:o.short,parent:o.parent,section:o.section,code:o.code,idx:o.idx,
-      assign:o.assign,assignQ1:o.assignQ1,q2:o.q2,sep25:o.sep25,ddoki:ddoki,totLim:totLim,totAct:totAct,exp:exp,
+      assign:o.assign,assignQ1:o.assignQ1,q2:o.q2,sep25:o.sep25,sep28:o.sep28,ddoki:ddoki,totLim:totLim,totAct:totAct,exp:exp,
       bal:o.assign-exp,up:o.assign?exp/o.assign:0,byCentre:bc};
   });
   const byName={}; subs.forEach(function(x){ byName[x.name]=x; });

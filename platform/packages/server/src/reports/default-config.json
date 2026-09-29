@@ -54,7 +54,7 @@
     }
   },
   "_divisionsNote": "The KI-1 / KI-2 split and componentTargets below were taken from the 'Components of KI 1 / KI 2' panels in the 02.09.2026 Expenditure Summary Report PDF, then verified against live data: this split reproduces the Assignment tab's own expenditure figures exactly (KI-1 48.3636 Cr, KI-2 97.4687 Cr), and each division's targets sum exactly to its assignment. The live cross-check in src/pipeline.js re-verifies this on every run.",
-  "_assignedNote": "Each division's 'assigned' below is now only a FALLBACK. A division is assigned the sum of its own componentTargets, and the KI Infra division the States/UTs table's total read live from the sheet (rollup.cjs, VENDOR PATCH 9) — so the division table always adds up to its own component rows, and matches the platform's KI 1 / KI 2 / INFRA panel, which derives its figures the same way. The workbook's Assignment tab is still read and still overwrites these numbers, but with every component targeted that override no longer decides anything; its expenditure column still runs the live cross-check. The figures here are kept in step anyway, for the case where componentTargets is empty: they include the 25.09.2026 allocation (KI-2 +67.98 Cr, SAI-INFRA +50.00 Cr) and KI Infra at 57.36 Cr.",
+  "_assignedNote": "Each division's 'assigned' below is now only a FALLBACK. A division is assigned the sum of its own componentTargets, and the KI Infra division the States/UTs table's total read live from the sheet (rollup.cjs, VENDOR PATCH 9) — so the division table always adds up to its own component rows, and matches the platform's KI 1 / KI 2 / INFRA panel, which derives its figures the same way. The workbook's Assignment tab is still read and still overwrites these numbers, but with every component targeted that override no longer decides anything; its expenditure column still runs the live cross-check. The figures here are kept in step anyway, for the case where componentTargets is empty: they include the 25.09.2026 allocation (KI-2 +67.98 Cr, SAI-INFRA +50.00 Cr), the 28.09.2026 one (KI-2 +35.00 Cr, SAI-INFRA +50.00 Cr) and KI Infra at 68.68 Cr.",
   "divisions": [
     {
       "key": "KI-1",
@@ -75,7 +75,7 @@
     {
       "key": "KI-2",
       "label": "KI-2",
-      "assigned": 2287800000,
+      "assigned": 2637800000,
       "components": [
         "Khelo India Centres",
         "Talent Identification & Development",
@@ -91,7 +91,7 @@
     {
       "key": "SAI-INFRA",
       "label": "SAI-INFRA",
-      "assigned": 1295500000,
+      "assigned": 1795500000,
       "components": [
         "New Sports Infrastructure Projects"
       ],
@@ -129,13 +129,13 @@
     "Sports for Peace and Development": 81700000,
     "Sports for rural/indigenous/tribal": 14900000,
     "Sports for disabled sportspersons": 0,
-    "Khelo India Centres": 605400000,
-    "Talent Identification & Development": 603100000,
+    "Khelo India Centres": 705400000,
+    "Talent Identification & Development": 853100000,
     "Khelo India Centres NR": 335800000,
     "Sports Academies NR": 693700000,
     "Sports Academies": 49800000,
     "Community Coaching & Development": 0,
-    "New Sports Infrastructure Projects": 1295500000
+    "New Sports Infrastructure Projects": 1795500000
   },
   "_agencyAliasNote": "Maps the Child Agency Name as written in the RBI report to the Test sheet 2 tab name. Matching is case-insensitive and ignores the SAI/RC/NSNIS prefixes, so most names resolve without an entry here.",
   "agencyAliases": {
@@ -157,7 +157,7 @@
   },
   "manualOverrides": {
     "_note": "Hand-entered figures for the page-1 summary table, in RUPEES. Any value set here is used on every report until cleared; the dashboard flags on its status card whenever any are in force. null = compute from the sheet.",
-    "_totalAssignedNote": "Left to compute, deliberately. It is now the sum of the four divisions, and each of those is the sum of its own components (or, for KI Infra, of the States/UTs table) — so the total follows an allocation the moment componentTargets carries it, with nothing to re-type and nothing to go stale. It computes to 516,55,00,000 today: 100.86 + 228.78 + 129.55 + 57.36 Cr. It was fixed at that same figure, and at 394,01,00,000 before the 25.09.2026 allocation. The workbook's Assignment tab states 516,54,75,000, which is 25,000 lower for a reason already known: its own total has carried that shortfall since the desktop tool. Typing a figure into the dashboard and ticking Fixed still overrides all of this, for the day someone needs it to.",
+    "_totalAssignedNote": "Left to compute, deliberately. It is now the sum of the four divisions, and each of those is the sum of its own components (or, for KI Infra, of the States/UTs table) — so the total follows an allocation the moment componentTargets carries it, with nothing to re-type and nothing to go stale. It computes to 612,87,00,000 today: 100.86 + 263.78 + 179.55 + 68.68 Cr. It was once fixed, at 394,01,00,000 and then 516,55,00,000. The workbook's Assignment tab lags: it states 586,86,75,000 - the 28.09.2026 allocation as a single 59.00 Cr, before its split was given as 85.00 Cr - and has carried a 25,000 shortfall of its own since the desktop tool. Typing a figure into the dashboard and ticking Fixed still overrides all of this, for the day someone needs it to.",
     "totalExpenditure": 2091160000.0000002,
     "balance": null,
     "dayTotal": 15500000,
@@ -172,11 +172,10 @@
   "_allocationsNote": "Allocations already folded into the figures above, by date. Because a database that already holds a config ignores this file, each allocation is ALSO applied to the stored copy once, by applyAllocations() in store.ts, which reads this same list to know what it has done. Never remove an entry to force a re-run: that would add the money a second time.",
   "allocationsApplied": [
     "25.09.2026",
-    "29.09.2026 grant"
+    "29.09.2026 grant",
+    "28.09.2026"
   ],
   "_unattributedGrantsNote": "Money assigned to the scheme that no component has been given yet. The report adds it to Total Assigned and Balance and names it under Total Assigned on page 1, because the division panels, which are sums of components, add up to that much less. When the split is known, move the amount into componentTargets and remove the entry here - in the same change, or it counts twice.",
-  "unattributedGrants": [
-    { "id": "29.09.2026 grant", "label": "Grant", "amount": 590000000 }
-  ],
+  "unattributedGrants": [],
   "_seedNote": "Seed copy of the automation config, used the first time the platform boots with an empty report_state. After that the live copy is the one in Postgres (report_state.key=config), which is what the manual-figures endpoint writes to. Editing this file changes nothing on a database that already has a row — which is why an allocation needs the one-time migration named above, not just an edit here. The upstream 'automation' block is deliberately absent: it configured the desktop tool's morning cron, and on the platform a report is produced only when somebody presses Process now."
 }

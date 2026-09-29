@@ -162,6 +162,8 @@ const ALLOCATIONS: {
   balance: number;
   /** Money assigned to the scheme but not yet to any component — see unattributedGrants. */
   unattributed?: { label: string; amount: number };
+  /** Ids of earlier unattributed grants this allocation replaces, now that their split is known. */
+  replaces?: string[];
 }[] = [
   {
     id: '25.09.2026',
@@ -200,6 +202,28 @@ const ALLOCATIONS: {
     balance: 590000000,
     unattributed: { label: 'Grant', amount: 590000000 },
   },
+  {
+    id: '28.09.2026',
+    note: '85.00 Cr to three components, replacing the 59.00 Cr grant',
+    /* The grant above, split: it was 60.00 Cr, not 59.00 Cr - 50.00 Cr to SAI Infra and
+       10.00 Cr to Khelo India Centres (the RECURRING component, which this config calls
+       plain "Khelo India Centres") - plus a further 25.00 Cr for TID. So the grant entry
+       goes and the three amounts land on their components.
+
+       It runs AFTER the grant entry, whatever the dates say, because it undoes it: on a
+       stored config that has a figure fixed by hand, the grant added 59.00 Cr to it and
+       this adds the other 26.00 Cr, 85.00 Cr in all. Where the figures compute - as they
+       do in production today - those two deltas are skipped and the sums do the work. */
+    componentTargets: {
+      'Talent Identification & Development': 250000000,
+      'Khelo India Centres': 100000000,
+      'New Sports Infrastructure Projects': 500000000,
+    },
+    divisions: { 'KI-2': 350000000, 'SAI-INFRA': 500000000 },
+    totalAssigned: 260000000,             // 85.00 Cr, less the 59.00 Cr grant it replaces
+    balance: 260000000,
+    replaces: ['29.09.2026 grant'],
+  },
 ];
 
 async function applyAllocations(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
@@ -227,6 +251,10 @@ async function applyAllocations(db: Awaited<ReturnType<typeof getDb>>): Promise<
       const ov = cfg.manualOverrides;
       if (ov && typeof ov.totalAssigned === 'number') ov.totalAssigned += a.totalAssigned;
       if (ov && typeof ov.balance === 'number') ov.balance += a.balance;
+      const replaced = a.replaces ?? [];
+      if (replaced.length && Array.isArray(cfg.unattributedGrants)) {
+        cfg.unattributedGrants = cfg.unattributedGrants.filter((g: { id?: string }) => !replaced.includes(String(g?.id)));
+      }
       if (a.unattributed) {
         const list = Array.isArray(cfg.unattributedGrants) ? cfg.unattributedGrants : (cfg.unattributedGrants = []);
         list.push({ id: a.id, label: a.unattributed.label, amount: a.unattributed.amount });
