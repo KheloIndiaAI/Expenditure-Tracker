@@ -101,7 +101,7 @@
     {
       "key": "MSD-INFRA",
       "label": "MSD-INFRA (State)",
-      "assigned": 573600000,
+      "assigned": 686800000,
       "source": "kiInfraStates"
     }
   ],
@@ -159,7 +159,7 @@
     "_note": "Hand-entered figures for the page-1 summary table, in RUPEES. Any value set here is used on every report until cleared; the dashboard flags on its status card whenever any are in force. null = compute from the sheet.",
     "_totalAssignedNote": "Left to compute, deliberately. It is now the sum of the four divisions, and each of those is the sum of its own components (or, for KI Infra, of the States/UTs table) — so the total follows an allocation the moment componentTargets carries it, with nothing to re-type and nothing to go stale. It computes to 516,55,00,000 today: 100.86 + 228.78 + 129.55 + 57.36 Cr. It was fixed at that same figure, and at 394,01,00,000 before the 25.09.2026 allocation. The workbook's Assignment tab states 516,54,75,000, which is 25,000 lower for a reason already known: its own total has carried that shortfall since the desktop tool. Typing a figure into the dashboard and ticking Fixed still overrides all of this, for the day someone needs it to.",
     "totalExpenditure": 2091160000.0000002,
-    "balance": 3074310000,
+    "balance": null,
     "dayTotal": 15500000,
     "totalAssigned": null,
     "totalAssignedFixed": false

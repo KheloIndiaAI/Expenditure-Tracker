@@ -228,38 +228,50 @@ async function applyAllocations(db: Awaited<ReturnType<typeof getDb>>): Promise<
 }
 
 /**
- * Total Assigned stops being a typed figure, once.
+ * The two figures that follow from the others stop being typed ones, once each.
  *
- * It is now the sum of the divisions, and each division the sum of its own components
- * (VENDOR PATCH 9), so the computed figure moves with an allocation on its own. A fixed
- * override does not: it was set to 516.55 Cr with the 25.09.2026 allocation and would
- * have had to be re-typed for every one after it, which is the staleness this whole
- * change is about. Clearing it makes the report compute the same number today and the
- * right one afterwards.
+ * Total Assigned is the sum of the divisions, and each division the sum of its own
+ * components or of the KI Infra table (VENDOR PATCH 9). Balance is Total Assigned less
+ * Total Expenditure. Both therefore move on their own as the sheet and the allocations
+ * move — and a figure typed over either does not. Total Assigned was fixed at 516.55 Cr
+ * with the 25.09.2026 allocation; Balance was raised with it and then went stale again
+ * within days, when KI Infra grew from 57.36 Cr to 68.68 Cr and page 1 stopped adding
+ * up. Clearing them computes the same numbers today and the right ones afterwards.
  *
- * Once, and never again — `totalAssignedComputedSince` records that it has happened, so
- * an operator who later decides to fix a figure of their own keeps it.
+ * Once each, and never again: the two markers below record that it has happened, so an
+ * operator who later types a figure of their own keeps it. Expenditure and Yesterday's
+ * Total are NOT touched — those are genuinely entered, not derived from anything here.
  */
-async function computeTotalAssigned(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
+async function computeDerivedFigures(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
   try {
     const row = await db.one<{ json: string }>("SELECT json FROM report_state WHERE key = 'config'");
     if (!row?.json) return;                       // nothing stored yet — the seed already computes
     let cfg: Record<string, any>;
     try { cfg = JSON.parse(row.json); } catch { return; }
-    if (cfg.totalAssignedComputedSince) return;
 
     const ov = (cfg.manualOverrides ??= {});
-    const was = typeof ov.totalAssigned === 'number' ? ` (was ₹${(ov.totalAssigned / 1e7).toFixed(2)} Cr, fixed)` : '';
-    ov.totalAssigned = null;
-    ov.totalAssignedFixed = false;
-    cfg.totalAssignedComputedSince = now();
+    const cr = (v: unknown) => `₹${(Number(v) / 1e7).toFixed(2)} Cr`;
+    const done: string[] = [];
+    if (!cfg.totalAssignedComputedSince) {
+      done.push(`Total Assigned${typeof ov.totalAssigned === 'number' ? ` (was ${cr(ov.totalAssigned)}, fixed)` : ''}`);
+      ov.totalAssigned = null;
+      ov.totalAssignedFixed = false;
+      cfg.totalAssignedComputedSince = now();
+    }
+    if (!cfg.balanceComputedSince) {
+      done.push(`Balance${typeof ov.balance === 'number' ? ` (was ${cr(ov.balance)})` : ''}`);
+      ov.balance = null;
+      cfg.balanceComputedSince = now();
+    }
+    if (!done.length) return;
+
     await db.run(
       'UPDATE report_state SET json = ?, updated_at = ? WHERE key = ?',
       [JSON.stringify(cfg), now(), 'config'],
     );
-    console.log(`✓ report config: Total Assigned is computed from the divisions${was}.`);
+    console.log(`✓ report config: computed rather than typed — ${done.join('; ')}.`);
   } catch (err) {
-    console.error('report config: could not switch Total Assigned to computed —', (err as Error)?.message ?? err);
+    console.error('report config: could not switch a figure to computed —', (err as Error)?.message ?? err);
   }
 }
 
@@ -272,7 +284,7 @@ export function initReports(): Promise<void> {
       await migrateRbiColumns(db);
       await migrateRbiSqlite(db);
       await applyAllocations(db);
-      await computeTotalAssigned(db);
+      await computeDerivedFigures(db);
       /* Once per process, right after the tables are known to exist. There is no
          scheduler to do this at boot any more, and it has to happen before the
          first status or run — a run left 'running' by a container replaced
