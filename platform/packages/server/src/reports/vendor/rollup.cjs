@@ -49,7 +49,7 @@ function rollup({ master, rbi, dsc, config, resolver }) {
       }
     }
 
-    /* VENDOR PATCH 9 of 9 — see reports/vendor/README.md.
+    /* VENDOR PATCH 9 of 10 — see reports/vendor/README.md.
        A division is assigned what its own parts are assigned.
        Upstream this is `config.divisions[].assigned`, a hand-maintained figure typed
        beside the division (and, on the platform, overwritten from the sheet's Assignment
@@ -173,6 +173,20 @@ function rollup({ master, rbi, dsc, config, resolver }) {
     balance: a.balance + d.balance,
     rcUnutilised: a.rcUnutilised + d.rcUnutilised,
   }), { assigned: 0, expenditure: 0, balance: 0, rcUnutilised: 0 });
+
+  /* VENDOR PATCH 10 of 10 — see reports/vendor/README.md.
+     Money assigned to the scheme that no component has been given yet. It belongs to no
+     division, so it cannot be summed from them the way everything above is; it is added
+     to the scheme's own totals instead — assigned, and balance, since none of it is spent
+     — and carried as `totals.unattributed` so page 1 can say why the division panels no
+     longer add up to Total Assigned. Unset, behaviour is upstream's. */
+  const grants = (config.unattributedGrants || []).filter(g => Number(g && g.amount) > 0);
+  totals.unattributed = grants.reduce((a, g) => a + Number(g.amount), 0);
+  if (totals.unattributed) {
+    totals.assigned += totals.unattributed;
+    totals.balance += totals.unattributed;
+    warnings.push(`Total Assigned includes ₹${(totals.unattributed / 1e7).toFixed(2)} Cr assigned to the scheme but not yet to any component (${grants.map(g => g.label || 'grant').join(', ')}), so the division panels add up to that much less. Give it a component in componentTargets when the split is known.`);
+  }
 
   // --- the day's claims, classified ---
   const daily = dsc || rbi;

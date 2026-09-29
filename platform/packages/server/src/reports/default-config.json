@@ -171,7 +171,12 @@
   },
   "_allocationsNote": "Allocations already folded into the figures above, by date. Because a database that already holds a config ignores this file, each allocation is ALSO applied to the stored copy once, by applyAllocations() in store.ts, which reads this same list to know what it has done. Never remove an entry to force a re-run: that would add the money a second time.",
   "allocationsApplied": [
-    "25.09.2026"
+    "25.09.2026",
+    "29.09.2026 grant"
+  ],
+  "_unattributedGrantsNote": "Money assigned to the scheme that no component has been given yet. The report adds it to Total Assigned and Balance and names it under Total Assigned on page 1, because the division panels, which are sums of components, add up to that much less. When the split is known, move the amount into componentTargets and remove the entry here - in the same change, or it counts twice.",
+  "unattributedGrants": [
+    { "id": "29.09.2026 grant", "label": "Grant", "amount": 590000000 }
   ],
   "_seedNote": "Seed copy of the automation config, used the first time the platform boots with an empty report_state. After that the live copy is the one in Postgres (report_state.key=config), which is what the manual-figures endpoint writes to. Editing this file changes nothing on a database that already has a row — which is why an allocation needs the one-time migration named above, not just an edit here. The upstream 'automation' block is deliberately absent: it configured the desktop tool's morning cron, and on the platform a report is produced only when somebody presses Process now."
 }

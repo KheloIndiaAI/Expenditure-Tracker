@@ -160,6 +160,8 @@ const ALLOCATIONS: {
   divisions: Record<string, number>;
   totalAssigned: number;
   balance: number;
+  /** Money assigned to the scheme but not yet to any component — see unattributedGrants. */
+  unattributed?: { label: string; amount: number };
 }[] = [
   {
     id: '25.09.2026',
@@ -183,6 +185,20 @@ const ALLOCATIONS: {
        same amount. Without this the report's own first page stops adding up: assigned
        would rise while balance, an entered figure, stood where the old total left it. */
     balance: 1225400000,
+  },
+  {
+    id: '29.09.2026 grant',
+    note: '59.00 Cr grant, not yet attributed to a component',
+    /* The workbook's Total Assigned moved from 527.87 Cr to 586.87 Cr with no component
+       breakdown anywhere in it. Nothing is guessed: no component or division moves, the
+       grant is recorded as scheme money and the report adds it to its own totals (rollup,
+       VENDOR PATCH 10). Total Assigned and Balance both compute today, so the two deltas
+       below only act on a stored config where someone has since fixed a figure by hand. */
+    componentTargets: {},
+    divisions: {},
+    totalAssigned: 590000000,
+    balance: 590000000,
+    unattributed: { label: 'Grant', amount: 590000000 },
   },
 ];
 
@@ -211,6 +227,10 @@ async function applyAllocations(db: Awaited<ReturnType<typeof getDb>>): Promise<
       const ov = cfg.manualOverrides;
       if (ov && typeof ov.totalAssigned === 'number') ov.totalAssigned += a.totalAssigned;
       if (ov && typeof ov.balance === 'number') ov.balance += a.balance;
+      if (a.unattributed) {
+        const list = Array.isArray(cfg.unattributedGrants) ? cfg.unattributedGrants : (cfg.unattributedGrants = []);
+        list.push({ id: a.id, label: a.unattributed.label, amount: a.unattributed.amount });
+      }
       done.push(a.id);
       applied.push(`${a.id} (${a.note})`);
     }

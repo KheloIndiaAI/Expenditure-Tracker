@@ -1,7 +1,7 @@
 # Vendored report pipeline
 
 This folder is the daily-report automation, copied in and run **unmodified**
-except for the nine patches listed below. Every figure in every document the
+except for the ten patches listed below. Every figure in every document the
 platform serves is computed by this code, not by anything written for the
 platform — that is the whole point of vendoring it rather than reimplementing
 it.
@@ -151,9 +151,22 @@ Each is marked in the source with `VENDOR PATCH n`.
    cross-check; only its assignment column has stopped deciding anything while
    every component carries a target.
 
+10. **`rollup.cjs` / `pdfgen.cjs` / `report-layout.cjs` — money assigned to the
+    scheme but not yet to a component.** `config.unattributedGrants` lists it.
+    It belongs to no division, so patch 9's sums cannot reach it; `rollup.cjs`
+    adds it to the scheme's own totals — assigned, and balance, since none of
+    it is spent — and carries it as `totals.unattributed`. Page 1 names it
+    under Total Assigned in both formats ("incl. ₹59.00 Cr grant not yet
+    attributed to a component"), because the division panels now add up to
+    that much less, and every run records a warning saying the same.
+
+    Unset — no entries — behaviour is upstream's exactly. When the split is
+    known the amount moves into `componentTargets` and its entry is removed in
+    the same change; otherwise it is counted twice.
+
 ## Updating
 
-Re-copy the files, re-apply the nine patches, then run the pipeline against the
+Re-copy the files, re-apply the ten patches, then run the pipeline against the
 live sheet and compare `result.totals`, `result.divisions` and the document byte
 counts with the run before. A change in any of them is a change to a published
 figure and wants explaining, not accepting.

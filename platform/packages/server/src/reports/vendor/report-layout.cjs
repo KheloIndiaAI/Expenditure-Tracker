@@ -237,19 +237,23 @@ const badge = section => {
 function headerSummary(d, o = {}) {
   const rowOf = (label, value, ro = {}) => new TableRow({ cantSplit: true,
     children: [
-      cell([line(label, { bold: true, size: 19, italics: ro.italics })], { width: 62, borders: BOX }),
+      cell([line(label, { bold: true, size: 19, italics: ro.italics })]
+        .concat(ro.note ? [line(ro.note, { size: 14, color: '64748B' })] : []), { width: 62, borders: BOX }),
       cell([line(value, { bold: true, size: 19, color: ro.color })], { width: 38, borders: BOX }),
     ],
   });
+  /* VENDOR PATCH 10 — the grant held at scheme level, named where it is counted. */
+  const un = d.totals.unattributed;
   return table([
-    rowOf('Total Assigned', cr(d.totals.assigned)),
+    rowOf('Total Assigned', cr(d.totals.assigned),
+      { note: un ? `incl. ${cr(un)} grant not yet attributed to a component` : null }),
     rowOf('Total Expenditure', cr(d.totals.expenditure), { color: GREEN }),
     rowOf('  BALANCE', cr(d.totals.balance), { color: RED }),
     rowOf("Yesterday's Total Expenditure", cr(d.day.total), { italics: true }),
   ], { borders: BOX, width: o.width, alignment: o.alignment });
 }
 
-/* VENDOR PATCH 7 of 9 — see reports/vendor/README.md.
+/* VENDOR PATCH 7 of 10 — see reports/vendor/README.md.
    distributionGrid() stood here: the day's claims as a grid of name/amount
    pairs, three to a row, drawn beside headerSummary() on page 1 to match the
    PDF. Neither format prints it now. The claims themselves are untouched —
@@ -630,7 +634,7 @@ function reportLayout(data) {
   return out;
 }
 
-/* VENDOR PATCH 6 of 9 — see reports/vendor/README.md.
+/* VENDOR PATCH 6 of 10 — see reports/vendor/README.md.
    Exports only. leaderboardPage() is this file's own Word rendering of the
    weekly leaderboard, written here but never called by reportLayout() - the
    desktop tool only ever produced that page as a PDF. The platform produces a

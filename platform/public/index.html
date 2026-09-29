@@ -1778,6 +1778,29 @@ const SEP25_TRANCHE={
 };
 const SEP25_TOTAL=Object.keys(SEP25_TRANCHE).reduce(function(a,k){ return a+SEP25_TRANCHE[k]; },0);
 
+/* ============================================================================
+   GRANT - 59.00 Cr assigned to the scheme, NOT YET ATTRIBUTED to any component
+   ============================================================================
+   The workbook's Assignment tab moved its Total Assigned from 527.87 Cr to 586.87 Cr
+   (it prints 5,86,86,75,000 - the same 25,000 short it has always carried) with no
+   component breakdown anywhere in the workbook. So it is held here as scheme money,
+   deliberately kept OUT of every component and every rollup built from them (SV, G,
+   the KI blocks): the KI panel reconciles its blocks against G.ex.assign to the rupee,
+   and putting unattributed money into a component would be a guess presented as a
+   figure.
+
+   It is added only where the page states a scheme-wide figure - the KPI band, the
+   tracker's grand total, the overall-utilisation insight - through grantInScope(),
+   and it is shown on its own line wherever it is, so the component rows above it
+   still add up to themselves. When the split is known, it moves into a tranche table
+   like the two above and this goes to zero. */
+const GRANT_LABEL='Grant';
+const GRANT_UNATTRIBUTED=590000000;               // 59.00 Cr
+/* It belongs to no classification and to no centre, so it is counted only while the
+   whole scheme is in view: every classification in scope, and not the Regional-Centres
+   -only reading, which is about money at the centres. */
+function grantInScope(){ return (state.filt||'All')==='All' && !rcOnlyOn() ? GRANT_UNATTRIBUTED : 0; }
+
 /* Fold both tranches into the assignment every view reads, and keep the seeded
    rollups in step so nothing reads a pre-tranche total before the first render. */
 (function applyTranches(){
@@ -2757,7 +2780,6 @@ const BUDGET_BE=924.35e7;
    the other. */
 function kpiScheme(){
   const ex=G.ex, inc=G.mdsdIncluded;
-  const exUp=ex.assign?ex.exp/ex.assign:0;
   /* KI Infra (States/UTs) totals. Added to the ex-MDSD rollup rather than read
      off G: `G.ex` is always ex-MDSD while `G` only carries KI Infra when the
      chip is ticked, so adding holds whichever way the chip is set and cannot
@@ -2795,13 +2817,18 @@ function kpiScheme(){
      sum would report a base the headline no longer matches. */
   const q2In=sum(SV,function(x){ return x.q2||0; });
   const sepIn=sum(SV,function(x){ return x.sep25||0; });
+  /* The unattributed grant: scheme money that is assigned and not spent, so it raises
+     the assignment and the balance by the same amount and every rate struck against
+     them - and nothing else. It is at no centre, so Unspent by Centre does not move. */
+  const grIn=grantInScope();
+  const asg=ex.assign+grIn, bal=ex.bal+grIn;
   const tipIdle=`<b>Unspent by Centre</b><br>${cr(ex.idle)} (Regional Centres + DDO HQ)${inc?`<br>+ Infrastructure-MDSD unspent ₹${(G.mdsdIdle/1e7).toFixed(2)} Cr = ${cr(G.idle)}`:''}${idleTipRows(SV)}`;
-  const asgBE=ex.assign+mAssign;
+  const asgBE=asg+mAssign;
   return `<div class="kpi-grid k5">
     <div class="kpi"><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('bank')}</span><div class="kpi-txt"><div class="lbl">Budget Allotment</div><div class="val tnum">${cr(BUDGET_BE)}</div></div></div><div class="sub">Budget Estimates · ${esc(FY)}</div>${capRow('Assigned',asgBE,pct(BUDGET_BE?asgBE/BUDGET_BE:0,1)+' of BE')}</div>
-    <div class="kpi accent"><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">Total Assignment</div><div class="val tnum">${cr(ex.assign)}</div></div></div><div class="sub">Previous ${cr(ex.assign-q2In-sepIn)}<br><b>Q2 Limit: ${cr(q2In)}</b><br><b>${SEP25_LABEL}: ${cr(sepIn)}</b></div>${cap(ex.assign+mAssign)}</div>
-    <div class="kpi"><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">Expenditure to date</div><div class="val tnum">${cr(ex.exp)}</div></div></div>${cap(ex.exp+mExp)}<div class="sub kpi-rates" style="color:var(--serious)">${pct(beUp,1)} of Budget allotment<br>${pct(exUp,1)} of assignment</div></div>
-    <div class="kpi"><div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('scale')}</span><div class="kpi-txt"><div class="lbl">Balance</div><div class="val tnum">${cr(ex.bal)}</div></div></div><div class="sub">${pct(ex.assign?ex.bal/ex.assign:0,1)} unspent</div>${cap(ex.bal+mBal)}</div>
+    <div class="kpi accent"><div class="kpi-top"><span class="kpi-ic ic-blue">${kpiIcon('wallet')}</span><div class="kpi-txt"><div class="lbl">Total Assignment</div><div class="val tnum">${cr(asg)}</div></div></div><div class="sub">Previous ${cr(ex.assign-q2In-sepIn)}<br><b>Q2 Limit: ${cr(q2In)}</b><br><b>${SEP25_LABEL}: ${cr(sepIn)}</b>${grIn?`<br><b>${GRANT_LABEL}: ${cr(grIn)}</b>`:''}</div>${cap(asg+mAssign)}</div>
+    <div class="kpi"><div class="kpi-top"><span class="kpi-ic ic-green">${kpiIcon('coins')}</span><div class="kpi-txt"><div class="lbl">Expenditure to date</div><div class="val tnum">${cr(ex.exp)}</div></div></div>${cap(ex.exp+mExp)}<div class="sub kpi-rates" style="color:var(--serious)">${pct(beUp,1)} of Budget allotment<br>${pct(asg?ex.exp/asg:0,1)} of assignment</div></div>
+    <div class="kpi"><div class="kpi-top"><span class="kpi-ic ic-orange">${kpiIcon('scale')}</span><div class="kpi-txt"><div class="lbl">Balance</div><div class="val tnum">${cr(bal)}</div></div></div><div class="sub">${pct(asg?bal/asg:0,1)} unspent</div>${cap(bal+mBal)}</div>
     <div class="kpi"${tattr(tipIdle)}><div class="kpi-top"><span class="kpi-ic ic-purple">${kpiIcon('gauge')}</span><div class="kpi-txt"><div class="lbl">Unspent by Centre</div><div class="val tnum neg">${cr(ex.idle)}</div></div></div><div class="sub">limit assigned, not spent</div>${cap(ex.idle+mBal)}</div>
   </div>`;
 }
@@ -3133,9 +3160,10 @@ function cmtSealClosed(centre){
 function insightCards(){
   const ca=centreAgg(), topIdle=ca.slice().sort((a,b)=>b.idle-a.idle)[0];
   const topBal=SVA.slice().sort((a,b)=>b.bal-a.bal)[0];
+  const grIn=grantInScope(), gA=G.assign+grIn, gB=G.bal+grIn;   // see GRANT_UNATTRIBUTED
   const cards=[
     ['var(--serious)','₹',`<b>${esc(topBal.name)}</b> holds the largest unspent balance - <b>${crShort(topBal.bal)}</b> of ${crShort(topBal.assign)} assigned (${pct(topBal.assign?1-topBal.up:0,0)} unspent).`, topBal.mdsd?"go('mdsd')":"go('sv')"],
-    ['var(--warn)','▲',`Overall utilisation is <b>${pct(G.assign?G.exp/G.assign:0,1)}</b> - <b>${crShort(G.bal)}</b> of the ${cr(G.assign)} assignment is still unspent.`,"go('tracker')"],
+    ['var(--warn)','▲',`Overall utilisation is <b>${pct(gA?G.exp/gA:0,1)}</b> - <b>${crShort(gB)}</b> of the ${cr(gA)} assignment is still unspent${grIn?` (including the ${cr(grIn)} ${GRANT_LABEL.toLowerCase()} not yet attributed to a component)`:''}.`,"go('tracker')"],
     ['var(--primary)','◧',`<b>${esc(topIdle.key)}</b> has the highest idle at a centre - <b>${crShort(topIdle.idle)}</b> of its ${crShort(topIdle.lim)} limit unspent.`,"go('rc')"],
     ['var(--good)','₹',`<b>DDO KI Direct</b> expenditure is <b>${crShort(G.ddoki)}</b>, spent centrally outside the centre limits.`,"go('detail')"]
   ];
@@ -3171,7 +3199,11 @@ function viewTracker(){
       }
     });
   });
-  rows+=`<tr class="total"><td>GRAND TOTAL</td><td class="num tnum">${(G.assign/1e7).toFixed(2)}</td><td class="num tnum" style="color:var(--good)">${(G.exp/1e7).toFixed(2)}</td><td class="num tnum" style="color:var(--serious)">${(G.bal/1e7).toFixed(2)}</td><td class="num tnum">${pct(G.assign?G.exp/G.assign:0,0)}</td><td></td></tr>`;
+  /* The unattributed grant gets a row of its own, above the total it joins, so the table
+     foots to the KPI band over it while every component row still adds up to itself. */
+  const grIn=grantInScope(), gA=G.assign+grIn, gB=G.bal+grIn;
+  if(grIn) rows+=`<tr class="secrow"><td>${GRANT_LABEL} <span class="small muted" style="font-weight:400">· assigned to the scheme, not yet attributed to a component</span></td>${treeCells({assign:grIn,exp:0,bal:grIn})}</tr>`;
+  rows+=`<tr class="total"><td>GRAND TOTAL</td><td class="num tnum">${(gA/1e7).toFixed(2)}</td><td class="num tnum" style="color:var(--good)">${(G.exp/1e7).toFixed(2)}</td><td class="num tnum" style="color:var(--serious)">${(gB/1e7).toFixed(2)}</td><td class="num tnum">${pct(gA?G.exp/gA:0,0)}</td><td></td></tr>`;
   return pageHead('Component Expenditure Tracker','')
     + kpiScheme()
     + `<div class="card"><div class="card-hd"><h3>Expenditure by scheme component</h3><span class="small muted">figures in ₹ Cr</span></div>

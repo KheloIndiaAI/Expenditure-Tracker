@@ -23,7 +23,7 @@ const COLORS = {
   dots: ['#2A78D6', '#EB6834', '#1BAF7A', '#EDA100', '#E87BA4', '#4A3AA7', '#E34948', '#008300'],
 };
 
-/* VENDOR PATCH 3 of 9 — see reports/vendor/README.md.
+/* VENDOR PATCH 3 of 10 — see reports/vendor/README.md.
    Upstream looks for Edge or Chrome at the four places they install on Windows,
    because that is where this ran. On the server it runs on Debian, where the
    browser is at a different path entirely and the Windows list finds nothing —
@@ -736,7 +736,7 @@ function leaderboardPage(lb) {
   const maxAmount = top.amount || 1;
   const totalClaims = lb.rows.reduce((s, r) => s + r.claims, 0);
 
-  /* VENDOR PATCH 8 of 9 — see reports/vendor/README.md.
+  /* VENDOR PATCH 8 of 10 — see reports/vendor/README.md.
      Every default below is upstream's own wording, for the completed week this
      page was written to report. The platform's "this week so far" report
      passes its own: a page covering Monday to today captioned "Previous week"
@@ -858,7 +858,7 @@ function componentLeaderboardPage(cw) {
   const divColour = d => (d === 'KI-1' ? COLORS.bluePill : d === 'KI-2' ? COLORS.purplePill : COLORS.orange);
   const idle = cw.idleRows || [];
 
-  /* VENDOR PATCH 8 of 9 — see reports/vendor/README.md. Upstream's own wording
+  /* VENDOR PATCH 8 of 10 — see reports/vendor/README.md. Upstream's own wording
      is the default; the "this week so far" report supplies its own. The
      "Movement between …" line below needs no override: it names the two dates
      it actually differenced, which is true of either report. */
@@ -996,7 +996,7 @@ function generateReportHtml(data, opts = {}) {
   const infra = divisions.find(d => d.key === 'SAI-INFRA');
   const scheme = divisions.filter(d => !d.source).reduce((s, d) => s + d.assigned, 0);
 
-  /* VENDOR PATCH 7 of 9 — see reports/vendor/README.md.
+  /* VENDOR PATCH 7 of 10 — see reports/vendor/README.md.
      Yesterday's Expenditure Distribution used to be laid out here, a grid of
      the day's claims three name/amount pairs to a row, sitting beside the
      summary table. It is no longer printed. `data.day.agencies` still carries
@@ -1152,8 +1152,9 @@ ${REPORT_CSS}
     <!-- Top Summary, centred — see VENDOR PATCH 7 -->
     <div class="summary-wrap">
       <table class="table-bordered">
+        <!-- VENDOR PATCH 10: the grant held at scheme level, named where it is counted -->
         <tr>
-          <td class="font-bold">Total Assigned</td>
+          <td class="font-bold">Total Assigned${data.totals.unattributed ? `<div style="font-weight:400;font-size:9px;color:#64748b;margin-top:1px">incl. ${formatCr(data.totals.unattributed)} grant not yet attributed to a component</div>` : ''}</td>
           <td class="text-right font-bold">${formatCr(data.totals.assigned)}</td>
         </tr>
         <tr>
