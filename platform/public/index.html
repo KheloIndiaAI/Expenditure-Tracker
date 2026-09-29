@@ -6371,11 +6371,21 @@ const SYNC={
   status:'idle', last:null, lastTry:null, err:null, timer:null, applied:0,
   lastTxn:null, editLog:null, lastEdit:null, notes:[]
 };
-/* Transport. A page opened from the filesystem cannot fetch() a remote URL - Chrome blocks
-   it outright, whatever CORS headers the server sends - so the sheet is pulled with a
-   <script> tag instead, which has no such restriction. Google's visualization endpoint
-   answers with executable JS that calls a known global, which we own. fetch() is still used
-   when the page is served over http(s), where it is the cleaner path.
+/* Transport. Two routes to the same gviz data, tried in this order:
+
+   1. THE PLATFORM'S OWN SERVER, /api/sheet. The server fetches the tab from Google and
+      hands back the JSON, same-origin. This is the route that works for everyone,
+      because the request no longer comes from the viewer's browser. The direct route
+      below did, and so it carried that browser's Google session and ran past its
+      extensions - a browser signed in to Google, or holding an expired ("Paused") Chrome
+      profile, can be redirected towards accounts.google.com, which the page's CSP blocks
+      and which answers HTML Chrome will not run as a script. onerror fired, the pill said
+      "could not reach the sheet", and the same sheet opened fine in the next tab.
+
+   2. DIRECT, a <script> tag pointed at Google (JSONP). Kept as the fallback: it is what
+      a page opened from the filesystem has to use - Chrome blocks fetch() from file://
+      outright - and it still rescues a sync if the server path is ever the one failing.
+
    Cells are read as their FORMATTED value (`f`) when present, so dates and grouped numbers
    arrive exactly as they do in the CSV the parsers were validated against. */
 function gvizCell(c){
@@ -6392,8 +6402,40 @@ function gvizRows(o){
     return out;
   });
 }
+/* Route 1 - see Transport above. A non-2xx carries the server's own reason, which names
+   what actually failed (Google's status, a timeout, a tab that is not there) rather than
+   the browser's anonymous "could not load". */
+function sheetViaServer(tab,id){
+  return fetch('/api/sheet?id='+encodeURIComponent(id)+'&tab='+encodeURIComponent(tab),
+               {credentials:'same-origin',cache:'no-store'})
+    .then(function(r){
+      return r.json().catch(function(){ return null; }).then(function(body){
+        if(!r.ok){ const e=new Error((body&&body.message)||('the platform answered '+r.status)); e.status=r.status; throw e; }
+        return gvizRows(body);
+      });
+    });
+}
 function jsonpTabOnce(tab,id){
   id=id||SYNC.id;
+  if(!/^https?:$/.test(location.protocol)) return jsonpDirect(tab,id);
+  return sheetViaServer(tab,id).catch(function(viaServer){
+    /* A definite answer about the request itself is final. 404 is the server reporting
+       that the workbook has no tab of this name - and the direct route must NOT be tried
+       then, because Google answers an unknown name with the workbook's first tab, silently,
+       which is exactly what the server refused to pass on. See routes/sheet.ts. */
+    if(viaServer.status===404||viaServer.status===400) throw new Error(tab+': '+viaServer.message);
+    /* Route 2 as the fallback. If that fails as well, the SERVER's reason is the one
+       reported - it says what went wrong, where the direct route can only say that the
+       script did not load. Retryable exactly when the direct failure was: a definite
+       onerror is, a timeout is not - see jsonpTab for why a timed-out script must never
+       be followed by another on the same shared callback. */
+    return jsonpDirect(tab,id).catch(function(direct){
+      const e=new Error(tab+': '+viaServer.message+' (direct: '+String(direct.message).replace(tab+': ','')+')');
+      e.transport=!!direct.transport; throw e;
+    });
+  });
+}
+function jsonpDirect(tab,id){
   return new Promise(function(res,rej){
     let done=false;
     const el=document.createElement('script');

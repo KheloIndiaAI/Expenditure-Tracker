@@ -29,6 +29,7 @@ import { recordLogin } from './logins.ts';
 import { registerAdminRoutes } from './routes/admin.ts';
 import { registerCommentRoutes } from './routes/comments.ts';
 import { registerReportRoutes } from './reports/routes.ts';
+import { registerSheetRoutes } from './routes/sheet.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -209,6 +210,11 @@ async function start(): Promise<void> {
      presses Process now, and only by somebody holding the 'reports' grant,
      which every route re-checks for itself. See reports/routes.ts. */
   registerReportRoutes(app);
+  /* The live Google Sheet, fetched here for the dashboard rather than by the viewer's
+     browser, whose Google session and extensions made the direct fetch fail for some
+     people and not others. Fixed host, two allowed spreadsheets, signed-in users only —
+     see routes/sheet.ts. */
+  registerSheetRoutes(app);
 
   // Public liveness probe — no user count or other internal detail is exposed.
   app.get('/api/health', async () => ({ ok: true }));
